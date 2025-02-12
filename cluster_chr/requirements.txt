@@ -1,0 +1,9 @@
+argcomplete
+Bio
+community
+matplotlib
+networkx
+numpy
+pandas
+python_igraph
+scikit_learn
