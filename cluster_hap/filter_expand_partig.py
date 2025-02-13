@@ -3,7 +3,6 @@ import csv
 import networkx as nx
 import pandas as pd
 import argparse
-import numpy as np
 
 
 #--------------------------------------#
@@ -22,7 +21,7 @@ def read_digraph(digraph_file):
     return digraph
 
 
-def get_N80(len_list, threshold=0.8):
+def get_N80(len_list):
 
         len_list.sort(reverse=True)
         total_length = sum(len_list)
@@ -31,7 +30,7 @@ def get_N80(len_list, threshold=0.8):
         N80_length = 0
         for length in len_list:
             cumulative_length += length
-            if cumulative_length >= threshold * total_length:
+            if cumulative_length >= 0.8 * total_length:
                 N80_length = length
                 break
             
@@ -79,12 +78,11 @@ def read_partig(partig_file):
     return partig_dict
 
 
-def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_len, threshold=0.8):
+def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_len):
 
     filted_dict = defaultdict()
     len_list = [ float( ctg_RE_len[utg][1]) for utg in ctg_RE_len]
-    N80 = get_N80(len_list, threshold)
-    print(N80)
+    N80 = get_N80(len_list)
 
     for (utg1, utg2), value in partig_dict.items():
 
@@ -121,17 +119,18 @@ def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ct
 
                 filted_dict[tuple(sorted([utg1, utg2]))] = value
 
-        # with open("filter_partig.csv", 'w') as file:
-        #     for (ctg1, ctg2), value in filted_dict.items():
-        #         file.write(f"{ctg1},{ctg2},{value}\n")
+        with open("filter_partig.csv", 'w') as file:
+            for (ctg1, ctg2), value in partig_dict.items():
+                if (ctg1, ctg2) not in filted_dict:
+                    file.write(f"{ctg1},{ctg2},{value}\n")
 
     return filted_dict
 
-def expand_allele(partig_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
+def expand_allele(filted_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
 
     expand_dict = defaultdict()
 
-    for (utg1, utg2) in partig_dict:
+    for (utg1, utg2) in filted_dict:
 
         
         if utg1 in ctg_subgraph_dict and utg2 in ctg_subgraph_dict and \
@@ -148,47 +147,52 @@ def expand_allele(partig_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
                         continue
                     expand_dict[tuple(sorted([sub_utg1, sub_utg2]))] = 1
 
-    return expand_dict
-
-def merge_allele(partig_dict, filted_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
-
-    re_allele_dict = defaultdict()
-    allele_filter_dict = defaultdict()
-    # print(f"{len(allele_dict)}\t{len(filted_dict)}\t{len(expand_dict)}")
-
-    for (utg1, utg2) in partig_dict:
-
-        # if (utg1, utg2)  not in filted_dict:
-        allele_filter_dict[(utg1, utg2)] = 1
-
-
-    expand_dict = expand_allele(allele_filter_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
-
-    merge_dict = {**allele_filter_dict, **expand_dict}
-
-    for (utg1, utg2) in merge_dict:
-
-        if (utg1, utg2)  not in filted_dict:
-            re_allele_dict[(utg1, utg2)] = 1
-
-
     with open("merge.partig.csv", 'w') as file:
         file.write("source,target,links\n")
         
-        for (utg1, utg2) in re_allele_dict:
+        for (utg1, utg2) in expand_dict:
             file.write(f"{utg1},{utg2},1\n")
 
+    return expand_dict
 
-    return re_allele_dict
+# def merge_allele(allele_dict, filted_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
+
+#     re_allele_dict = defaultdict()
+#     allele_filter_dict = defaultdict()
+#     # print(f"{len(allele_dict)}\t{len(filted_dict)}\t{len(expand_dict)}")
+
+#     for (utg1, utg2) in allele_dict:
+
+#         if (utg1, utg2)  not in filted_dict:
+#             allele_filter_dict[(utg1, utg2)] = 1
+
+
+#     with open("filter.partig.csv", 'w') as file:
+#         file.write("source,target,links\n")
+#         for (utg1, utg2) in allele_filter_dict:
+#             file.write(f"{utg1},{utg2},1\n")
+
+#     expand_dict = expand_allele(allele_filter_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
+
+#     merge_dict = {**allele_filter_dict, **expand_dict}
+
+#     for (utg1, utg2) in merge_dict:
+
+#         if (utg1, utg2)  not in filted_dict:
+#             re_allele_dict[(utg1, utg2)] = 1
+
+
+#     with open("merge.partig.csv", 'w') as file:
+#         file.write("source,target,links\n")
+        
+#         for (utg1, utg2) in re_allele_dict:
+#             file.write(f"{utg1},{utg2},1\n")
+
+
+#     return re_allele_dict
 
 
 if __name__ == '__main__':
-
-    def validate_num_N(value=0.8):
-        value = float(value)
-        if value <= 0 or value >= 1:
-            raise argparse.ArgumentTypeError("num_N must be between 0 and 1 (exclusive).")
-        return value
 
     parser = argparse.ArgumentParser(description="filter partig")
     parser.add_argument('-d', '--digraph', required=True,
@@ -199,8 +203,6 @@ if __name__ == '__main__':
                         help='<filepath> subgraph ctgs')
     parser.add_argument('-p', '--partig_file', required=True,
                         help='<filepath> partig file')
-    parser.add_argument('-n', '--n_threshold', default=0.8,type=validate_num_N,
-                        help='<filepath> filter utg(default: N80)')
 
 
 
@@ -214,10 +216,6 @@ if __name__ == '__main__':
     REFile = args.REs
     subgraph_file = args.subgraph_file
     partig_file = args.partig_file
-    num_N = args.n_threshold
-
-
-
 
 
     digraph = read_digraph(digraph_file)
@@ -227,8 +225,8 @@ if __name__ == '__main__':
 
     subgraph_ctgs_dict, ctg_subgraph_dict = read_subgraph(subgraph_file)
 
-    filted_dict= filter_allele(digraph, partig_dict, subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_dict, threshold=num_N)
-    merge_allele(partig_dict, filted_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
+    filted_dict = filter_allele(digraph, partig_dict, subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_dict)
+    expand_allele(filted_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
 
 
 

@@ -31,16 +31,15 @@ def get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix):
         for line in  fp:
             if line[0] == "#":
                 continue
-            else:
-                line = line.strip().split()
-                ctg_RE_dict[line[0]] = (int(line[1]), int(line[2]))
+            line = line.strip().split()
+            ctg_RE_dict[line[0]] = (int(line[1]), int(line[2]))
 
     for scaffold in scaffold_ctgs_dict:
         for contig, pair in scaffold_ctgs_dict[scaffold].items():
             if contig in ctg_RE_dict:
-                scaffold_RE_dict[scaffold] += int((pair[3]-pair[2]+1) / ctg_RE_dict[contig][1]) * ctg_RE_dict[contig][0]
+                scaffold_RE_dict[scaffold] += ((pair[3]-pair[2]+1) / ctg_RE_dict[contig][1]) * ctg_RE_dict[contig][0]
     
-    with open(f"{output_prefix}.scaffold.txt", 'w') as file:
+    with open(f"{output_prefix}.scaffold.RE_counts.txt", 'w') as file:
         file.write("#Contig\tRECounts\tLength\n")
         for scaffold, value in scaffold_RE_dict.items():
             file.write(f"{scaffold}\t{int(value)}\t{scaffold_length_dict[scaffold]}\n")
@@ -104,7 +103,8 @@ def read_pairs(pairs_file, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_lengt
 
 
 
-    pickle.dump(scaffold_HT_dict, open(f"{output_prefix}.scaffold.HT.pkl", 'wb'))
+    with open(f"{output_prefix}.scaffold.HT.pkl", 'wb') as file:
+        pickle.dump(scaffold_HT_dict, file)
     
     with open(f"{output_prefix}.scaffold.clm", 'w') as file:
         for (scaffold_1, scaffold_2) in scaffold_clm_dict:
@@ -143,17 +143,14 @@ def main():
     # pairs_file = "chr1g1.pairs"
     # agp_file = "subgraphGroup.agp"
     # RE_file = "rice4.RE_counts.txt"
-    args = parser.parse_args()
-    argcomplete.autocomplete(parser)
     pairs_file = args.pair
     agp_file = args.agp
     RE_file = args.RE_file
     output_prefix = args.output_prefix
 
     scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict = read_agp(agp_file)
-    scaffold_HT_dict, scaffold_clm_dict = read_pairs(pairs_file, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict, output_prefix)
-    scaffold_RE_dict = get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix)
-    print("run get_data_HapHiC_sort.py done!")
+    read_pairs(pairs_file, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict, output_prefix)
+    get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix)
 
 
 if __name__ == "__main__":

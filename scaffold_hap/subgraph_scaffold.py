@@ -75,7 +75,7 @@ def process_chromosome(pwd: str, chr_num: int, args: argparse.Namespace) -> bool
         os.chdir(chr_dir)
 
         # Create symbolic links
-        os.symlink(os.path.join("../", f"{args.RE_file}"), f"{args.RE_file}")
+        os.symlink(os.path.join("../", f"{args.RE_file}"), f"{args.op}.RE_counts.txt")
         os.symlink(
             os.path.join("../", args.cluster_hap_path, f"chr{chr_num}", "reassign_collapse.cluster.txt"),
             "reassign_collapse.cluster.txt"
@@ -85,7 +85,7 @@ def process_chromosome(pwd: str, chr_num: int, args: argparse.Namespace) -> bool
         if not run_command([
             "/data/duwenjie/opt/cluster2group.sh",
             "-c", "reassign_collapse.cluster.txt",
-            "-r", f"{args.RE_file}"
+            "-r", f"{args.op}.RE_counts.txt"
         ]):
             return False
 

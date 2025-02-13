@@ -1,6 +1,5 @@
 from matplotlib.colors import to_hex
 from collections import defaultdict
-from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import networkx as nx
 import igraph as ig
@@ -117,51 +116,46 @@ def run_cor_cluster(collapse_num_dict, hic_links_dict, cluster_dict, utg_group_d
     cluster_modify_dict = copy.deepcopy(cluster_dict)
     cluster_copy_dict = defaultdict()
 
-    max_iterations, num_iterations= 20,0
 
-    while cluster_modify_dict != cluster_copy_dict and num_iterations < max_iterations:
+    cluster_modify_flag_dict = { utg:[ "group"+str(i) for i in range(1,int(n_hap)+1)] for utg in utgs_list if collapse_num_dict[utg] <2 }
 
-        num_iterations += 1
-        cluster_modify_flag_dict = { utg:[ "group"+str(i) for i in range(1,int(n_hap)+1)] for utg in utgs_list if collapse_num_dict[utg] <2 }
 
-        cluster_copy_dict = copy.deepcopy(cluster_modify_dict)
+    cluster_copy_dict = copy.deepcopy(cluster_modify_dict)
 
-        
-        for group_ in cluster_modify_dict:
-            Allele_utg_pair = set( tuple(sorted([utg1, utg2])) 
-                                for utg1 in cluster_modify_dict[group_] 
-                                for utg2 in cluster_modify_dict[group_] 
-                                if utg1 != utg2 and tuple(sorted([utg1, utg2])) in allele_key_dict 
-                            )
-            Allele_utgs = set( utg for pair in Allele_utg_pair for utg in pair )
-            # unAllele_utgs = set(utg for utg in cluster_modify_dict[group_] if utg not in Allele_utgs)
-            # print(Allele_utg_pair)
+    
+    for group_ in cluster_modify_dict:
+        Allele_utg_pair = set( tuple(sorted([utg1, utg2])) 
+                            for utg1 in cluster_modify_dict[group_] 
+                            for utg2 in cluster_modify_dict[group_] 
+                            if utg1 != utg2 and tuple(sorted([utg1, utg2])) in allele_key_dict 
+                        )
+        Allele_utgs = set( utg for pair in Allele_utg_pair for utg in pair )
+        unAllele_utgs = set(utg for utg in cluster_modify_dict[group_] if utg not in Allele_utgs)
+        # print(Allele_utg_pair)
 
-            for (utg1, utg2) in Allele_utg_pair:
-                if utg1 in cluster_modify_dict[group_] and utg2 in cluster_modify_dict[group_]:
+        for (utg1, utg2) in Allele_utg_pair:
+            if utg1 in cluster_modify_dict[group_] and utg2 in cluster_modify_dict[group_]:
+                
 
-                    other_utgs = set(utg for utg in cluster_modify_dict[group_] if utg not in [utg1,utg2])
-                    utg1_num = cal_hic_links(hic_links_dict, utg1, other_utgs)
-                    utg2_num = cal_hic_links(hic_links_dict, utg2, other_utgs)
+                utg1_num = cal_hic_links(hic_links_dict, utg1, unAllele_utgs)
+                utg2_num = cal_hic_links(hic_links_dict, utg2, unAllele_utgs)
 
-                    min_utg = utg1 if utg1_num < utg2_num else utg2
+                min_utg = utg1 if utg1_num < utg2_num else utg2
 
-                    print(f"{utg1_num}\t{utg2_num}\t{min_utg}")
+                
+                try:
+                    select_group_dict = find_other_group(hic_links_dict, cluster_modify_dict, min_utg)
+                    if select_group_dict:
+                        select_group_list = list(select_group_dict)
 
+                    select_group = next((x for x in select_group_list if x in cluster_modify_flag_dict[min_utg]), None)
                     
-                    try:
-                        select_group_dict = find_other_group(hic_links_dict, cluster_modify_dict, min_utg)
-                        if select_group_dict:
-                            select_group_list = list(select_group_dict)
-
-                        select_group = next((x for x in select_group_list if x in cluster_modify_flag_dict[min_utg]), None)
-                        
-                        if select_group:
-                            cluster_modify_dict[group_].remove(min_utg)
-                            cluster_modify_dict[select_group].append(min_utg)
-                            cluster_modify_flag_dict[min_utg].remove(group_)
-                    except:
-                        print(f"error:{min_utg} not in cluster.txt {group_}\n")
+                    if select_group:
+                        cluster_modify_dict[group_].remove(min_utg)
+                        cluster_modify_dict[select_group].append(min_utg)
+                        cluster_modify_flag_dict[min_utg].remove(group_)
+                except:
+                    print(f"error:{min_utg} not in cluster.txt {group_}\n")
 
     with open("cor.cluster.txt", "w") as file:
         for group in cluster_modify_dict:

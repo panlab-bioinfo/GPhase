@@ -198,7 +198,6 @@ def get_filter_subgraph_digraph(filter_subgraph_ctgs_dict, filter_ctg_subgraph_d
                 ctg_group_dict[ctg] = f"group{idx}"
                 graph.add_node(ctg,before_pos=set(),before_oppo=set(),pos=set(), oppo=set())
 
-
         graphs_dict[f"group{idx}"] = graph
 
     with open(gfa_filePath, 'r') as file:
@@ -251,15 +250,11 @@ def get_filter_subgraph_digraph(filter_subgraph_ctgs_dict, filter_ctg_subgraph_d
 def trans_digraph(graph):
     # 双向传播
     digraph = nx.DiGraph()
-    visited = set()
-    queue = deque()
-
-    components = list(nx.connected_components(graph))
-    for i, component in enumerate(components):
-        start_node = list(component)[0]
-        pair = (start_node, 1)
-        queue.append(pair)
-        visited.add(start_node)
+    start_node = list(graph.nodes())[0]
+    pair = (start_node, 1)
+    queue = deque([pair])
+ 
+    visited = {start_node}
 
     while queue:
         # + : 1 : out ; - : 0 : enter
@@ -300,7 +295,6 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
 
     ctgs_dir_path_filter_dict = defaultdict(list)
     digraph_copy = cp.deepcopy(digraph)
-    nodes = list(digraph.nodes())
 
     for u,v in digraph_copy.edges():
         if tuple(sorted([u,v])) in hic_links_dict and u in hic_nei_dict and v in hic_nei_dict:
@@ -329,14 +323,11 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
 
     topo_order = list(nx.topological_sort(digraph_copy))
     ctgs_sort = [ ctg for ctg in topo_order if ctg in ctgs ]
+    
 
-
-    if not topo_order or not set(ctgs).issubset(set(topo_order)):
-        re_dict = defaultdict(list)
-        for idx, ctg in enumerate(ctgs):
-            re_dict[idx].append((ctg,1))
-        return re_dict
-
+    if len(ctgs) == 2:
+        print(ctgs)
+        print(topo_order)
     
     # 检测相邻节点是否连通，若不连通则打断
     ctgs_sort_check = list()
@@ -400,6 +391,7 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
         
 
         ctgs_dir_path_filter_dict[str(idx)] = list(ctgs_dir_path_filter)
+
 
 
     return ctgs_dir_path_filter_dict

@@ -203,3 +203,20 @@ if __name__ == '__main__':
     filted_dict = filter_allele(digraph, utgs_list, allele_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_len)
     expand_dict = expand_allele(allele_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
     re_allele_dict = merge_allele(allele_dict, filted_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
+
+
+
+
+
+
+
+                    
+
+
+
+
+
+
+
+
+

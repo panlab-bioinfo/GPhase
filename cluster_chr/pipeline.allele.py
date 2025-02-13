@@ -144,7 +144,7 @@ def trans_net(utgs_list, graph, ctg_RE_dict):
 
     # 使用subprocess.run来执行cat命令，并将输出重定向到文件
     with open("group_ctgs_All.txt", 'w') as f:
-        subprocess.run(['cat', 'group_ctgs_save.txt', 'group_ctg_filter.txt'], stdout=f, text=True)
+        subprocess.run(['cat', 'group_ctgs_save.txt', 'group_ctgs_filter.txt'], stdout=f, text=True)
     
     return group_ctg_dict, ctg_group_dict
 
@@ -186,7 +186,6 @@ def expand_cluster(csv_file, group_ctg_dict, output_prefix):
 
     script_path = os.path.abspath(sys.path[0])
     script_path_add = os.path.join(script_path,"multilevel_cluster.py")
-    print(script_path_add)
     script = f"""python {script_path_add} -c {csv_file} -o {output_prefix}.allele.cluster.txt """
     process = subprocess.run(script, shell=True, executable='/bin/bash', capture_output=True, text=True)
 

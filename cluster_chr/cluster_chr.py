@@ -9,7 +9,7 @@ import sys
 from argcomplete.completers import FilesCompleter
 
 def setup_logging(output_prefix):
-    log_file = f"{output_prefix}.pipeline.log"
+    log_file = f"{output_prefix}.cluster_chr.log"
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
@@ -32,40 +32,42 @@ def run_command(command, description):
         logging.error(f"Error output: {e.stderr}")
         return None
 
-# def index_fasta(asm_fa):
-#     return run_command(["samtools", "faidx", asm_fa], "Indexing the assembly FASTA")
+def index_fasta(asm_fa):
+    return run_command(["samtools", "faidx", asm_fa], "Indexing the assembly FASTA")
 
-# def split_gfa(gfa, split_gfa_n, split_gfa_iter, output_prefix):
-#     script_path = os.path.abspath(sys.path[0])
-#     return run_command([
-#         "python", os.path.join(script_path, "split_GFA.py"),
-#         "-g", gfa,
-#         "-n", str(split_gfa_n),
-#         "-iter", str(split_gfa_iter),
-#         "-o", output_prefix
-#     ], "Splitting the GFA file")
+def split_gfa(gfa, split_gfa_n, split_gfa_iter, output_prefix):
+    script_path = os.path.abspath(sys.path[0])
+    return run_command([
+        "python", os.path.join(script_path, "split_GFA.py"),
+        "-g", gfa,
+        "-n", str(split_gfa_n),
+        "-iter", str(split_gfa_iter),
+        "-o", output_prefix
+    ], "Splitting the GFA file")
 
 
-# def run_partig(asm_fa, partig_k, partig_w, partig_c, partig_m, output_prefix):
-#     output_file = f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt"
-#     try:
-#         with open(output_file, "w") as outfile:
-#             command = [
-#                 "../partig/partig", asm_fa,
-#                 "-k", str(partig_k),
-#                 "-w", str(partig_w),
-#                 "-c", str(partig_c),
-#                 "-m", str(partig_m)
-#             ]
-#             logging.info(f"Starting: Running Partig")
-#             logging.info(f"Command: {' '.join(command)}")
-#             subprocess.run(command, check=True, stdout=outfile, stderr=subprocess.PIPE, text=True)
-#             logging.info(f"Completed: Running Partig\n")
-#         return True
-#     except subprocess.CalledProcessError as e:
-#         logging.error(f"Error in: Running Partig\nCommand failed: {' '.join(command)}")
-#         logging.error(f"Error output: {e.stderr}")
-#         return False
+def run_partig(asm_fa, partig_k, partig_w, partig_c, partig_m, output_prefix):
+    output_file = f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt"
+    script_path = os.path.abspath(sys.path[0])
+    script_path_add = os.path.join(script_path, "../bin/partig")
+    try:
+        with open(output_file, "w") as outfile:
+            command = [
+                script_path_add, asm_fa,
+                "-k", str(partig_k),
+                "-w", str(partig_w),
+                "-c", str(partig_c),
+                "-m", str(partig_m)
+            ]
+            logging.info(f"Starting: Running Partig")
+            logging.info(f"Command: {' '.join(command)}")
+            subprocess.run(command, check=True, stdout=outfile, stderr=subprocess.PIPE, text=True)
+            logging.info(f"Completed: Running Partig\n")
+        return True
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error in: Running Partig\nCommand failed: {' '.join(command)}")
+        logging.error(f"Error output: {e.stderr}")
+        return False
 
 
 def convert_partig_output(asm_fa, partig_k, partig_w, partig_c, partig_m, output_prefix):
@@ -200,19 +202,19 @@ def main():
     # Logging setup
     setup_logging(args.output_prefix)
 
-    # if not index_fasta(args.asm_fa):
-    #     logging.error("Get fasta index Error: Samtools gets fasta file index error.")
-    #     return
+    if not index_fasta(args.asm_fa):
+        logging.error("Get fasta index Error: Samtools gets fasta file index error.")
+        return
 
-    # if not split_gfa(args.gfa, args.split_gfa_n, args.split_gfa_iter, args.output_prefix):
-    #     logging.error("Split GFA Error: An error occurred while splitting the GFA.")
-    #     return
+    if not split_gfa(args.gfa, args.split_gfa_n, args.split_gfa_iter, args.output_prefix):
+        logging.error("Split GFA Error: An error occurred while splitting the GFA.")
+        return
 
     split_gfa_file = f"{args.output_prefix}.rmTip.split.gfa"
 
-    # if not run_partig(args.asm_fa, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix):
-    #     logging.error("Run partig Error: An error occurred while running Partig.")
-    #     return
+    if not run_partig(args.asm_fa, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix):
+        logging.error("Run partig Error: An error occurred while running Partig.")
+        return
 
     if not convert_partig_output(args.asm_fa, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix):
         logging.error("Conversion partig Error: in Partig output to CSV.")

@@ -38,15 +38,15 @@ def normalize_links(utg_utg_link_dict, ctg_RE_len_dict, output_file, write_sep):
         file.write("source" + write_sep + "target" + write_sep + "links" + "\n")
         for pair, links in utg_utg_link_dict.items():
 
-            r1 = float(ctg_RE_len_dict[pair[0]][0])
-            r2 = float(ctg_RE_len_dict[pair[1]][0])
+            # r1 = float(ctg_RE_len_dict[pair[0]][0])
+            # r2 = float(ctg_RE_len_dict[pair[1]][0])
 
 
             # r1 = float(ctg_RE_len_dict[pair[0]][0]**2 / ctg_RE_len_dict[pair[0]][1]) 
             # r2 = float(ctg_RE_len_dict[pair[1]][0]**2 / ctg_RE_len_dict[pair[1]][1])
 
-            # r1 = float(ctg_RE_len_dict[pair[0]][0] / ctg_RE_len_dict[pair[0]][1]) 
-            # r2 = float(ctg_RE_len_dict[pair[1]][0] / ctg_RE_len_dict[pair[1]][1])
+            r1 = float(ctg_RE_len_dict[pair[0]][0] / ctg_RE_len_dict[pair[0]][1]) 
+            r2 = float(ctg_RE_len_dict[pair[1]][0] / ctg_RE_len_dict[pair[1]][1])
 
             # r1 = float(ctg_RE_len_dict[pair[0]][0] * ctg_RE_len_dict[pair[0]][1]) 
             # r2 = float(ctg_RE_len_dict[pair[1]][0] * ctg_RE_len_dict[pair[1]][1])

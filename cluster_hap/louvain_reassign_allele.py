@@ -156,7 +156,7 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict
                 # 检测最大值是否离群，是否中值的三倍    
                 median = statistics.median(hic_list[1:])
 
-                if unreassign_groups_hic[max_hic_group] > median * 5:
+                if unreassign_groups_hic[max_hic_group] > median * 2:
                     reassign_list.append(max_hic_group)
                     cluster_dict[max_hic_group].append(collapse_utg)
                     if i==0:

@@ -7,7 +7,7 @@ import argparse
 
 #--------------------------------------#
 # 过滤 等位contig对
-# 非同一子图：两个contig长度大于N80
+# 非同一子图：两个contig长度大于N90
 # 同一子图：相同前驱和相同后继
 #--------------------------------------#
 
@@ -21,20 +21,20 @@ def read_digraph(digraph_file):
     return digraph
 
 
-def get_N80(len_list, threshold = 0.8):
+def get_N90(len_list,):
 
         len_list.sort(reverse=True)
         total_length = sum(len_list)
 
         cumulative_length = 0
-        N80_length = 0
+        N90_length = 0
         for length in len_list:
             cumulative_length += length
-            if cumulative_length >= threshold * total_length:
-                N80_length = length
+            if cumulative_length >= 0.9 * total_length:
+                N90_length = length
                 break
             
-        return int(N80_length)
+        return int(N90_length)
 
 def read_RE(REFile):
     ctg_RE_dict = defaultdict(tuple)
@@ -78,11 +78,11 @@ def read_partig(partig_file):
     return partig_dict
 
 
-def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_len, threshold = 0.8):
+def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_len):
 
     filted_dict = defaultdict()
     len_list = [ float( ctg_RE_len[utg][1]) for utg in ctg_RE_len]
-    N80 = get_N80(len_list, threshold=threshold)
+    N90 = get_N90(len_list)
 
     for (utg1, utg2), value in partig_dict.items():
 
@@ -110,30 +110,24 @@ def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ct
             successors_utg1 = set(digraph.successors(utg1))
             successors_utg2 = set(digraph.successors(utg2))
 
+            # 没有相同的前驱或者相同得后继节点
             if not (predecessors_utg1 & predecessors_utg2 ) and \
                 not (successors_utg1 & successors_utg2 ):
                 filted_dict[tuple(sorted([utg1, utg2]))] = value
         else:
-            if utg1 not in ctg_RE_len or ctg_RE_len[utg1][1] < N80 or \
-                utg2 not in ctg_RE_len or ctg_RE_len[utg2][1] < N80:
+            if utg1 not in ctg_RE_len or ctg_RE_len[utg1][1] < N90 or \
+                utg2 not in ctg_RE_len or ctg_RE_len[utg2][1] < N90:
 
                 filted_dict[tuple(sorted([utg1, utg2]))] = value
 
         with open("filter_partig.csv", 'w') as file:
-            for (ctg1, ctg2), value in partig_dict.items():
-                if (ctg1, ctg2) not in filted_dict:
-                    file.write(f"{ctg1},{ctg2},{value}\n")
+            for (ctg1, ctg2), value in filted_dict.items():
+                file.write(f"{ctg1},{ctg2},{value}\n")
 
     return filted_dict
 
 
 if __name__ == '__main__':
-
-    def validate_n_threshold(value=0.8):
-        value = float(value)
-        if value <= 0 or value >= 1:
-            raise argparse.ArgumentTypeError("num_N must be between 0 and 1 (exclusive).")
-        return value
 
     parser = argparse.ArgumentParser(description="filter partig")
     parser.add_argument('-d', '--digraph', required=True,
@@ -144,8 +138,6 @@ if __name__ == '__main__':
                         help='<filepath> subgraph ctgs')
     parser.add_argument('-p', '--partig_file', required=True,
                         help='<filepath> partig file')
-    parser.add_argument('-n', '--n_threshold',  default=0.8,type=validate_n_threshold,
-                        help='<filepath>  filter utg(default: N80)')
 
 
 
@@ -159,7 +151,6 @@ if __name__ == '__main__':
     REFile = args.REs
     subgraph_file = args.subgraph_file
     partig_file = args.partig_file
-    n_threshold = args.n_threshold
 
 
     digraph = read_digraph(digraph_file)
@@ -169,7 +160,8 @@ if __name__ == '__main__':
 
     subgraph_ctgs_dict, ctg_subgraph_dict = read_subgraph(subgraph_file)
 
-    filter_allele(digraph, partig_dict, subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_dict, n_threshold)
+    filter_allele(digraph, partig_dict, subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_dict)
+
 
 
 

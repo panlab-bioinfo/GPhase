@@ -7,6 +7,7 @@ from argcomplete.completers import FilesCompleter
 from multiprocessing import Pool, cpu_count
 from concurrent.futures import ThreadPoolExecutor
 import functools
+import sys
 
 def setup_logging():
     logging.basicConfig(
@@ -16,7 +17,7 @@ def setup_logging():
 
 def execute_command(command, error_message):
     try:
-        subprocess.run(command, shell=True, check=True)
+        subprocess.run( command, shell=True, check=True, executable='/bin/bash')
         logging.info(f"Command executed successfully: {command}")
     except subprocess.CalledProcessError:
         logging.error(error_message)
@@ -31,10 +32,11 @@ def create_symlink(source, dest):
 
 def filter_links_by_utgs(utg_file, input_file, output_file):
     command = (
-        f"awk -F '[,\\t ]' 'NR==FNR{{lines[$1];next}}($1 in lines && $2 in lines)' "
+        # f"awk -F '[,\\t ]' 'NR==FNR{{lines[$1];next}}($1 in lines && $2 in lines)' "
+        # f"<(cut -f1 {utg_file}) {input_file} > {output_file}"
+        f"awk -F \"[,\\t ]\" \"NR==FNR{{lines[\$1];next}}(\$1 in lines && \$2 in lines)\" "
         f"<(cut -f1 {utg_file}) {input_file} > {output_file}"
     )
-    print(command)
     execute_command(command, f"Failed to filter links for {output_file}")
     execute_command(f"sed '1isource,target,links' -i {output_file}", f"Failed to add header to {output_file}")
 
@@ -62,7 +64,7 @@ def adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_file, cluster_co
 
     raise ValueError(f"Failed to find optimal r within range {min_r}-{max_r}")
 
-def process_chromosome(chr_num, args, pwd):
+def process_chromosome(chr_num, args, pwd, partig_file):
     try:
 
         chr_dir = os.path.join(pwd, f"chr{chr_num}")
@@ -79,7 +81,7 @@ def process_chromosome(chr_num, args, pwd):
             "collapse_num_file": f"../{args.collapse_num_file}",
             "HiC_file": f"../{args.HiC_file}",
             "RE_file": f"../{args.RE_file}",
-            "partig_file": f"../{args.partig_file}",
+            "partig_file": f"../{partig_file}",
             "merge_partig_file": f"../merge.partig.csv"
         }
 
@@ -97,7 +99,9 @@ def process_chromosome(chr_num, args, pwd):
 
 
         utg_file = f"{args.output_prefix}.chr{chr_num}.utgs.txt"
+        utg_rescue_file = f"{args.output_prefix}.chr{chr_num}.utgs.rescue.txt"
         create_symlink(f"../group{chr_num}.txt", utg_file)
+        create_symlink(f"../group{chr_num}_rescue.txt", utg_rescue_file)
 
         # Process files with ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=args.thread_num) as executor:
@@ -123,16 +127,19 @@ def process_chromosome(chr_num, args, pwd):
         execute_command(f"sed '1isource,target,links' -i {filtered_links_file}", f"Failed to add header to {filtered_links_file}")
 
         # Run louvain_nei.py
+        script_path = os.path.abspath(sys.path[0])
+        script_path_add = os.path.join(script_path, "louvain_nei.py")
         execute_command(
-            f"python /data/duwenjie/opt/louvain_nei.py -c {args.collapse_num_file} -chr {utg_file} "
-            f"-l {filtered_links_file} -a {merge_partig_file}",
+            f"python {script_path_add} -c {args.collapse_num_file} -chr {utg_file} "
+            f"-l {filtered_links_file} -a {partig_file}",
             "Failed to run louvain_nei.py"
         )
 
         # Adjust r and run multilevel_cluster.py
+        script_path_add = os.path.join(script_path, "multilevel_cluster.py")
         cluster_output = f"{args.output_prefix}.chr{chr_num}.cluster.txt"
         cluster_command = (
-            f"python /data/duwenjie/opt/multilevel_cluster.py -c louvain_nei.csv -o {cluster_output} -r {{r}}"
+            f"python {script_path_add} -c louvain_nei.csv -o {cluster_output} -r {{r}}"
         )
         try:
             optimal_r = adjust_r_and_cluster(
@@ -149,18 +156,24 @@ def process_chromosome(chr_num, args, pwd):
             logging.error(f"Failed to determine optimal r for chromosome {chr_num}: {e}")
             return
 
-        # Run correct uncollapse clusters
-        execute_command(
-            f"python /data/duwenjie/opt/anHiC/cluster_hap/cluster_correct.py -cn {args.collapse_num_file} "
-            f"-chr {utg_file} -l {filtered_links_file} -a {args.partig_file} -c {cluster_output} -n_hap {args.hap_number}",
-            "Failed to run filter_partig.py"
-        )
 
-        # Run louvain_reassign_allele.py\
-        cluster_file = "cor.cluster.txt"
+        if args.correct:
+            script_path_add = os.path.join(script_path, "cluster_correct.py")
+            execute_command(
+                f"python {script_path_add} -cn {args.collapse_num_file} "
+                f"-chr {utg_file} -l {filtered_links_file} -a {partig_file} -c {cluster_output} -n_hap {args.hap_number}",
+                "Failed to run cluster_correct.py"
+            )
+            cluster_file = "cor.cluster.txt"
+        
+        else:
+            cluster_file = cluster_output
+
+        # Run louvain_reassign_allele.py
+        script_path_add = os.path.join(script_path, "louvain_reassign_allele.py")
         execute_command(
-            f"python /data/duwenjie/opt/anHiC/cluster_hap/louvain_reassign_allele.py -c {args.collapse_num_file} "
-            f"-chr {utg_file} -l {links_file} -r {args.RE_file} -a {merge_partig_file} "
+            f"python {script_path_add} -c {args.collapse_num_file} "
+            f"-chr {utg_rescue_file} -l {links_file} -r {args.RE_file} -a {merge_partig_file} "
             f"-clusters {cluster_file}",
             "Failed to run louvain_reassign_allele.py"
         )
@@ -171,37 +184,73 @@ def process_chromosome(chr_num, args, pwd):
         logging.error(f"Error processing chromosome {chr_num}: {e}")
         return f"Failed to process chromosome {chr_num}: {e}"
 
+def run_partig(asm_fa, partig_k, partig_w, partig_c, partig_m, output_prefix):
+    execute_command(f"samtools faidx {asm_fa}, Indexing the assembly FASTA")
+    output_file = f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt"
+    script_path = os.path.abspath(sys.path[0])
+    script_path_add = os.path.join(script_path, "../bin/partig")
+    try:
+        with open(output_file, "w") as outfile:
+            command = [
+                script_path_add, asm_fa,
+                "-k", str(partig_k),
+                "-w", str(partig_w),
+                "-c", str(partig_c),
+                "-m", str(partig_m)
+            ]
+            logging.info(f"Starting: Running Partig")
+            logging.info(f"Command: {' '.join(command)}")
+            subprocess.run(command, check=True, stdout=outfile, stderr=subprocess.PIPE, text=True)
+            logging.info(f"Completed: Running Partig\n")
+        return True
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error in: Running Partig\nCommand failed: {' '.join(command)}")
+        logging.error(f"Error output: {e.stderr}")
+        return False
+
+
+def convert_partig_output(asm_fa, partig_k, partig_w, partig_c, partig_m, output_prefix):
+    script_path = os.path.abspath(sys.path[0])
+    script_path_add = os.path.join(script_path, "trans.partig.py")
+    return execute_command(
+        f"python {script_path_add} -fai {asm_fa}.fai -p {output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt -o {output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.csv", "Converting Partig output to CSV")
+
 def main(args):
     setup_logging()
     pwd = os.getcwd()
 
     # Log configuration
     logging.info(f"Running with {args.process_num} processes and {args.thread_num} threads per process")
-    
-    # Step 1: Run cluster2group.sh
+
+    # Step 1: Run partig
+    # run_partig(args.asm_fa, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix)
+    # convert_partig_output(args.asm_fa, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix)
+    partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.csv"
+
+    # Step 2: Run cluster2group.py
+    script_path = os.path.abspath(sys.path[0])
+    script_path_add = os.path.join(script_path, "cluster2group.py")
     execute_command(
-        f"/data/duwenjie/opt/cluster2group.sh -c {args.chr_cluster_file} -r {args.RE_file}",
-        "Failed to run cluster2group.sh"
+        f"python {script_path_add} -c {args.chr_cluster_file} -r {args.RE_file}",
+        "Failed to run cluster2group.py"
+    )
+    execute_command(
+        f"python {script_path_add} -c {args.chr_cluster_rescue_file} -r {args.RE_file} -m rescue",
+        "Failed to run cluster2group.py"
     )
 
-    # Run filter_allele.py
-    execute_command(
-            f"python /data/duwenjie/opt/anHiC/cluster_hap/filter_partig.py -d {args.digraph_file} "
-            f"-r {args.RE_file} -s {args.subgraph_file} -p {args.partig_file} -n 0.9",
-            "Failed to run filter_partig.py"
-    )
-    filter_partig_file = "filter_partig.csv"
-    execute_command(
-            f"python /data/duwenjie/opt/anHiC/cluster_hap/filter_expand_partig.py -d {args.digraph_file} "
-            f"-r {args.RE_file} -s {args.subgraph_file} -p {filter_partig_file}",
-            "Failed to run filter_partig.py"
-    )
+    # script_path_add = os.path.join(script_path, "filter_expand_partig.py")
+    # execute_command(
+    #         f"python {script_path_add} -d {args.digraph_file} "
+    #         f"-r {args.RE_file} -s {args.subgraph_file} -p {partig_file}",
+    #         "Failed to run filter_expand_partig.py"
+    # )
 
-    # Step 2: Process chromosomes in parallel
+    # Step 3: Process chromosomes in parallel
     with Pool(processes=args.process_num) as pool:
 
         # Create partial function with fixed arguments
-        process_chr = functools.partial(process_chromosome, args=args, pwd=pwd)
+        process_chr = functools.partial(process_chromosome, args=args, pwd=pwd, partig_file=partig_file)
         
         # Process chromosomes in parallel
         results = pool.map(process_chr, range(1, args.chr_number + 1))
@@ -215,13 +264,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parallel Hi-C data processing pipeline")
 
     # Required arguments
+    parser.add_argument("-a", "--asm_fa", required=True, help="Path to the assembly FASTA file.")
     parser.add_argument("-c", "--chr_cluster_file", required=True, help="Chromosome cluster file")
+    parser.add_argument("-cr", "--chr_cluster_rescue_file", required=True, help="Chromosome cluster file")
     parser.add_argument("-d", "--digraph_file", required=True, help="Directed graph file")
     parser.add_argument("-s", "--subgraph_file", required=True, help="Subgraph file")
     parser.add_argument("-cn", "--collapse_num_file", required=True, help="Collapse number file")
     parser.add_argument("-l", "--HiC_file", required=True, help="Hi-C file")
     parser.add_argument("-r", "--RE_file", required=True, help="Restriction enzyme file")
-    parser.add_argument("-p", "--partig_file", required=True, help="Partig file")
+    parser.add_argument('--correct', action='store_true', help='correct the cluster')
+    parser.add_argument("-pk", "--partig_k", type=int, default=17, help="K-mer size for Partig. Default: 17.")
+    parser.add_argument("-pw", "--partig_w", type=int, default=17, help="Minimizer window size for Partig. Default: 17.")
+    parser.add_argument("-pc", "--partig_c", type=int, default=60, help="Max occurrance for Partig. Default: 60.")
+    parser.add_argument("-pm", "--partig_m", type=float, default=0.6, help="Mini k-mer similarity for Partig. Default: 0.6.")
     parser.add_argument("-op", "--output_prefix", required=True, help="Output prefix")
     parser.add_argument("-n_chr", "--chr_number", type=int, required=True, help="Number of chromosomes")
     parser.add_argument("-n_hap", "--hap_number", type=int, required=True, help="Number of haplotypes")
