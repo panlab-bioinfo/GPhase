@@ -1,0 +1,3 @@
+[submodule "src/HapHiC"]
+    path = src/HapHiC
+    url = https://github.com/zengxiaofei/HapHiC

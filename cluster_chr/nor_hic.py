@@ -52,7 +52,7 @@ def normalize_links(utg_utg_link_dict, ctg_RE_len_dict, output_file, write_sep):
             # r2 = float(ctg_RE_len_dict[pair[1]][0] * ctg_RE_len_dict[pair[1]][1])
 
             links /= (r1 * r2)
-            links *= 1e6
+            links /= 1e6
             line = pair[0] + write_sep + pair[1] + write_sep + str(links) + "\n"
             file.write(line)
 

@@ -3,6 +3,7 @@ import pickle
 import argcomplete
 from argcomplete.completers import FilesCompleter
 import argparse
+import pysam
 
 def read_agp(agp_file):
 
@@ -48,58 +49,75 @@ def get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix):
     return scaffold_RE_dict
 
 
-def read_pairs(pairs_file, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict, output_prefix):
+def read_map_file(map_file, map_file_type, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict, output_prefix):
 
     scaffold_HT_dict = defaultdict(int)
     scaffold_clm_dict = defaultdict(lambda: defaultdict(list))
 
-    with open(pairs_file, 'r') as file:
-        for line in file:
+    if map_file_type == "bam":
+        map_file_iter = pysam.AlignmentFile(map_file, "rb")
+
+    elif map_file_type == "pa5":
+        with open(map_file, "r") as file:
+            map_file_iter = file.readlines()
+
+    for line in map_file_iter:
+        
+        if map_file_type == "pa5":  
             line = line.strip().split()
             if line[0][0] == '#':
                 continue
+            ctg1, ctg1_map_idx = line[1], line[2]
+            ctg2, ctg2_map_idx = line[3], line[4]
+
+        elif map_file_type == "bam":
+            if line.is_proper_pair:
+                ctg1, ctg1_map_idx = line.reference_name, line.reference_start
+                ctg2, ctg2_map_idx = line.next_reference_name, line.next_reference_start
             else:
-                if line[1] == line[3]:
-                    continue
+                continue
 
-                for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[line[1]]:
-                    if int(line[2]) > idx_1 and int(line[2]) < idx_2:
-                        scaffold_1 = scaffold
-                        break
-                for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[line[3]]:
-                    if int(line[4]) > idx_1 and int(line[4]) < idx_2:
-                        scaffold_2 = scaffold
-                        break
-                
-                if not scaffold_1 or not scaffold_2 or scaffold_1 == scaffold_2:
-                    continue
-                
-                ctg1_in_scaffold_idx = scaffold_ctgs_dict[scaffold_1][line[1]][0] + int(line[2])
-                ctg2_in_scaffold_idx = scaffold_ctgs_dict[scaffold_2][line[3]][0] + int(line[4])
+        if ctg1 == ctg2 or ctg2 == "=":
+            continue
+        
+        for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[line[1]]:
+            if int(ctg1_map_idx) > idx_1 and int(ctg1_map_idx) < idx_2:
+                scaffold_1 = scaffold
+                break
+        for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[line[3]]:
+            if int(ctg2_map_idx) > idx_1 and int(ctg2_map_idx) < idx_2:
+                scaffold_2 = scaffold
+                break
+        
+        if not scaffold_1 or not scaffold_2 or scaffold_1 == scaffold_2:
+            continue
+        
+        ctg1_in_scaffold_idx = scaffold_ctgs_dict[scaffold_1][ctg1][0] + int(ctg1_map_idx)
+        ctg2_in_scaffold_idx = scaffold_ctgs_dict[scaffold_2][ctg2][0] + int(ctg2_map_idx)
 
-                # HT
-                if ctg1_in_scaffold_idx * 2 > scaffold_length_dict[scaffold_1]:
-                    scaffold_1_pos = "T"
-                else:
-                    scaffold_1_pos = "H"
-                
-                if ctg2_in_scaffold_idx * 2 > scaffold_length_dict[scaffold_2]:
-                    scaffold_2_pos = "T"
-                else:
-                    scaffold_2_pos = "H"
+        # HT
+        if ctg1_in_scaffold_idx * 2 > scaffold_length_dict[scaffold_1]:
+            scaffold_1_pos = "T"
+        else:
+            scaffold_1_pos = "H"
+        
+        if ctg2_in_scaffold_idx * 2 > scaffold_length_dict[scaffold_2]:
+            scaffold_2_pos = "T"
+        else:
+            scaffold_2_pos = "H"
 
-                scaffold_HT_dict[tuple(sorted([scaffold_1+"_"+scaffold_1_pos, scaffold_2+"_"+scaffold_2_pos]))] += 1
+        scaffold_HT_dict[tuple(sorted([scaffold_1+"_"+scaffold_1_pos, scaffold_2+"_"+scaffold_2_pos]))] += 1
 
-                # clm
-                dir_0 = scaffold_length_dict[scaffold_1] - ctg1_in_scaffold_idx + ctg2_in_scaffold_idx
-                dir_1 = scaffold_length_dict[scaffold_1] - ctg1_in_scaffold_idx + scaffold_length_dict[scaffold_2] - ctg2_in_scaffold_idx
-                dir_2 = ctg1_in_scaffold_idx + ctg2_in_scaffold_idx
-                dir_3 = ctg1_in_scaffold_idx + scaffold_length_dict[scaffold_2] - ctg2_in_scaffold_idx
+        # clm
+        dir_0 = scaffold_length_dict[scaffold_1] - ctg1_in_scaffold_idx + ctg2_in_scaffold_idx
+        dir_1 = scaffold_length_dict[scaffold_1] - ctg1_in_scaffold_idx + scaffold_length_dict[scaffold_2] - ctg2_in_scaffold_idx
+        dir_2 = ctg1_in_scaffold_idx + ctg2_in_scaffold_idx
+        dir_3 = ctg1_in_scaffold_idx + scaffold_length_dict[scaffold_2] - ctg2_in_scaffold_idx
 
-                scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][0].append(dir_0)
-                scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][1].append(dir_1)
-                scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][2].append(dir_2)
-                scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][3].append(dir_3)
+        scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][0].append(dir_0)
+        scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][1].append(dir_1)
+        scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][2].append(dir_2)
+        scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][3].append(dir_3)
 
 
 
@@ -134,7 +152,8 @@ def main():
     parser = argparse.ArgumentParser(description="Gets the data for running HapHiC sort.")
 
     # Required arguments
-    parser.add_argument("-p", "--pair", required=True, help="pair from mapping contig.")
+    parser.add_argument("-m", "--map_file", required=True, help="mapping file.")
+    parser.add_argument("--map_file_type", default="bam", choices=['bam', 'pa5'], type=str.lower, help="mapping file type.")
     parser.add_argument("-a", "--agp", required=True, help="agp files.")
     parser.add_argument("-r", "--RE_file", required=True, help="Path to the restriction enzyme file.")
     parser.add_argument("-o", "--output_prefix", required=True, help="Prefix for output files.")
@@ -143,13 +162,15 @@ def main():
     # pairs_file = "chr1g1.pairs"
     # agp_file = "subgraphGroup.agp"
     # RE_file = "rice4.RE_counts.txt"
-    pairs_file = args.pair
+    args = parser.parse_args()
+    map_file = args.map_file
+    map_file_type = args.map_file_type
     agp_file = args.agp
     RE_file = args.RE_file
     output_prefix = args.output_prefix
 
     scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict = read_agp(agp_file)
-    read_pairs(pairs_file, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict, output_prefix)
+    read_map_file(map_file, map_file_type, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict, output_prefix)
     get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix)
 
 

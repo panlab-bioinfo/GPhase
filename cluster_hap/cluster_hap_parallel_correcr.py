@@ -32,8 +32,6 @@ def create_symlink(source, dest):
 
 def filter_links_by_utgs(utg_file, input_file, output_file):
     command = (
-        # f"awk -F '[,\\t ]' 'NR==FNR{{lines[$1];next}}($1 in lines && $2 in lines)' "
-        # f"<(cut -f1 {utg_file}) {input_file} > {output_file}"
         f"awk -F \"[,\\t ]\" \"NR==FNR{{lines[\$1];next}}(\$1 in lines && \$2 in lines)\" "
         f"<(cut -f1 {utg_file}) {input_file} > {output_file}"
     )
@@ -223,8 +221,8 @@ def main(args):
     logging.info(f"Running with {args.process_num} processes and {args.thread_num} threads per process")
 
     # Step 1: Run partig
-    # run_partig(args.asm_fa, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix)
-    # convert_partig_output(args.asm_fa, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix)
+    run_partig(args.asm_fa, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix)
+    convert_partig_output(args.asm_fa, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix)
     partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.csv"
 
     # Step 2: Run cluster2group.py
@@ -239,12 +237,12 @@ def main(args):
         "Failed to run cluster2group.py"
     )
 
-    # script_path_add = os.path.join(script_path, "filter_expand_partig.py")
-    # execute_command(
-    #         f"python {script_path_add} -d {args.digraph_file} "
-    #         f"-r {args.RE_file} -s {args.subgraph_file} -p {partig_file}",
-    #         "Failed to run filter_expand_partig.py"
-    # )
+    script_path_add = os.path.join(script_path, "filter_expand_partig.py")
+    execute_command(
+            f"python {script_path_add} -d {args.digraph_file} "
+            f"-r {args.RE_file} -s {args.subgraph_file} -p {partig_file}",
+            "Failed to run filter_expand_partig.py"
+    )
 
     # Step 3: Process chromosomes in parallel
     with Pool(processes=args.process_num) as pool:

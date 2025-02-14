@@ -151,7 +151,7 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
                 break
 
         topo_order = list(nx.topological_sort(subgraph_digraph))
-        print(f"topo: {topo_order}")
+        # print(f"topo: {topo_order}")
 
         # check : 相邻两点是否只存在一条路径, 如果没有路径或者存在多条路径则打断,并且无同源节点
         for i in range(len(topo_order)-1):
@@ -181,7 +181,7 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
         topo_order_list.append(topo_order[start:])
 
 
-    print(f"Final : {topo_order_list}")
+    # print(f"Final : {topo_order_list}")
 
     return topo_order_list
 
@@ -312,7 +312,7 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
     while True:
         try:
             cycle = nx.find_cycle(digraph_copy)
-            print("找到环:", cycle)
+            # print("找到环:", cycle)
             # topo_order = list(nx.topological_sort(digraph))
             edge_to_remove = min(cycle, key=lambda x: digraph_copy.edges[x]['weight'])
             digraph_copy.remove_edge(*edge_to_remove)
@@ -324,10 +324,6 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
     topo_order = list(nx.topological_sort(digraph_copy))
     ctgs_sort = [ ctg for ctg in topo_order if ctg in ctgs ]
     
-
-    if len(ctgs) == 2:
-        print(ctgs)
-        print(topo_order)
     
     # 检测相邻节点是否连通，若不连通则打断
     ctgs_sort_check = list()
@@ -419,7 +415,7 @@ def get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict):
         
         
         for subgraphGroup, ctgs_dir_path_filter in ctgs_dir_path_filter_dict.items():
-            print(f"ctgs_dir_path_filter:{ ctgs_dir_path_filter}")
+            # print(f"ctgs_dir_path_filter:{ ctgs_dir_path_filter}")
             ctgs_path_filter_list = [ pair[0] for pair in ctgs_dir_path_filter]
             filter_subgraph_sort_dir_dict[subgraphGroup_idx] = list(ctgs_dir_path_filter)
             filter_subgraph_sort_dict[subgraphGroup_idx] = list(ctgs_path_filter_list)
