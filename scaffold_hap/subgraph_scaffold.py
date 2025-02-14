@@ -261,6 +261,7 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
 
 def perform_final_merge(pwd: str, args: argparse.Namespace) -> bool:
     """Perform final merging steps."""
+    script_path = os.path.abspath(sys.path[0])
     try:
         os.chdir(pwd)
         haphic_dir = os.path.join(pwd, "HapHiC_sort")
@@ -310,18 +311,19 @@ def perform_final_merge(pwd: str, args: argparse.Namespace) -> bool:
         script_content = f"""
             cd {haphic_dir}
             {script_path_add} sort {args.op}.merge.fa {args.op}.merge.HT.pkl split_clms/ groups_REs/* --quick_view
-            {script_path_add} build {args.op}.merge.fa {args.op}.merge.fa {args.op}.merge.pairs.bin final_tours/*tour
+            {script_path_add} build {args.op}.merge.fa {args.op}.merge.fa {args.op}.merge.map.bin final_tours/*tour
             seqkit sort scaffolds.fa > scaffolds.sort.fa
             samtools faidx scaffolds.sort.fa
         """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as script_file:
-            script_file.write(script_content)
-            script_path = script_file.name
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as temp_script_file:
+            temp_script_file.write(script_content)
+            temp_script_path  = temp_script_file.name
 
-        if not run_command(["bash", script_path]):
+        if not run_command(["bash", temp_script_path]):
             return False
 
-        os.unlink(script_path)
+        if os.path.exists(temp_script_path):
+            os.unlink(temp_script_path)
         return True
     except Exception as e:
         print(f"Error in final merge steps: {e}")
@@ -336,7 +338,7 @@ def main():
         if not process_chromosome(pwd, i, args):
             sys.exit(1)
 
-    # Process haplotypes in parallel
+    #Process haplotypes in parallel
     with ProcessPoolExecutor(max_workers=args.threads) as executor:
         futures = []
         for i in range(1, args.n_chr + 1):

@@ -402,6 +402,8 @@ def get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict):
     
     subgraphGroup_idx = 1
     for graph in graphs_dict.values():
+        if len(graph.nodes()) == 0:
+            continue
         graph, digraph = trans_digraph(graph)
 
         ctgs = list(set(graph.nodes()) & set(ctgs_list))

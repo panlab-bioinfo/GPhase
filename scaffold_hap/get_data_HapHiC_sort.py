@@ -57,67 +57,108 @@ def read_map_file(map_file, map_file_type, scaffold_ctgs_dict, ctg_scaffold_dict
     if map_file_type == "bam":
         map_file_iter = pysam.AlignmentFile(map_file, "rb")
 
-    elif map_file_type == "pa5":
-        with open(map_file, "r") as file:
-            map_file_iter = file.readlines()
+        for line in map_file_iter:
 
-    for line in map_file_iter:
-        
-        if map_file_type == "pa5":  
-            line = line.strip().split()
-            if line[0][0] == '#':
+            ctg1, ctg1_map_idx = line.reference_name, line.reference_start
+            ctg2, ctg2_map_idx = line.next_reference_name, line.next_reference_start
+
+            if ctg1 == ctg2 or ctg2 == "=":
                 continue
-            ctg1, ctg1_map_idx = line[1], line[2]
-            ctg2, ctg2_map_idx = line[3], line[4]
+            
+            scaffold_1_None_flag , scaffold_2_None_flag= True, True
+            for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[ctg1]:
+                if int(ctg1_map_idx) > idx_1 and int(ctg1_map_idx) < idx_2:
+                    scaffold_1 = scaffold
+                    scaffold_1_None_flag = False
+                    break
+            for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[ctg2]:
+                if int(ctg2_map_idx) > idx_1 and int(ctg2_map_idx) < idx_2:
+                    scaffold_2 = scaffold
+                    scaffold_2_None_flag = False
+                    break
 
-        elif map_file_type == "bam":
-            if line.is_proper_pair:
-                ctg1, ctg1_map_idx = line.reference_name, line.reference_start
-                ctg2, ctg2_map_idx = line.next_reference_name, line.next_reference_start
+            if scaffold_1_None_flag or scaffold_2_None_flag or scaffold_1 == scaffold_2:
+                continue
+
+            ctg1_in_scaffold_idx = scaffold_ctgs_dict[scaffold_1][ctg1][0] + int(ctg1_map_idx)
+            ctg2_in_scaffold_idx = scaffold_ctgs_dict[scaffold_2][ctg2][0] + int(ctg2_map_idx)
+
+            # HT
+            if ctg1_in_scaffold_idx * 2 > scaffold_length_dict[scaffold_1]:
+                scaffold_1_pos = "T"
             else:
-                continue
+                scaffold_1_pos = "H"
+            
+            if ctg2_in_scaffold_idx * 2 > scaffold_length_dict[scaffold_2]:
+                scaffold_2_pos = "T"
+            else:
+                scaffold_2_pos = "H"
 
-        if ctg1 == ctg2 or ctg2 == "=":
-            continue
-        
-        for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[line[1]]:
-            if int(ctg1_map_idx) > idx_1 and int(ctg1_map_idx) < idx_2:
-                scaffold_1 = scaffold
-                break
-        for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[line[3]]:
-            if int(ctg2_map_idx) > idx_1 and int(ctg2_map_idx) < idx_2:
-                scaffold_2 = scaffold
-                break
-        
-        if not scaffold_1 or not scaffold_2 or scaffold_1 == scaffold_2:
-            continue
-        
-        ctg1_in_scaffold_idx = scaffold_ctgs_dict[scaffold_1][ctg1][0] + int(ctg1_map_idx)
-        ctg2_in_scaffold_idx = scaffold_ctgs_dict[scaffold_2][ctg2][0] + int(ctg2_map_idx)
+            scaffold_HT_dict[tuple(sorted([scaffold_1+"_"+scaffold_1_pos, scaffold_2+"_"+scaffold_2_pos]))] += 1
 
-        # HT
-        if ctg1_in_scaffold_idx * 2 > scaffold_length_dict[scaffold_1]:
-            scaffold_1_pos = "T"
-        else:
-            scaffold_1_pos = "H"
-        
-        if ctg2_in_scaffold_idx * 2 > scaffold_length_dict[scaffold_2]:
-            scaffold_2_pos = "T"
-        else:
-            scaffold_2_pos = "H"
+            # clm
+            dir_0 = scaffold_length_dict[scaffold_1] - ctg1_in_scaffold_idx + ctg2_in_scaffold_idx
+            dir_1 = scaffold_length_dict[scaffold_1] - ctg1_in_scaffold_idx + scaffold_length_dict[scaffold_2] - ctg2_in_scaffold_idx
+            dir_2 = ctg1_in_scaffold_idx + ctg2_in_scaffold_idx
+            dir_3 = ctg1_in_scaffold_idx + scaffold_length_dict[scaffold_2] - ctg2_in_scaffold_idx
 
-        scaffold_HT_dict[tuple(sorted([scaffold_1+"_"+scaffold_1_pos, scaffold_2+"_"+scaffold_2_pos]))] += 1
+            scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][0].append(dir_0)
+            scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][1].append(dir_1)
+            scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][2].append(dir_2)
+            scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][3].append(dir_3)
 
-        # clm
-        dir_0 = scaffold_length_dict[scaffold_1] - ctg1_in_scaffold_idx + ctg2_in_scaffold_idx
-        dir_1 = scaffold_length_dict[scaffold_1] - ctg1_in_scaffold_idx + scaffold_length_dict[scaffold_2] - ctg2_in_scaffold_idx
-        dir_2 = ctg1_in_scaffold_idx + ctg2_in_scaffold_idx
-        dir_3 = ctg1_in_scaffold_idx + scaffold_length_dict[scaffold_2] - ctg2_in_scaffold_idx
+    elif map_file_type == "pa5":
 
-        scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][0].append(dir_0)
-        scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][1].append(dir_1)
-        scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][2].append(dir_2)
-        scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][3].append(dir_3)
+        with open(map_file, "r") as file:
+
+            for line in file:
+                line = line.strip().split()
+                if line[0][0] == '#':
+                    continue
+                ctg1, ctg1_map_idx = line[1], line[2]
+                ctg2, ctg2_map_idx = line[3], line[4]
+
+                if ctg1 == ctg2 or ctg2 == "=":
+                    continue
+                
+                for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[ctg1]:
+                    if int(ctg1_map_idx) > idx_1 and int(ctg1_map_idx) < idx_2:
+                        scaffold_1 = scaffold
+                        break
+                for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[ctg2]:
+                    if int(ctg2_map_idx) > idx_1 and int(ctg2_map_idx) < idx_2:
+                        scaffold_2 = scaffold
+                        break
+                
+                if scaffold_1 not in locals() or scaffold_2 not in locals() or scaffold_1 == scaffold_2:
+                    continue
+                
+                ctg1_in_scaffold_idx = scaffold_ctgs_dict[scaffold_1][ctg1][0] + int(ctg1_map_idx)
+                ctg2_in_scaffold_idx = scaffold_ctgs_dict[scaffold_2][ctg2][0] + int(ctg2_map_idx)
+
+                # HT
+                if ctg1_in_scaffold_idx * 2 > scaffold_length_dict[scaffold_1]:
+                    scaffold_1_pos = "T"
+                else:
+                    scaffold_1_pos = "H"
+                
+                if ctg2_in_scaffold_idx * 2 > scaffold_length_dict[scaffold_2]:
+                    scaffold_2_pos = "T"
+                else:
+                    scaffold_2_pos = "H"
+
+                scaffold_HT_dict[tuple(sorted([scaffold_1+"_"+scaffold_1_pos, scaffold_2+"_"+scaffold_2_pos]))] += 1
+
+                # clm
+                dir_0 = scaffold_length_dict[scaffold_1] - ctg1_in_scaffold_idx + ctg2_in_scaffold_idx
+                dir_1 = scaffold_length_dict[scaffold_1] - ctg1_in_scaffold_idx + scaffold_length_dict[scaffold_2] - ctg2_in_scaffold_idx
+                dir_2 = ctg1_in_scaffold_idx + ctg2_in_scaffold_idx
+                dir_3 = ctg1_in_scaffold_idx + scaffold_length_dict[scaffold_2] - ctg2_in_scaffold_idx
+
+                scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][0].append(dir_0)
+                scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][1].append(dir_1)
+                scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][2].append(dir_2)
+                scaffold_clm_dict[tuple(sorted([scaffold_1, scaffold_2]))][3].append(dir_3)
 
 
 
@@ -162,6 +203,7 @@ def main():
     # pairs_file = "chr1g1.pairs"
     # agp_file = "subgraphGroup.agp"
     # RE_file = "rice4.RE_counts.txt"
+    
     args = parser.parse_args()
     map_file = args.map_file
     map_file_type = args.map_file_type
