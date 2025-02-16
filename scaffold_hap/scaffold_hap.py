@@ -125,7 +125,7 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
 
         # Run scaffold.subgraph.py
         script_path = os.path.abspath(sys.path[0])
-        script_path_add = os.path.join(script_path, "scaffold.subgraph.py")
+        script_path_add = os.path.join(script_path, "get_subgraph_scaffold.py")
 
         cmd = [
             "python", script_path_add,

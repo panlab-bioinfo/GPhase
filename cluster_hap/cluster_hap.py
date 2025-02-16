@@ -172,7 +172,7 @@ def process_chromosome(chr_num, args, pwd, partig_file):
         execute_command(
             f"python {script_path_add} -c {args.collapse_num_file} "
             f"-chr {utg_rescue_file} -l {links_file} -r {args.RE_file} -a {merge_partig_file} "
-            f"-clusters {cluster_file}",
+            f"--clusters {cluster_file} --isolated_threshold {args.isolated_threshold}",
             "Failed to run louvain_reassign_allele.py"
         )
 
@@ -271,6 +271,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--HiC_file", required=True, help="Hi-C file")
     parser.add_argument("-r", "--RE_file", required=True, help="Restriction enzyme file")
     parser.add_argument('--correct', action='store_true', help='correct the cluster')
+    parser.add_argument('--isolated_threshold', default=5,help='<int>Detect whether the intensity of the hic signal is an outlier')
     parser.add_argument("-pk", "--partig_k", type=int, default=17, help="K-mer size for Partig. Default: 17.")
     parser.add_argument("-pw", "--partig_w", type=int, default=17, help="Minimizer window size for Partig. Default: 17.")
     parser.add_argument("-pc", "--partig_c", type=int, default=60, help="Max occurrance for Partig. Default: 60.")

@@ -90,7 +90,7 @@ def allele_sort(unreassign_groups_hic):
 
 
 
-def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict):
+def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold):
 
     log_file = open("reassign_collapse.log", 'w')
     collapse_utgs_list = [ utg for utg in collapse_num_dict if collapse_num_dict[utg] > 1 and utg in utgs_list]
@@ -152,11 +152,10 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict
 
             if len(hic_list) == 1:
                 cluster_dict[max_hic_group].append(collapse_utg)
-            else:
-                # 检测最大值是否离群，是否中值的三倍    
+            else:  
                 median = statistics.median(hic_list[1:])
 
-                if unreassign_groups_hic[max_hic_group] > median * 2:
+                if unreassign_groups_hic[max_hic_group] > median*isolated_threshold:
                     reassign_list.append(max_hic_group)
                     cluster_dict[max_hic_group].append(collapse_utg)
                     if i==0:
@@ -205,8 +204,10 @@ if __name__ == '__main__':
                         help='<filepath>REs and Length for utgs')
     parser.add_argument('-a', '--allele', required=True,
                         help='<filepath>alleles links for utgs')
-    parser.add_argument('-clusters', '--clusters', required=True,
+    parser.add_argument('--clusters', required=True,
                         help='<filepath>clusters for utgs')
+    parser.add_argument('--isolated_threshold',type=float,default=7,
+                        help='<int>Detect whether the intensity of the hic signal is an outlier')
 
 
     # argcomplete.autocomplete(parser)
@@ -222,6 +223,7 @@ if __name__ == '__main__':
     c = args.clusters
     r = args.REs
     a = args.allele
+    isolated_threshold = args.isolated_threshold
 
     collapse_num_dict = read_collapse_num(collapse_num_file)
     utgs_list = read_chr_utgs(chr_file)
@@ -231,6 +233,6 @@ if __name__ == '__main__':
     allele_dict, ctg_allele_dict = read_allele(a)
 
 
-    run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict)
+    run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold)
 
 
