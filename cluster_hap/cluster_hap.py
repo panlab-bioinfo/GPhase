@@ -96,9 +96,9 @@ def execute_command(command, error_message,logger):
 def create_symlink(source, dest,logger):
     if not os.path.exists(dest):
         os.symlink(source, dest)
-        logging.info(f"Created symlink: {source} -> {dest}")
+        logger.info(f"Created symlink: {source} -> {dest}")
     else:
-        logging.warning(f"Symlink already exists: {dest}")
+        logger.warning(f"Symlink already exists: {dest}")
 
 def filter_links_by_utgs(flag, utg_file, input_file, output_file,logger):
     temp_file = f"temp_utg_file_{flag}.txt"
@@ -153,7 +153,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         os.makedirs(chr_dir, exist_ok=True)
 
         os.chdir(chr_dir)
-        logging.info(f"Processing chromosome {chr_num} in {chr_dir}")
+        logger.info(f"Processing chromosome {chr_num} in {chr_dir}")
 
         # Create symlinks with ThreadPoolExecutor
         param_files = {
@@ -348,7 +348,7 @@ def main():
         
         # Log results
         for result in results:
-            logging.info(result)
+            logger.info(result)
 
 
 

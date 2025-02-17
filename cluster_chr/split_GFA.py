@@ -126,7 +126,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="split gfa", formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-g', '--gfa_file', required=True, help='gfa file')
-    parser.add_argument('-n', '--n', required=False,default=2, type=int, help='Nth-order neighbor')
+    parser.add_argument('-n', '--n', required=False,default=5, type=int, help='Nth-order neighbor')
     parser.add_argument('-iter', '--iter_number', required=False, default=3,type=int, help='Number of iterations')
     parser.add_argument('-o', '--output_prefix', required=True, help='output prefix')
 

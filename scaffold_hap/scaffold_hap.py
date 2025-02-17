@@ -51,7 +51,7 @@ def parse_arguments() -> argparse.Namespace:
     graph_group.add_argument("-d", "--digraph_file", metavar='\b', required=True,help="Directed graph resulting from GFA conversion")
 
     hic_group  = parser.add_argument_group('>>> Parameters for HiC data alignment')
-    hic_group.add_argument("--map_file_type",metavar='\b', default="bam", choices=['bam', 'pa5'], type=str.lower,help="HiC mapping file type")
+    hic_group.add_argument("--map_file_type",metavar='\b', default="pa5", choices=['bam', 'pa5'], type=str.lower,help="HiC mapping file type")
     hic_group.add_argument("-m", "--map_file", metavar='\b', required=True,help="HiC mapping file")
     hic_group.add_argument("-l", "--HiC_file", metavar='\b', required=True,help="HiC links file")
 
@@ -67,7 +67,7 @@ def parse_arguments() -> argparse.Namespace:
     
     return parser.parse_args()
 
-def run_command(cmd: List[str], cwd: Optional[str] = None, shell: bool = False) -> bool:
+def run_command(cmd: List[str], logger, cwd: Optional[str] = None, shell: bool = False) -> bool:
     """Execute a shell command."""
     try:
         logger.info(f"Running command: {cmd}")
@@ -76,13 +76,13 @@ def run_command(cmd: List[str], cwd: Optional[str] = None, shell: bool = False) 
         return True
     except subprocess.CalledProcessError as e:
         logger.error(f"Command failed: {' '.join(cmd)}")
-        logger.error(f"Error: {e}")
+        logger.error(f"Error: {str(e)}")
         return False
     except Exception as e:
-        logger.error(f"Error executing command: {e}")
+        logger.error(f"Error executing command: {str(e)}")
         return False
 
-def process_chromosome(pwd: str, chr_num: int, args: argparse.Namespace,logger: logging.Logger) -> bool:
+def process_chromosome(pwd: str, chr_num: int, args: argparse.Namespace,logger) -> bool:
     """Process a single chromosome directory."""
     logger.info(f"Processing chromosome {chr_num}...")
     script_path = os.path.abspath(sys.path[0])
@@ -102,16 +102,16 @@ def process_chromosome(pwd: str, chr_num: int, args: argparse.Namespace,logger: 
 
         # Run cluster2group.sh
         cmd = ["python", script_path_add, "-c", "reassign_collapse.cluster.txt", "-r", f"{args.output_prefix}.RE_counts.txt"]
-        if not run_command(cmd):
+        if not run_command(cmd, logger):
             return False
 
         logger.info(f"Chromosome {chr_num} processing completed.")
         return True
     except Exception as e:
-        logger.error(f"Error processing chromosome {chr_num}: {e}")
+        logger.error(f"Error processing chromosome {chr_num}: {str(e)}")
         return False
 
-def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Namespace,logger: logging.Logger) -> bool:
+def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Namespace,logger) -> bool:
     """Process a single haplotype."""
     logger.info(f"Processing haplotype {hap_num} of chromosome {chr_num}...")
     try:
@@ -130,7 +130,6 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
             args.digraph_file,
             args.RE_file,
             args.map_file,
-            args.map_file+".bai",
             args.HiC_file,
             args.fa_file
         ]
@@ -154,24 +153,24 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
             "-l", args.HiC_file
         ]
 
-        if not run_command(cmd):
+        if not run_command(cmd,logger):
             return False
 
         # split asm.fa
         tmp_file = f"tmp_{hap_num}.txt"
         cut_command = f"cut -f1 group{hap_num}.txt > {tmp_file}"
-        if not run_command([cut_command], shell=True):
+        if not run_command([cut_command], shell=True, logger=logger):
             return False
         # seqkit 
         seqkit_cmd = f"seqkit grep -f {tmp_file} {args.fa_file} > chr{chr_num}g{hap_num}.fa"
-        if not run_command([seqkit_cmd], shell=True):
+        if not run_command([seqkit_cmd], shell=True, logger=logger):
             return False
         cleanup_command = f"rm {tmp_file}"
-        if not run_command([cleanup_command], shell=True):
+        if not run_command([cleanup_command], shell=True, logger=logger):
             return False
 
         # Create fasta index
-        if not run_command(["samtools", "faidx", f"chr{chr_num}g{hap_num}.fa"]):
+        if not run_command(["samtools", "faidx", f"chr{chr_num}g{hap_num}.fa"], logger=logger):
             return False
 
         # Process bam or pairs file
@@ -181,7 +180,7 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
 
             # Use it in the samtools command
             samtools_cmd = f"samtools view -b {args.map_file} {cut_output} -o chr{chr_num}g{hap_num}.bam"
-            if not run_command([samtools_cmd], shell=True):
+            if not run_command([samtools_cmd], shell=True, logger=logger):
                 return False
 
             # Run YAHS
@@ -191,23 +190,23 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
                 f"chr{chr_num}g{hap_num}.bam",
                 "-a", "subgraphGroup.agp",
                 "-o", "subgraph_yahs"
-            ]):
+            ], logger=logger):
                 return False
 
         if args.map_file_type == "pa5":
 
             tmp_file = f"tmp_{hap_num}.txt"
             cut_command = f"cut -f1 group{hap_num}.txt > {tmp_file}"
-            if not run_command([cut_command], shell=True):
+            if not run_command([cut_command], shell=True,logger=logger):
                 return False
 
             # 使用 awk 命令
             awk_cmd = f"""awk 'NR==FNR{{lines[$1];next}}{{if(NF < 8 && $2 in lines){{print $0;next}}if($2 in lines && $4 in lines){{print $1"\\t"$2"\\t"$3"\\t"$4"\\t"$5}}}}' {tmp_file} {args.map_file} > chr{chr_num}g{hap_num}.pairs"""
-            if not run_command([awk_cmd], shell=True):
+            if not run_command([awk_cmd], shell=True, logger=logger):
                 return False
 
             cleanup_command = f"rm {tmp_file}"
-            if not run_command([cleanup_command], shell=True):
+            if not run_command([cleanup_command], shell=True, logger=logger):
                 return False
 
             # Run YAHS
@@ -218,7 +217,7 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
                 "-a", "subgraphGroup.agp",
                 "-o", "subgraph_yahs",
                 "--file-type", "pa5"
-            ]):
+            ], logger=logger):
                 return False
 
         # Update scaffold names
@@ -226,7 +225,7 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
             ("subgraph_yahs_scaffolds_final.agp", f"s/^/chr{chr_num}g{hap_num}_/g"),
             ("subgraph_yahs_scaffolds_final.fa", f"s/>/>chr{chr_num}g{hap_num}_/g")
         ]:
-            if not run_command(["sed", "-i", sed_cmd, file_pattern]):
+            if not run_command(["sed", "-i", sed_cmd, file_pattern], logger=logger):
                 return False
 
         # Set up scaffold_HapHiC_sort directory
@@ -260,7 +259,7 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
                 "-a", "subgraph_yahs_scaffolds_final.agp",
                 "-r", args.RE_file,
                 "-o", f"{args.output_prefix}.chr{chr_num}g{hap_num}"
-            ]):
+            ],logger=logger):
                 return False
         if args.map_file_type == "pa5":
             if not run_command([
@@ -269,16 +268,16 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
                 "-a", "subgraph_yahs_scaffolds_final.agp",
                 "-r", args.RE_file,
                 "-o", f"{args.output_prefix}.chr{chr_num}g{hap_num}"
-            ]):
+            ], logger=logger):
                 return False
 
         logger.info(f"Haplotype {hap_num} of chromosome {chr_num} processing completed.")
         return True
     except Exception as e:
-        logger.error(f"Error processing chr{chr_num}g{hap_num}: {e}")
+        logger.error(f"Error processing chr{chr_num}g{hap_num}: {str(e)}")
         return False
 
-def perform_final_merge(pwd: str, args: argparse.Namespace,logger: logging.Logger) -> bool:
+def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
     """Perform final merging steps."""
     logger.info(f"Starting final merge steps...")
     script_path = os.path.abspath(sys.path[0])
@@ -341,12 +340,12 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger: logging.Logge
             temp_script_path = temp_script.name
 
         cmd = ["bash", temp_script_path]
-        if not run_command(cmd):
+        if not run_command(cmd, logger=logger):
             return False
         logger.info("Final merge completed.")
         return True
     except Exception as e:
-        logger.error(f"Error during final merge: {e}")
+        logger.error(f"Error during final merge: {str(e)}")
         return False
 
 def log_start(logger: logging.Logger, script_name: str, version: str, args: argparse.Namespace):

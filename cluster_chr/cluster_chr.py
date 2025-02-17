@@ -260,9 +260,9 @@ def main():
 
     split_gfa_file = f"{args.output_prefix}.rmTip.split.gfa"
 
-    # if not run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger):
-    #     logger.error("Run partig Error: An error occurred while running Partig.")
-    #     return
+    if not run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger):
+        logger.error("Run partig Error: An error occurred while running Partig.")
+        return
 
     if not convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix, logger):
         logger.error("Conversion partig Error: in Partig output to CSV.")

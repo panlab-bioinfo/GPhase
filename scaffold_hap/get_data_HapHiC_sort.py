@@ -194,7 +194,7 @@ def main():
 
     # Required arguments
     parser.add_argument("-m", "--map_file", required=True, help="mapping file.")
-    parser.add_argument("--map_file_type", default="bam", choices=['bam', 'pa5'], type=str.lower, help="mapping file type.")
+    parser.add_argument("--map_file_type", default="pa5", choices=['bam', 'pa5'], type=str.lower, help="mapping file type.")
     parser.add_argument("-a", "--agp", required=True, help="agp files.")
     parser.add_argument("-r", "--RE_file", required=True, help="Path to the restriction enzyme file.")
     parser.add_argument("-o", "--output_prefix", required=True, help="Prefix for output files.")
