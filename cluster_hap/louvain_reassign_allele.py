@@ -13,7 +13,6 @@ def read_collapse_num(collapse_num_file):
                 try:
                     collapse_num_dict[line[0]] = int(line[1])
                 except:
-                    print(f"error : {line[0]}\t{line[1]}")
                     collapse_num_dict[line[0]] = 1
     return collapse_num_dict
 
