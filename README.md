@@ -18,7 +18,7 @@ chromap --preset hic -x index -r asm.fa \
 
 ```
 
-# Run HapHiC scaffolding pipeline
+# Run AnHiC scaffolding pipeline
 
 1. `asm.fa` :  your genome assembly file in FASTA format.
 2. `p_utg.gfa` : the GFA file representing the assembly graph.
