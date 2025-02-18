@@ -3,19 +3,19 @@
 # Function for displaying usage
 usage() {
     echo "-------------------------------------------------------------------------------------------------------"
-    echo "|Usage: $0 -f <fa_file> -g <gfa> -c <collapse_num_file> -m <map_file> -n_chr <n_chr> -n_hap <n_hap> -p <output_prefix>"
+    echo "|Usage: $0 -f <fa_file> -g <gfa> -c <collapse_num_file> -m <map_file> --n_chr <n_chr> --n_hap <n_hap> -p <output_prefix>"
     echo "|"
     echo "|Required Parameters:"
     echo "|  -f     <fa_file>                : The FASTA file containing the genome sequences."
     echo "|  -g     <gfa>                    : The GFA file representing the assembly graph."
     echo "|  -c     <collapse_num_file>      : The file that number information for collapse unitigs."
     echo "|  -m     <map_file>               : The mapping file used to map the Hi-C reads."
-    echo "|  -n_chr <n_chr>                  : The number of chromosomes (integer)."
-    echo "|  -n_hap <n_hap>                  : The number of haplotypes (integer)."
+    echo "|  --n_chr <n_chr>                  : The number of chromosomes (integer)."
+    echo "|  --n_hap <n_hap>                  : The number of haplotypes (integer)."
     echo "|  -p     <output_prefix>          : The prefix for the output files."
     echo "|"
     echo "|Example:"
-    echo "|  bash $0 -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.pairs -n 12 -h 4 -p output_prefix"
+    echo "|  bash $0 -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.pairs --n_chr 12 --n_hap 4 -p output_prefix"
     echo "--------------------------------------------------------------------------------------------------------"
     exit 1
 }
