@@ -19,6 +19,8 @@ chromap --preset hic -x index -r asm.fa \
 ```
 
 # Estimating of the number of contig collapses based on HiC data and popCNV
+By default, popCNV_pipeline.sh will use the file ending with fastaq.gz in the directory as HiFi data
+
 1. `asm.fa` : your genome assembly file in FASTA format (Unitigs).
 2. `p` : The prefix for the output files.
 3. `t` : The number of threads.
@@ -28,7 +30,7 @@ chromap --preset hic -x index -r asm.fa \
 -p output_prefix \
 -t 32
 ```
-collapse_num.txt : popcnv/06.genes.round.cn
+`collapse_num.txt` : popcnv/06.genes.round.cn
 
 
 
