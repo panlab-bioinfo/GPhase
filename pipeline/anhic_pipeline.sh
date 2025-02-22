@@ -69,14 +69,14 @@ for file in "$fa_file" "$gfa" "$collapse_num_file" "$map_file"; do
 done
 
 log_path=$(pwd)
-log_file="${log_path}/pipeline.log"
+log_file="${log_path}/AnHiC_pipeline.log"
 
 LOG_INFO() {
     time=$(date "+%Y-%m-%d %H:%M:%S")
     log_file=$1
     flag=$2
     msg=$3
-    echo "${time} <anhic_pipeline> [${flag}] ${msg}" >> ${log_file}
+    echo "${time} <AnHiC_pipeline> [${flag}] ${msg}" >> ${log_file}
 
 }
 # Directory setup
@@ -184,5 +184,3 @@ ln -s "../cluster_chr/${output_prefix}.rmTip.split.gfa"
 ln -s "../cluster_chr/group_ctgs_All.txt" ${output_prefix}.subgraphs.txt
 ln -s "../cluster_chr/rescue.cluster.ctg.txt" ${output_prefix}.chr.cluster.txt
 ln -s ../scaffold_hap/HapHiC_sort/scaffolds.sort.fa ${output_prefix}.genome.fasta
-
-LOG_INFO ${log_file} "done" "Pipeline completed successfully!"
