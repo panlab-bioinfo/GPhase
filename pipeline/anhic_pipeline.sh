@@ -66,7 +66,22 @@ for file in "$fa_file" "$gfa" "$collapse_num_file" "$map_file"; do
         echo "Error: File '$file' does not exist."
         exit 1
     fi
+    if [ ! -f "$(basename "$file")" ]; then
+        ln -s "$file" "$(basename "$file")"
+    fi
 done
+
+fa_file="$(basename "$fa_file")"
+gfa="$(basename "$gfa")"
+collapse_num_file="$(basename "$collapse_num_file")"
+map_file="$(basename "$map_file")"
+
+
+set -e 
+
+current_dir=$(pwd)
+
+
 
 log_path=$(pwd)
 log_file="${log_path}/AnHiC_pipeline.log"
@@ -169,7 +184,7 @@ ln -s "../../${map_file}"
 
 
 LOG_INFO ${log_file} "run" "Running scaffold_hap.py..."
-python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file}
+python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file} -t 32
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: scaffold_hap.py failed."
     exit 1

@@ -57,7 +57,7 @@ def parse_arguments() -> argparse.Namespace:
     partig_group.add_argument("-pk", "--partig_k",metavar='\b', type=int, default=17, help="K-mer size for Partig. Default: 17.")
     partig_group.add_argument("-pw", "--partig_w", metavar='\b',type=int, default=17, help="Minimizer window size for Partig. Default: 17.")
     partig_group.add_argument("-pc", "--partig_c", metavar='\b',type=int, default=60, help="Max occurrance for Partig. Default: 60.")
-    partig_group.add_argument("-pm", "--partig_m", metavar='\b',type=float, default=0.6, help="Mini k-mer similarity for Partig. Default: 0.6.")
+    partig_group.add_argument("-pm", "--partig_m", metavar='\b',type=float, default=0.5, help="Mini k-mer similarity for Partig. Default: 0.5.")
 
     output_group  = parser.add_argument_group('>>> Parameter for the prefix of the result file')
     output_group.add_argument("-op", "--output_prefix", metavar='\b',required=True, help="Output prefix")
@@ -74,6 +74,7 @@ def parse_arguments() -> argparse.Namespace:
 
     Optional_group  = parser.add_argument_group('>>> Optional parameters')
     Optional_group.add_argument('--correct', action='store_true', help='correct the cluster')
+    Optional_group.add_argument('--expand', action='store_true', help='expand the allele')
     Optional_group.add_argument('--isolated_threshold', default=5,help='<int>Detect whether the intensity of the hic signal is an outlier')
 
     return parser.parse_args()
@@ -163,11 +164,14 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
             "collapse_num_file": f"../{args.collapse_num_file}",
             "HiC_file": f"../{args.HiC_file}",
             "RE_file": f"../{args.RE_file}",
-            "partig_file": f"../{partig_file}",
-            "merge_partig_file": f"../merge.partig.csv"
+            "partig_file": f"../{partig_file}"
         }
-
-        merge_partig_file = "merge.partig.csv"
+        # "merge_partig_file": f"../merge.partig.csv"
+        if args.expand:
+            origin_partig_file = "merge.partig.csv"
+            create_symlink(f"../merge.partig.csv", origin_partig_file, logger)
+        else:
+            origin_partig_file = partig_file
         
         with ThreadPoolExecutor(max_workers=args.thread_num) as executor:
             futures = []
@@ -189,11 +193,11 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         with ThreadPoolExecutor(max_workers=args.thread_num) as executor:
             # Process links file
             links_file = f"{args.output_prefix}.chr{chr_num}.links.nor.csv"
-            links_future = executor.submit(filter_links_by_utgs,str(chr_num)+"_links", utg_file, args.HiC_file, links_file, logger)
+            links_future = executor.submit(filter_links_by_utgs,str(chr_num)+"_links", utg_rescue_file, args.HiC_file, links_file, logger)
             
             # Process partig file
             partig_file = f"{args.output_prefix}.chr{chr_num}.partig.csv"
-            partig_future = executor.submit(filter_links_by_utgs,str(chr_num)+"_partig", utg_file, merge_partig_file, partig_file, logger)
+            partig_future = executor.submit(filter_links_by_utgs,str(chr_num)+"_partig", utg_rescue_file, origin_partig_file, partig_file, logger)
             
             # Wait for both operations to complete
             links_future.result()
@@ -255,10 +259,18 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         script_path_add = os.path.join(script_path, "louvain_reassign_allele.py")
         execute_command(
             f"python {script_path_add} -c {args.collapse_num_file} "
-            f"-chr {utg_rescue_file} -l {links_file} -r {args.RE_file} -a {merge_partig_file} "
-            f"--clusters {cluster_file} --isolated_threshold {args.isolated_threshold}",
+            f"-chr {utg_rescue_file} -l {links_file} -r {args.RE_file} -a {partig_file} "
+            f"--clusters {cluster_file} --isolated_threshold {args.isolated_threshold} -op {args.output_prefix}",
             "Failed to run louvain_reassign_allele.py",logger
         )
+        for i in range(3):
+            execute_command(
+                f"python {script_path_add} -c {args.collapse_num_file} "
+                f"-chr {utg_rescue_file} -l {links_file} -r {args.RE_file} -a {partig_file} "
+                f"--clusters {args.output_prefix}.reassign.cluster.txt "
+                f"--isolated_threshold {args.isolated_threshold} -op {args.output_prefix}",
+                "Failed run",logger
+            )
 
         
         return f"Successfully processed chromosome {chr_num}"
@@ -314,8 +326,8 @@ def main():
     log_start(logger, "cluster_hap.py", "1.0.0", args)
 
     # Step 1: Run partig
-    run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
-    convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
+    # run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
+    # convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
     partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.csv"
 
     # Step 2: Run cluster2group.py

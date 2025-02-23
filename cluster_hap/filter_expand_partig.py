@@ -30,7 +30,7 @@ def get_N80(len_list):
         N80_length = 0
         for length in len_list:
             cumulative_length += length
-            if cumulative_length >= 0.8 * total_length:
+            if cumulative_length >= 0.9 * total_length:
                 N80_length = length
                 break
             
@@ -45,12 +45,6 @@ def read_RE(REFile):
             line = line.strip().split()
             ctg_RE_dict[line[0]] = (int(line[1]), int(line[2]))
     return ctg_RE_dict
-
-
-
-
-
-
 
 
 def read_subgraph(subgraph_file):
@@ -118,19 +112,21 @@ def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ct
                 utg2 not in ctg_RE_len or ctg_RE_len[utg2][1] < N80:
 
                 filted_dict[tuple(sorted([utg1, utg2]))] = value
+    
+    save_dict = {k:v for k,v in partig_dict.items() if k not in filted_dict}
 
-        with open("filter_partig.csv", 'w') as file:
-            for (ctg1, ctg2), value in partig_dict.items():
-                if (ctg1, ctg2) not in filted_dict:
-                    file.write(f"{ctg1},{ctg2},{value}\n")
+    with open("filter_partig.csv", 'w') as file:
+        for (ctg1, ctg2), value in save_dict.items():
+            file.write(f"{ctg1},{ctg2},{value}\n")
 
-    return filted_dict
 
-def expand_allele(filted_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
+    return save_dict
+
+def expand_allele(save_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
 
     expand_dict = defaultdict()
 
-    for (utg1, utg2) in filted_dict:
+    for (utg1, utg2) in save_dict:
 
         
         if utg1 in ctg_subgraph_dict and utg2 in ctg_subgraph_dict and \
@@ -141,15 +137,11 @@ def expand_allele(filted_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
 
             for sub_utg1 in subgraph1:
                 for sub_utg2 in subgraph2:
-                    if sub_utg1 == utg1 and sub_utg2 == utg2:
-                        continue
-                    if sub_utg2 == utg1 and sub_utg1 == utg2:
-                        continue
                     expand_dict[tuple(sorted([sub_utg1, sub_utg2]))] = 1
+
 
     with open("merge.partig.csv", 'w') as file:
         file.write("source,target,links\n")
-        
         for (utg1, utg2) in expand_dict:
             file.write(f"{utg1},{utg2},1\n")
 
@@ -225,8 +217,8 @@ if __name__ == '__main__':
 
     subgraph_ctgs_dict, ctg_subgraph_dict = read_subgraph(subgraph_file)
 
-    filted_dict = filter_allele(digraph, partig_dict, subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_dict)
-    expand_allele(filted_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
+    save_dict = filter_allele(digraph, partig_dict, subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_dict)
+    expand_allele(save_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
 
 
 

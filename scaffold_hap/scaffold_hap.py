@@ -96,12 +96,12 @@ def process_chromosome(pwd: str, chr_num: int, args: argparse.Namespace,logger) 
         # Create symbolic links
         os.symlink(os.path.join("../", f"{args.RE_file}"), f"{args.output_prefix}.RE_counts.txt")
         os.symlink(
-            os.path.join("../", args.cluster_hap_path, f"chr{chr_num}", "reassign_collapse.cluster.txt"),
-            "reassign_collapse.cluster.txt"
+            os.path.join("../", args.cluster_hap_path, f"chr{chr_num}", f"{args.output_prefix}.reassign.cluster.txt"),
+            f"{args.output_prefix}.reassign.cluster.txt"
         )
 
         # Run cluster2group.sh
-        cmd = ["python", script_path_add, "-c", "reassign_collapse.cluster.txt", "-r", f"{args.output_prefix}.RE_counts.txt"]
+        cmd = ["python", script_path_add, "-c", f"{args.output_prefix}.reassign.cluster.txt", "-r", f"{args.output_prefix}.RE_counts.txt"]
         if not run_command(cmd, logger):
             return False
 

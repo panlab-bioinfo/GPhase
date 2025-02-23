@@ -120,19 +120,22 @@ def read_map_file(map_file, map_file_type, scaffold_ctgs_dict, ctg_scaffold_dict
 
                 if ctg1 == ctg2 or ctg2 == "=":
                     continue
-                
+
+                scaffold_1_flag, scaffold_2_flag = False, False
                 for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[ctg1]:
                     if int(ctg1_map_idx) > idx_1 and int(ctg1_map_idx) < idx_2:
                         scaffold_1 = scaffold
+                        scaffold_1_flag = True
                         break
                 for (idx_1, idx_2, scaffold) in ctg_scaffold_dict[ctg2]:
                     if int(ctg2_map_idx) > idx_1 and int(ctg2_map_idx) < idx_2:
                         scaffold_2 = scaffold
+                        scaffold_2_flag = True
                         break
-                
-                if scaffold_1 not in locals() or scaffold_2 not in locals() or scaffold_1 == scaffold_2:
+
+                if not scaffold_1_flag or not scaffold_2_flag or scaffold_1 == scaffold_2:
                     continue
-                
+
                 ctg1_in_scaffold_idx = scaffold_ctgs_dict[scaffold_1][ctg1][0] + int(ctg1_map_idx)
                 ctg2_in_scaffold_idx = scaffold_ctgs_dict[scaffold_2][ctg2][0] + int(ctg2_map_idx)
 
@@ -210,6 +213,7 @@ def main():
     agp_file = args.agp
     RE_file = args.RE_file
     output_prefix = args.output_prefix
+
 
     scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict = read_agp(agp_file)
     read_map_file(map_file, map_file_type, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict, output_prefix)

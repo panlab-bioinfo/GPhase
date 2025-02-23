@@ -363,23 +363,33 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
                         oppo_list = graph.nodes()[shortest_path[j]]['oppo']
                         node_dir = 1 if (shortest_path[j+1],0) in pos_list \
                                             or (shortest_path[j+1],1) in pos_list else 0
+                                            
                         if node_dir == 1:
-                            next_node_dir = [node[1] for node in pos_list if node[0] == shortest_path[j+1]][0]
+                            next_node = [node[1] for node in pos_list if node[0] == shortest_path[j+1]]
+                            if next_node:
+                                next_node_dir = next_node[0]
                         else:
-                            next_node_dir = [node[1] for node in oppo_list if node[0] == shortest_path[j+1]][0]
+                            next_node = [node[1] for node in oppo_list if node[0] == shortest_path[j+1]]
+                            if next_node:
+                                next_node_dir = next_node[0]
                         
                         ctgs_dir_path.append((shortest_path[j], node_dir))
                     
                     else:
-
                         # ctgs_dir_path_list.append((shortest_path[j], next_node_dir))
 
                         if next_node_dir == 1:
                             pos_list = graph.nodes()[shortest_path[j]]['pos']
-                            next_node_dir = [node[1] for node in pos_list if node[0] == shortest_path[j+1]][0]
+                            if pos_list:
+                                next_node = [node[1] for node in pos_list if node[0] == shortest_path[j+1]]
+                                if next_node:
+                                    next_node_dir = next_node[0]
                         else:
                             oppo_list = graph.nodes()[shortest_path[j]]['oppo']
-                            next_node_dir = [node[1] for node in oppo_list if node[0] == shortest_path[j+1]][0]
+                            if oppo_list:
+                                next_node = [node[1] for node in oppo_list if node[0] == shortest_path[j+1]]
+                                if next_node:
+                                    next_node_dir = next_node[0]
 
                 ctgs_dir_path.append((shortest_path[-1], next_node_dir))
     
