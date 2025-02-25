@@ -59,8 +59,8 @@ def split_GFA(gfa_filePath, digraph, nei_level:2, output_prefix):
         if len(successors) > 1:
 
             # 若邻居全为端点
-            if all(check_end_point(digraph, successor) == True for successor in successors):
-                continue
+            # if all(check_end_point(digraph, successor) == True for successor in successors):
+            #     continue
 
 
             successors_nei_dict = {utg:find_n_nei(digraph, utg, nei_level, "successors") for utg in successors}
@@ -81,8 +81,8 @@ def split_GFA(gfa_filePath, digraph, nei_level:2, output_prefix):
         if len(predecessors) > 1:
 
             # 若邻居全为端点
-            if all(check_end_point(digraph, predecessor) == True for predecessor in predecessors):
-                continue
+            # if all(check_end_point(digraph, predecessor) == True for predecessor in predecessors):
+            #     continue
 
             predecessors_nei_dict = {utg:find_n_nei(digraph, utg, nei_level, "predecessors") for utg in predecessors}
             

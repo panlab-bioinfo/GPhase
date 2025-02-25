@@ -23,18 +23,18 @@ def read_digraph(digraph_file):
 
 def get_N80(len_list):
 
-        len_list.sort(reverse=True)
-        total_length = sum(len_list)
+    len_list.sort(reverse=True)
+    total_length = sum(len_list)
 
-        cumulative_length = 0
-        N80_length = 0
-        for length in len_list:
-            cumulative_length += length
-            if cumulative_length >= 0.9 * total_length:
-                N80_length = length
-                break
-            
-        return int(N80_length)
+    cumulative_length = 0
+    N80_length = 0
+    for length in len_list:
+        cumulative_length += length
+        if cumulative_length >= 0.95 * total_length:
+            N80_length = length
+            break
+    
+    return int(N80_length)
 
 def read_RE(REFile):
     ctg_RE_dict = defaultdict(tuple)
@@ -77,41 +77,43 @@ def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ct
     filted_dict = defaultdict()
     len_list = [ float( ctg_RE_len[utg][1]) for utg in ctg_RE_len]
     N80 = get_N80(len_list)
-
     for (utg1, utg2), value in partig_dict.items():
 
-        if not (utg1 in digraph and utg2 in digraph):
-            filted_dict[tuple(sorted([utg1, utg2]))] = value
-            continue
-
-        if digraph.has_edge(utg1, utg2) or digraph.has_edge(utg2, utg1):
+        if utg1 not in ctg_RE_len or ctg_RE_len[utg1][1] < N80 or \
+            utg2 not in ctg_RE_len or ctg_RE_len[utg2][1] < N80:
             filted_dict[tuple(sorted([utg1, utg2]))] = value
 
-        if utg1 in ctg_subgraph_dict and utg2 in ctg_subgraph_dict:
+        # if not (utg1 in digraph and utg2 in digraph):
+        #     continue
 
-            subgraph1 = ctg_subgraph_dict[utg1]
-            subgraph2 = ctg_subgraph_dict[utg2]
+        # # if digraph.has_edge(utg1, utg2) or digraph.has_edge(utg2, utg1):
+        # #     filted_dict[tuple(sorted([utg1, utg2]))] = value
 
-        else:
+        # if utg1 in ctg_subgraph_dict and utg2 in ctg_subgraph_dict:
 
-            filted_dict[tuple(sorted([utg1, utg2]))] = value
-            continue
+        #     subgraph1 = ctg_subgraph_dict[utg1]
+        #     subgraph2 = ctg_subgraph_dict[utg2]
 
-        if subgraph1 == subgraph2:
-            predecessors_utg1 = set(digraph.predecessors(utg1))
-            predecessors_utg2 = set(digraph.predecessors(utg2))
+        # else:
 
-            successors_utg1 = set(digraph.successors(utg1))
-            successors_utg2 = set(digraph.successors(utg2))
+        #     filted_dict[tuple(sorted([utg1, utg2]))] = value
+        #     continue
 
-            if not (predecessors_utg1 & predecessors_utg2 ) and \
-                not (successors_utg1 & successors_utg2 ):
-                filted_dict[tuple(sorted([utg1, utg2]))] = value
-        else:
-            if utg1 not in ctg_RE_len or ctg_RE_len[utg1][1] < N80 or \
-                utg2 not in ctg_RE_len or ctg_RE_len[utg2][1] < N80:
+        # if subgraph1 == subgraph2:
+        #     predecessors_utg1 = set(digraph.predecessors(utg1))
+        #     predecessors_utg2 = set(digraph.predecessors(utg2))
 
-                filted_dict[tuple(sorted([utg1, utg2]))] = value
+        #     successors_utg1 = set(digraph.successors(utg1))
+        #     successors_utg2 = set(digraph.successors(utg2))
+
+        #     # if not (predecessors_utg1 & predecessors_utg2 ) and \
+        #     #     not (successors_utg1 & successors_utg2 ):
+        #     #     filted_dict[tuple(sorted([utg1, utg2]))] = value
+        # else:
+        #     if utg1 not in ctg_RE_len or ctg_RE_len[utg1][1] < N80 or \
+        #         utg2 not in ctg_RE_len or ctg_RE_len[utg2][1] < N80:
+
+        #         filted_dict[tuple(sorted([utg1, utg2]))] = value
     
     save_dict = {k:v for k,v in partig_dict.items() if k not in filted_dict}
 
@@ -128,16 +130,18 @@ def expand_allele(save_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
 
     for (utg1, utg2) in save_dict:
 
-        
+        expand_dict[tuple(sorted([utg1, utg2]))] = 1
+
         if utg1 in ctg_subgraph_dict and utg2 in ctg_subgraph_dict and \
             ctg_subgraph_dict[utg1] != ctg_subgraph_dict[utg2]:
 
             subgraph1 = subgraph_ctgs_dict[ctg_subgraph_dict[utg1]]
             subgraph2 = subgraph_ctgs_dict[ctg_subgraph_dict[utg2]]
 
-            for sub_utg1 in subgraph1:
-                for sub_utg2 in subgraph2:
-                    expand_dict[tuple(sorted([sub_utg1, sub_utg2]))] = 1
+            if subgraph1 != subgraph2:
+                for sub_utg1 in subgraph1:
+                    for sub_utg2 in subgraph2:
+                        expand_dict[tuple(sorted([sub_utg1, sub_utg2]))] = 1
 
 
     with open("merge.partig.csv", 'w') as file:

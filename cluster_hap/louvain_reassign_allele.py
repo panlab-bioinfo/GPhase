@@ -142,6 +142,9 @@ def run(correct_collapse_num, utgs_list, hic_links_dict, hic_nei_dict, cluster_d
         reassign_list = list()
         for i in range(correct_collapse_num[collapse_utg]):
 
+            if i >= n_hap:
+                break
+
             # 未分配的group
             unreassign_groups_hic = { group:value for group, value in collapse_utg_group_links_dict[collapse_utg].items() \
                                             if group not in reassign_list }
@@ -165,26 +168,27 @@ def run(correct_collapse_num, utgs_list, hic_links_dict, hic_nei_dict, cluster_d
                 continue
 
             # 记录 可以分配的 group
-            hic_list = list(unreassign_groups_hic_sorted.values())
+            hic_list = list(unreassign_groups_hic_sorted.keys())
             allele_list = list(unreassign_groups_allele_sorted.values())
 
-            if len(hic_list) == 1:
-                cluster_dict[max_hic_group].append(collapse_utg)
-            else:  
-                mean = statistics.mean(hic_list[1:])
+            # if len(hic_list) == 1:
+            #     cluster_dict[max_hic_group].append(collapse_utg)
+            # else:  
+            #     mean = statistics.mean(hic_list[1:])
 
-                if unreassign_groups_hic[max_hic_group] > mean*isolated_threshold:
-                    reassign_list.append(max_hic_group)
-                    cluster_dict[max_hic_group].append(collapse_utg)
-                    if i==0:
-                        cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
+                # if unreassign_groups_hic[max_hic_group] > mean*isolated_threshold:
+                #     reassign_list.append(max_hic_group)
+                #     cluster_dict[max_hic_group].append(collapse_utg)
+                #     if i==0:
+                #         cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
                 
-                # 不显著离群，使用 allele 信息 
-                else:
-                    reassign_list.append(min_allele_group)
-                    cluster_dict[min_allele_group].append(collapse_utg)
-                    if i==0:
-                        cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
+                # # 不显著离群，使用 allele 信息 
+                # else:
+
+            reassign_list.append(min_allele_group)
+            cluster_dict[min_allele_group].append(collapse_utg)
+            if i==0:
+                cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
 
 
     
@@ -227,7 +231,7 @@ if __name__ == '__main__':
                         help='<filepath>clusters for utgs')
     parser.add_argument('-op','--output_prefix',required=True,
                         help='output file prefix')
-    parser.add_argument('--isolated_threshold',type=float,default=3,
+    parser.add_argument('--isolated_threshold',type=float,default=7,
                         help='<int>Detect whether the intensity of the hic signal is an outlier')
 
 

@@ -57,7 +57,7 @@ def parse_arguments() -> argparse.Namespace:
     partig_group.add_argument("-pk", "--partig_k",metavar='\b', type=int, default=17, help="K-mer size for Partig. Default: 17.")
     partig_group.add_argument("-pw", "--partig_w", metavar='\b',type=int, default=17, help="Minimizer window size for Partig. Default: 17.")
     partig_group.add_argument("-pc", "--partig_c", metavar='\b',type=int, default=60, help="Max occurrance for Partig. Default: 60.")
-    partig_group.add_argument("-pm", "--partig_m", metavar='\b',type=float, default=0.5, help="Mini k-mer similarity for Partig. Default: 0.5.")
+    partig_group.add_argument("-pm", "--partig_m", metavar='\b',type=float, default=0.75, help="Mini k-mer similarity for Partig. Default: 0.75.")
 
     output_group  = parser.add_argument_group('>>> Parameter for the prefix of the result file')
     output_group.add_argument("-op", "--output_prefix", metavar='\b',required=True, help="Output prefix")
@@ -67,10 +67,10 @@ def parse_arguments() -> argparse.Namespace:
     genome_group.add_argument("-n_hap", "--hap_number", metavar='\b',type=int, required=True, help="Number of haplotypes")
 
     performance_group  = parser.add_argument_group('>>> Parameters for performance')
-    performance_group.add_argument("--process_num", metavar='\b',type=int, default=10,
-                       help=f"Number of parallel processes (default: 10)")
-    performance_group.add_argument("--thread_num", metavar='\b',type=int,default=10,
-                       help=f"Number of threads per process (default: 10)")
+    performance_group.add_argument("--process_num", metavar='\b',type=int, default=20,
+                       help=f"Number of parallel processes (default: 20)")
+    performance_group.add_argument("--thread_num", metavar='\b',type=int,default=20,
+                       help=f"Number of threads per process (default: 20)")
 
     Optional_group  = parser.add_argument_group('>>> Optional parameters')
     Optional_group.add_argument('--correct', action='store_true', help='correct the cluster')
@@ -216,7 +216,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         script_path = os.path.abspath(sys.path[0])
         script_path_add = os.path.join(script_path, "louvain_nei.py")
         execute_command(
-            f"python {script_path_add} -c {args.collapse_num_file} -chr {utg_file} "
+            f"python {script_path_add} -c {args.collapse_num_file} -chr {utg_rescue_file} "
             f"-l {filtered_links_file} -a {partig_file}",
             "Failed to run louvain_nei.py",logger
         )
@@ -239,8 +239,43 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
             )
             logger.info(f"Optimal r for chromosome {chr_num}: {optimal_r}")
         except ValueError as e:
-            logger.error(f"Failed to determine optimal r for chromosome {chr_num}: {e}")
-            return
+            logger.error(f"Chr:{chr_num} louvain_nei clustering error!")
+            # 无法聚类正确单倍型数目时
+            chr_num_collapse_num_file = f"{args.output_prefix}.chr{chr_num}.utgs.uncollapse.txt"
+            command = (
+                "awk -F '[, \\t]' 'NR==FNR{lines[$1]=$2;next}{if(lines[$1]<=1){print $0}}' "
+                f"{args.collapse_num_file} {utg_rescue_file} > {chr_num_collapse_num_file}"
+            )
+            execute_command(command, f"Failed to filter collapse Contig for {chr_num_collapse_num_file}",logger)
+
+            chr_num_uncollapse_hic_file = f"{args.output_prefix}.chr{chr_num}.links.uncollapse.csv"
+            command = (
+                "awk -F '[, \\t]' 'NR==FNR{lines[$1];next}($1 in lines && $2 in lines)' "
+                f"{chr_num_collapse_num_file} {args.HiC_file} > {chr_num_uncollapse_hic_file}"
+            )
+            execute_command(command, f"Failed to filter hic for {chr_num_uncollapse_hic_file}",logger)
+
+            # Adjust r and run multilevel_cluster.py
+            script_path_add = os.path.join(script_path, "multilevel_cluster.py")
+            cluster_output = f"{args.output_prefix}.chr{chr_num}.cluster.txt"
+            cluster_command = (
+                f"python {script_path_add} -c {chr_num_uncollapse_hic_file} -o {cluster_output} -r {{r}}"
+            )
+            try:
+                optimal_r = adjust_r_and_cluster(
+                    initial_r=1.0,
+                    min_r=0.01,
+                    max_r=5.0,
+                    step=0.01,
+                    cluster_file=cluster_output,
+                    cluster_command=cluster_command,
+                    hap_number=args.hap_number, logger=logger
+                )
+                logger.info(f"Optimal r for chromosome {chr_num}: {optimal_r}")
+                return
+            except ValueError as e:
+                logger.error(f"Chr:{chr_num} clustering error!")
+
 
 
         if args.correct:
@@ -326,8 +361,8 @@ def main():
     log_start(logger, "cluster_hap.py", "1.0.0", args)
 
     # Step 1: Run partig
-    # run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
-    # convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
+    run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
+    convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
     partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.csv"
 
     # Step 2: Run cluster2group.py

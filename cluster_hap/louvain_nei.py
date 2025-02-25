@@ -146,31 +146,31 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
 
             
             # cluster filter : 对聚类结果进行过滤，过滤掉等位的基因组（和不等位的基因links小的过滤掉）
-            if not nei_uncollapse_utg_links or not cluster_dict:
-                continue
-            for group_ in cluster_dict:
-                Allele_utg_pair = set( tuple(sorted([utg1, utg2])) 
-                                        for utg1 in cluster_dict[group_] 
-                                        for utg2 in cluster_dict[group_] 
-                                        if utg1 != utg2 and tuple(sorted([utg1, utg2])) in allele_key_dict 
-                                    )
-                Allele_utgs = set( utg for pair in Allele_utg_pair for utg in pair )
-                unAllele_utgs = set(utg for utg in cluster_dict[group_] if utg not in Allele_utgs)
+            # if not nei_uncollapse_utg_links or not cluster_dict:
+            #     continue
+            # for group_ in cluster_dict:
+            #     Allele_utg_pair = set( tuple(sorted([utg1, utg2])) 
+            #                             for utg1 in cluster_dict[group_] 
+            #                             for utg2 in cluster_dict[group_] 
+            #                             if utg1 != utg2 and tuple(sorted([utg1, utg2])) in allele_key_dict 
+            #                         )
+            #     Allele_utgs = set( utg for pair in Allele_utg_pair for utg in pair )
+            #     unAllele_utgs = set(utg for utg in cluster_dict[group_] if utg not in Allele_utgs)
 
-                for (utg1, utg2) in Allele_utg_pair:
-                    if utg1 in cluster_dict[group_] and utg2 in cluster_dict[group_]:
+            #     for (utg1, utg2) in Allele_utg_pair:
+            #         if utg1 in cluster_dict[group_] and utg2 in cluster_dict[group_]:
 
-                        utg1_num = cal_hic_links(hic_links_dict, utg1, unAllele_utgs)
-                        utg2_num = cal_hic_links(hic_links_dict, utg2, unAllele_utgs)
+            #             utg1_num = cal_hic_links(hic_links_dict, utg1, unAllele_utgs)
+            #             utg2_num = cal_hic_links(hic_links_dict, utg2, unAllele_utgs)
 
-                        min_utg = utg1 if utg1_num < utg2_num else utg2
-                        try:
-                            cluster_dict[group_].remove(min_utg)
-                        except:
-                            louvin_nei_log_file.write(f"error:{min_utg} not in {utg}.cluster.txt {group_}\n")
-                            # print(f"error:{min_utg} not in {utg}.cluster.txt {group_}")
-                louvin_nei_log_file.write(f"{utg}\t{group_}\t{','.join(cluster_dict[group_])}\n")
-                # print(f"{utg}\t{group_}\t{','.join(cluster_dict[group_])}")
+            #             min_utg = utg1 if utg1_num < utg2_num else utg2
+            #             try:
+            #                 cluster_dict[group_].remove(min_utg)
+            #             except:
+            #                 louvin_nei_log_file.write(f"error:{min_utg} not in {utg}.cluster.txt {group_}\n")
+            #                 # print(f"error:{min_utg} not in {utg}.cluster.txt {group_}")
+            #     louvin_nei_log_file.write(f"{utg}\t{group_}\t{','.join(cluster_dict[group_])}\n")
+            #     # print(f"{utg}\t{group_}\t{','.join(cluster_dict[group_])}")
 
             for group_ in cluster_dict:
                 for idx1, utg_1 in enumerate(cluster_dict[group_]):
