@@ -292,20 +292,21 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
         # Run louvain_reassign_allele.py
         script_path_add = os.path.join(script_path, "louvain_reassign_allele.py")
+
         execute_command(
             f"python {script_path_add} -c {args.collapse_num_file} "
-            f"-chr {utg_rescue_file} -l {links_file} -r {args.RE_file} -a {partig_file} "
+            f"-chr {utg_rescue_file} -l {filtered_links_file} -r {args.RE_file} -a {partig_file} "
             f"--clusters {cluster_file} --isolated_threshold {args.isolated_threshold} -op {args.output_prefix}",
             "Failed to run louvain_reassign_allele.py",logger
         )
-        for i in range(3):
-            execute_command(
-                f"python {script_path_add} -c {args.collapse_num_file} "
-                f"-chr {utg_rescue_file} -l {links_file} -r {args.RE_file} -a {partig_file} "
-                f"--clusters {args.output_prefix}.reassign.cluster.txt "
-                f"--isolated_threshold {args.isolated_threshold} -op {args.output_prefix}",
-                "Failed run",logger
-            )
+        # for i in range(3):
+        #     execute_command(
+        #         f"python {script_path_add} -c {args.collapse_num_file} "
+        #         f"-chr {utg_rescue_file} -l {links_file} -r {args.RE_file} -a {partig_file} "
+        #         f"--clusters {args.output_prefix}.reassign.cluster.txt "
+        #         f"--isolated_threshold {args.isolated_threshold} -op {args.output_prefix}",
+        #         "Failed run",logger
+        #     )
 
         
         return f"Successfully processed chromosome {chr_num}"

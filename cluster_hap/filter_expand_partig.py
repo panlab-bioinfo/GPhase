@@ -86,8 +86,8 @@ def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ct
         # if not (utg1 in digraph and utg2 in digraph):
         #     continue
 
-        # # if digraph.has_edge(utg1, utg2) or digraph.has_edge(utg2, utg1):
-        # #     filted_dict[tuple(sorted([utg1, utg2]))] = value
+        if digraph.has_edge(utg1, utg2) or digraph.has_edge(utg2, utg1):
+            filted_dict[tuple(sorted([utg1, utg2]))] = value
 
         # if utg1 in ctg_subgraph_dict and utg2 in ctg_subgraph_dict:
 

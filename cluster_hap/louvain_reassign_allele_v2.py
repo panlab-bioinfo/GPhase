@@ -103,53 +103,52 @@ def allele_sort(unreassign_groups_hic):
 def run(correct_collapse_num, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold, output_prefix):
 
     log_file = open("reassign_collapse.log", 'w')
+    
     collapse_utgs_list = [ utg for utg in correct_collapse_num if correct_collapse_num[utg] > 1 and utg in utgs_list]
-
     # 计算collapse utg 对每个cluster的hic信号总数和allele的片段总长
     collapse_utg_group_links_dict = defaultdict(lambda: defaultdict(float))
     collapse_utg_group_allele_dict = defaultdict(lambda: defaultdict(float))
     cluster_uncollapse_dict = copy.deepcopy(cluster_dict)
     n_hap = len(cluster_dict)
 
-    for collapse_utg in collapse_utgs_list:
-        for group in cluster_dict:
-            group_links, allele_links = 0, 0
-            for utg in cluster_dict[group]:
-                if utg != collapse_utg:
+    reassign_dict = defaultdict(list)
+    for i in range(n_hap):
+        
+        collapse_utgs_list = [ utg for utg in correct_collapse_num if correct_collapse_num[utg] > 0 and utg in collapse_utgs_list]
 
-                    tmp = tuple(sorted([utg, collapse_utg]))
-                    group_links += float(hic_links_dict[tmp]) if tmp in hic_links_dict else 0
+        for collapse_utg in collapse_utgs_list:
+            for group in cluster_dict:
+                group_links, allele_links = 0, 0
+                for utg in cluster_dict[group]:
+                    if utg != collapse_utg:
 
-                    allele_links += ctg_RE_len[utg][1] \
-                                    if utg in ctg_allele_dict[collapse_utg] and utg in ctg_RE_len \
-                                    else 0
+                        tmp = tuple(sorted([utg, collapse_utg]))
+                        group_links += float(hic_links_dict[tmp]) if tmp in hic_links_dict else 0
 
-
-
-            collapse_utg_group_links_dict[collapse_utg][group] = float(group_links)
-            collapse_utg_group_allele_dict[collapse_utg][group] = float(allele_links)
-
-
-        log_file.write(f"{collapse_utg}\thic links: {collapse_utg_group_links_dict[collapse_utg]}\n")
-        log_file.write(f"{collapse_utg}\talleles: {collapse_utg_group_allele_dict[collapse_utg]}\n")
+                        allele_links += ctg_RE_len[utg][1] \
+                                        if utg in ctg_allele_dict[collapse_utg] and utg in ctg_RE_len \
+                                        else 0
 
 
 
-    # 检测hic信号中最大值是否属于离群值，若不为离群值则使用按照allele选择；若为离群值，则按照hic分配此值
-    for collapse_utg in collapse_utg_group_links_dict:
+                collapse_utg_group_links_dict[collapse_utg][group] = float(group_links)
+                collapse_utg_group_allele_dict[collapse_utg][group] = float(allele_links)
 
 
-        reassign_list = list()
-        for i in range(correct_collapse_num[collapse_utg]):
+            log_file.write(f"{collapse_utg}\thic links: {collapse_utg_group_links_dict[collapse_utg]}\n")
+            log_file.write(f"{collapse_utg}\talleles: {collapse_utg_group_allele_dict[collapse_utg]}\n")
 
-            if i >= n_hap:
-                break
+
+
+        # 检测hic信号中最大值是否属于离群值，若不为离群值则使用按照allele选择；若为离群值，则按照hic分配此值
+        for collapse_utg in collapse_utgs_list:
+
 
             # 未分配的group
             unreassign_groups_hic = { group:value for group, value in collapse_utg_group_links_dict[collapse_utg].items() \
-                                            if group not in reassign_list }
+                                            if group not in reassign_dict[collapse_utg] }
             unreassign_groups_allele = { group:value for group, value in collapse_utg_group_allele_dict[collapse_utg].items() \
-                                            if group not in reassign_list }
+                                            if group not in reassign_dict[collapse_utg] }
 
             unreassign_groups_hic_sorted = dict(sorted(unreassign_groups_hic.items(), \
                                             key=lambda item: item[1], reverse=True))
@@ -162,44 +161,42 @@ def run(correct_collapse_num, utgs_list, hic_links_dict, hic_nei_dict, cluster_d
             
             max_hic_group = list(unreassign_groups_hic_sorted)[0]
             min_allele_group = list(unreassign_groups_allele_sorted)[0]
-            min_allele_group, max_allele_group = list(unreassign_groups_allele_sorted)[0], list(unreassign_groups_allele_sorted)[n_hap - len(reassign_list) -1]
+            min_allele_group, max_allele_group = list(unreassign_groups_allele_sorted)[0], list(unreassign_groups_allele_sorted)[n_hap - len(reassign_dict[collapse_utg]) -1]
 
-            if unreassign_groups_hic_sorted[max_hic_group] == 0 and unreassign_groups_allele_sorted[max_allele_group] ==0:
+            if unreassign_groups_hic_sorted[max_hic_group] == 0 and unreassign_groups_allele_sorted[max_allele_group] ==0 or len(reassign_dict[collapse_utg]) == n_hap:
                 continue
 
             # 记录 可以分配的 group
             hic_list = list(unreassign_groups_hic_sorted.keys())
             allele_list = list(unreassign_groups_allele_sorted.values())
 
-            if len(hic_list) == 1:
+            if len(reassign_dict[collapse_utg]) == n_hap -1:
                 cluster_dict[max_hic_group].append(collapse_utg)
             else:  
+
                 list_ = list(unreassign_groups_hic_sorted.values())
                 list_.remove(float(list(unreassign_groups_hic_sorted.values())[0]))
                 mean = statistics.mean(list_)
 
                 if unreassign_groups_hic[max_hic_group] > mean*isolated_threshold:
-                    reassign_list.append(max_hic_group)
+                    reassign_dict[collapse_utg].append(max_hic_group)
                     cluster_dict[max_hic_group].append(collapse_utg)
-                    if i==0:
-                        cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
+                    correct_collapse_num[collapse_utg] -= 1
                 
-                # 不显著离群，使用 allele 信息 
+                # # # 不显著离群，使用 allele 信息 
                 else:
 
-                    reassign_list.append(min_allele_group)
+                    reassign_dict[collapse_utg].append(min_allele_group)
                     cluster_dict[min_allele_group].append(collapse_utg)
-                    if i==0:
-                        cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
-
+                    correct_collapse_num[collapse_utg] -= 1
 
     
-    with open(f"{output_prefix}.reassign.cluster.txt", 'w') as file:
-        for group in cluster_dict:
-            file.write(f"{group}\t{len(cluster_dict[group])}\t")
-            for utg in cluster_dict[group]:
-                file.write(f"{utg} ")
-            file.write("\n")
+        with open(f"{output_prefix}.reassign.cluster.{i+1}.txt", 'w') as file:
+            for group in cluster_dict:
+                file.write(f"{group}\t{len(cluster_dict[group])}\t")
+                for utg in cluster_dict[group]:
+                    file.write(f"{utg} ")
+                file.write("\n")
 
     with open(f"{output_prefix}.reassign.uncopy.cluster.txt", 'w') as file:
         for group in cluster_uncollapse_dict:
@@ -208,7 +205,7 @@ def run(correct_collapse_num, utgs_list, hic_links_dict, hic_nei_dict, cluster_d
                 file.write(f"{utg} ")
             file.write("\n")
 
-
+            
 
 
 

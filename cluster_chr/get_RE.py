@@ -4,16 +4,7 @@ from argcomplete.completers import FilesCompleter
 import argparse
 
 def count_restriction_sites(fasta_file, enzyme_site):
-    """
-    统计每个序列中的内切酶位点数目，并返回包含序列名称、内切酶位点数目和序列长度的列表。
-    
-    参数:
-    fasta_file (str): FASTA 文件路径
-    enzyme_site (str): 内切酶识别位点的序列
-    
-    返回:
-    list: 包含每条序列名称、内切酶位点数目和序列长度的元组列表
-    """
+
     result = []
 
     enzyme_site = enzyme_site.lower()
@@ -28,13 +19,8 @@ def count_restriction_sites(fasta_file, enzyme_site):
     return result
 
 def write_output_to_file(results, output_prefix):
-    """
-    将结果写入CSV文件
-    
-    参数:
-    results (list): 包含每条序列名称、内切酶位点数目和序列长度的元组列表
-    output_file (str): 输出文件路径
-    """
+le (str): 输出文件路径
+
     with open(f"{output_prefix}.RE_counts.txt", "w") as f:
         f.write("#Contig\tRECounts\tLength\n")
 
@@ -47,9 +33,7 @@ def main():
     parser.add_argument("-e", "--enzyme_site", default="GATC", help="restriction enzyme file.")
     parser.add_argument("-op", "--output_prefix", required=True, help="Prefix for output files.")
 
-    # fasta_file = "asm.fa"  # 替换为你的FASTA文件路径
-    # enzyme_site = "GATC"  # 替换为你感兴趣的内切酶位点（如 EcoRI 的 GAATTC）
-    # output_file = "wax.test.counts.txt"  # 输出文件路径
+
 
     args = parser.parse_args()
     argcomplete.autocomplete(parser)
@@ -58,10 +42,9 @@ def main():
     output_prefix = args.output_prefix
 
 
-    # 获取每个序列中的内切酶位点数目
     results = count_restriction_sites(fasta_file, enzyme_site)
 
-    # 将结果写入CSV文件
+
     write_output_to_file(results, output_prefix)
 
 if __name__ == "__main__":

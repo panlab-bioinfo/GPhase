@@ -308,6 +308,7 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
         ctgs_dir_path_filter_dict[0] = [(ctgs[0],1)]
         return ctgs_dir_path_filter_dict
 
+
     # 执行拓扑排序
     while True:
         try:
@@ -323,6 +324,10 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
 
     topo_order = list(nx.topological_sort(digraph_copy))
     ctgs_sort = [ ctg for ctg in topo_order if ctg in ctgs ]
+
+    if len(ctgs_sort) != len(ctgs):
+        ctgs_sort = list(set(graph.nodes()) & set(ctgs))
+
     
     
     # 检测相邻节点是否连通，若不连通则打断
@@ -330,9 +335,13 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
     break_points_list = list()
     for i in range(len(ctgs_sort) - 1):
         # print(f"source:{ctgs_sort[i]}\ttarget:{ctgs_sort[i+1]}")
-        is_strongly_connected = nx.has_path(digraph, source=ctgs_sort[i], target=ctgs_sort[i+1])
-        if not is_strongly_connected:
+        try:
+            if not nx.has_path(digraph, source=ctgs_sort[i], target=ctgs_sort[i+1]):
+                break_points_list.append(i+1)
+        except:
             break_points_list.append(i+1)
+
+
     # 根据断点打断
     start = 0
     for break_point in break_points_list:
@@ -341,6 +350,7 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
     ctgs_sort_check.append(ctgs_sort[start:])
 
     ctgs_sort_list = cp.deepcopy(ctgs_sort_check)
+
 
     for idx, ctgs_sort in enumerate(ctgs_sort_list):
 
@@ -398,8 +408,6 @@ def get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict):
 
         ctgs_dir_path_filter_dict[str(idx)] = list(ctgs_dir_path_filter)
 
-
-
     return ctgs_dir_path_filter_dict
     
 
@@ -412,6 +420,7 @@ def get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict):
     
     subgraphGroup_idx = 1
     for graph in graphs_dict.values():
+
         if len(graph.nodes()) == 0:
             continue
         graph, digraph = trans_digraph(graph)
@@ -422,6 +431,8 @@ def get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict):
             filter_subgraph_sort_dict[subgraphGroup_idx] = [ctgs[0]]
             subgraphGroup_idx += 1
             continue
+
+
 
         ctgs_dir_path_filter_dict = get_topological_sort(graph, digraph, ctgs, hic_links_dict, hic_nei_dict)
         

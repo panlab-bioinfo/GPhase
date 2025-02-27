@@ -143,7 +143,7 @@ ln -s "../preprocessing/${output_prefix}.RE_counts.txt"
 ln -s "../preprocessing/${output_prefix}.chromap.links.nor.csv"
 
 LOG_INFO ${log_file} "run" "Running cluster_chr.py..."
-python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa} -n 5 -pm 0.9
+python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa} -n 5 -pm 0.95
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_chr.py failed."
@@ -165,7 +165,7 @@ ln -s "../cluster_chr/${output_prefix}.chr.cluster.ctg.txt"
 
 
 LOG_INFO ${log_file} "run" "Running cluster_hap.py..."
-python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr rescue.cluster.ctg.txt --expand -pm 0.75
+python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr rescue.cluster.ctg.txt  --expand -pm 0.6
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_hap.py failed."
     exit 1
@@ -184,7 +184,7 @@ ln -s "../../${map_file}"
 
 
 LOG_INFO ${log_file} "run" "Running scaffold_hap.py..."
-python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file} -t 32
+python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file} -t 64
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: scaffold_hap.py failed."
     exit 1

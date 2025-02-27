@@ -90,11 +90,9 @@ def run_trans_digraph(gfa_filePath, gfa_file, flag_output_csv=False):
                 writer.writerow([u, v])
 
     return digraph
-    
 
-if __name__ == '__main__':
-    
 
+def main():
     parser = argparse.ArgumentParser(description="trans GFA", formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-g', '--gfa_file', required=True, help='gfa file')
     parser.add_argument('-o', '--output_prefix', required=True, help='output prefix')
@@ -105,6 +103,14 @@ if __name__ == '__main__':
     output_prefix = args.output_prefix
 
     run_trans_digraph(gfa_file, output_prefix)
+
+    
+
+if __name__ == '__main__':
+    main()
+    
+
+    
 
 
 
