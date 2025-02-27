@@ -35,7 +35,7 @@ By default, popCNV_pipeline.sh will use the file ending with fastaq.gz in the di
 
 
 # Running the AnHiC scaffolding pipeline
-| Scaffold Pipeline : subGraph_scaffold + YaHs [YaHS](https://github.com/c-zhou/yahs) + HapHiC [HapHiC](https://github.com/zengxiaofei/HapHiC)
+| Scaffolding Pipeline : subGraph_scaffold + YaHs [YaHS](https://github.com/c-zhou/yahs) + HapHiC [HapHiC](https://github.com/zengxiaofei/HapHiC)
 
 1. `asm.fa` :  your genome assembly file in FASTA format (Unitigs).
 2. `p_utg.gfa` : the GFA file representing the assembly graph.
