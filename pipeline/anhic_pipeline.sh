@@ -198,4 +198,5 @@ ln -s "../preprocessing/${hic_links}"
 ln -s "../cluster_chr/${output_prefix}.rmTip.split.gfa"
 ln -s "../cluster_chr/group_ctgs_All.txt" ${output_prefix}.subgraphs.txt
 ln -s "../cluster_chr/rescue.cluster.ctg.txt" ${output_prefix}.chr.cluster.txt
-ln -s ../scaffold_hap/HapHiC_sort/scaffolds.sort.fa ${output_prefix}.genome.fasta
+ln -s ../scaffold_hap/HapHiC_sort/scaffolds.sort.fa ${output_prefix}.scaffolds.fasta
+ln -s ../scaffold_hap/HapHiC_sort/final_agp/${output_prefix}.final.agp

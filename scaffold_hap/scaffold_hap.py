@@ -298,7 +298,7 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
 
         # Link RE files
         os.chdir(os.path.join(haphic_dir, "groups_REs"))
-        re_files = glob.glob(os.path.join(pwd, "chr*/chr*/scaffold_HapHiC_sort", f"{args.output_prefix}.chr*g*scaffold*txt"))
+        re_files = glob.glob(os.path.join(pwd, "chr*/chr*/scaffold_HapHiC_sort/", f"{args.output_prefix}.chr*g*scaffold*txt"))
         for re_file in re_files:
             try:
                 os.symlink(re_file, os.path.basename(re_file))
@@ -306,6 +306,13 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
                 pass
 
         os.chdir(haphic_dir)
+
+        # Merge AGP files
+        with open(f"{args.output_prefix}.merge.agp", 'w') as outfile:
+            for agp_file in glob.glob(os.path.join(pwd, "chr*/chr*/scaffold_HapHiC_sort/subgraph_yahs_scaffolds_final.agp")):
+                with open(agp_file) as infile:
+                    outfile.write(infile.read())
+
 
         # Merge HT files
         with open(f"{args.output_prefix}.merge.HT.pkl", 'wb') as outfile:
@@ -319,20 +326,21 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
                 with open(scaffold_file) as infile:
                     outfile.write(infile.read())
 
-        # Merge pairs files
-        with open(f"{args.output_prefix}.merge.map.bin", 'wb') as outfile:
-            for pairs_file in glob.glob(os.path.join(pwd, "chr*/chr*/subgraph_yahs.bin")):
-                with open(pairs_file, 'rb') as infile:
-                    outfile.write(infile.read())
+        # # Merge pairs files
+        # with open(f"{args.output_prefix}.merge.map.bin", 'wb') as outfile:
+        #     for pairs_file in glob.glob(os.path.join(pwd, "chr*/chr*/subgraph_yahs.bin")):
+        #         with open(pairs_file, 'rb') as infile:
+        #             outfile.write(infile.read())
 
         # Create and execute final commands script
         script_path_add = os.path.join(script_path, "../src/HapHiC/haphic")
         script_content = f"""
             cd {haphic_dir}
-            {script_path_add} sort {args.output_prefix}.merge.fa {args.output_prefix}.merge.HT.pkl split_clms/ groups_REs/* --quick_view
+            {script_path_add} sort {args.output_prefix}.merge.fa {args.output_prefix}.merge.HT.pkl split_clms/ groups_REs/* 
             {script_path_add} build {args.output_prefix}.merge.fa {args.output_prefix}.merge.fa {args.output_prefix}.merge.map.bin final_tours/*tour
             seqkit sort scaffolds.fa > scaffolds.sort.fa
             samtools faidx scaffolds.sort.fa
+
         """
 
         with tempfile.NamedTemporaryFile(delete=False) as temp_script:
@@ -342,7 +350,39 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
         cmd = ["bash", temp_script_path]
         if not run_command(cmd, logger=logger):
             return False
-        logger.info("Final merge completed.")
+        logger.info("HapHiC sort completed.")
+
+        # get final agp (using agptools)
+        os.chdir(haphic_dir)
+        os.makedirs(os.path.join(haphic_dir, "final_agp"), exist_ok=True)
+        os.chdir(os.path.join(haphic_dir, "final_agp"))
+        # Loop through i and j values
+        for i in range(1, int(args.chr_number) + 1):
+            for j in range(1, int(args.hap_number) + 1):
+                # Step 1: Extract rows from scaffolds.agp
+                subprocess.run(f"grep chr{i}g{j} ../scaffolds.agp > chr{i}g{j}.agp", shell=True)
+
+                # Step 2: Process and convert the data from .agp file into .joins.txt
+                with open(f"chr{i}g{j}.agp", 'r') as infile, open(f"chr{i}g{j}.joins.txt", 'w') as outfile:
+
+                    first_scaffold = True
+                    for line in infile:
+                        cols = line.strip().split()
+
+                        if first_scaffold:
+                            first_scaffold = False
+                        elif cols[8] == "+" or cols[8] == "-":
+                            outfile.write(",")
+                           
+                        if cols[8] == "+":
+                            outfile.write(f"{cols[5]}")
+                        elif cols[8] == "-":
+                            outfile.write(f"-{cols[5]}")
+
+                # Step 4: Join using agptools
+                subprocess.run(f"agptools join chr{i}g{j}.joins.txt <(grep 'chr{i}g{j}' ../{args.output_prefix}.merge.agp) | "
+                            f"awk -v i={i} -v j={j} 'BEGIN{{OFS=\"\\t\"}}{{$1=\"Chr\"i\"g\"j; print $0}}' >> {args.output_prefix}.final.agp", shell=True)
+        
         return True
     except Exception as e:
         logger.error(f"Error during final merge: {str(e)}")
