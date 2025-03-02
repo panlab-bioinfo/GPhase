@@ -19,7 +19,7 @@ def count_restriction_sites(fasta_file, enzyme_site):
     return result
 
 def write_output_to_file(results, output_prefix):
-le (str): 输出文件路径
+
 
     with open(f"{output_prefix}.RE_counts.txt", "w") as f:
         f.write("#Contig\tRECounts\tLength\n")

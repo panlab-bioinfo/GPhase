@@ -135,6 +135,7 @@ dependencies:
   - zlib=1.2.13=h4ab18f5_6
   - zstd=1.5.6=hc292b87_0
   - pip:
+      - agptools==0.0.1
       - argcomplete==3.5.3
       - blinker==1.9.0
       - certifi==2025.1.31
@@ -144,6 +145,7 @@ dependencies:
       - dill==0.3.9
       - flask==3.1.0
       - idna==3.10
+      - importlib-metadata==8.6.1
       - itsdangerous==2.2.0
       - jinja2==3.1.5
       - joblib==1.4.2
@@ -154,11 +156,14 @@ dependencies:
       - portion==2.6.0
       - pox==0.3.5
       - ppft==1.7.6.9
+      - pyfaidx==0.8.1.3
       - pysam==0.23.0
       - requests==2.32.3
       - scikit-learn==1.6.1
       - scipy==1.15.1
+      - screed==1.1.3
       - threadpoolctl==3.5.0
       - urllib3==2.3.0
       - werkzeug==3.1.3
-prefix: /data/duwenjie/miniconda3/envs/anhic
+      - zipp==3.21.0
+
