@@ -57,7 +57,7 @@ def parse_arguments() -> argparse.Namespace:
     partig_group.add_argument("-pk", "--partig_k",metavar='\b', type=int, default=17, help="K-mer size for Partig. Default: 17.")
     partig_group.add_argument("-pw", "--partig_w", metavar='\b',type=int, default=17, help="Minimizer window size for Partig. Default: 17.")
     partig_group.add_argument("-pc", "--partig_c", metavar='\b',type=int, default=60, help="Max occurrance for Partig. Default: 60.")
-    partig_group.add_argument("-pm", "--partig_m", metavar='\b',type=float, default=0.75, help="Mini k-mer similarity for Partig. Default: 0.75.")
+    partig_group.add_argument("-pm", "--partig_m", metavar='\b',type=float, default=0.6, help="Mini k-mer similarity for Partig. Default: 0.6.")
 
     output_group  = parser.add_argument_group('>>> Parameter for the prefix of the result file')
     output_group.add_argument("-op", "--output_prefix", metavar='\b',required=True, help="Output prefix")
@@ -145,7 +145,29 @@ def adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_file, cluster_co
 
         r = (min_r + max_r) / 2
 
-    raise ValueError(f"Failed to find optimal r within range {min_r}-{max_r}")
+    return 0
+
+def multiple_adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_file, cluster_command, hap_number,logger):
+    section_length = float((max_r - min_r) / 8)
+
+    section_1 = adjust_r_and_cluster((min_r + min_r+section_length)/2, min_r, min_r+section_length, step, cluster_file, cluster_command, hap_number,logger)
+    section_2 = adjust_r_and_cluster((min_r+section_length + min_r+section_length*2)/2, min_r+section_length, min_r+section_length*2, step, cluster_file, cluster_command, hap_number,logger)
+    section_3 = adjust_r_and_cluster((min_r+section_length*2 + min_r+section_length*3)/2, min_r+section_length*2, min_r+section_length*3, step, cluster_file, cluster_command, hap_number,logger)
+    section_4 = adjust_r_and_cluster((min_r+section_length*3 + min_r+section_length*4)/2, min_r+section_length*3, min_r+section_length*4, step, cluster_file, cluster_command, hap_number,logger)
+
+    section_5 = adjust_r_and_cluster((min_r+section_length*4 + min_r+section_length*5)/2, min_r+section_length*4, min_r+section_length*5, step, cluster_file, cluster_command, hap_number,logger)
+    section_6 = adjust_r_and_cluster((min_r+section_length*5 + min_r+section_length*6)/2, min_r+section_length*5, min_r+section_length*6, step, cluster_file, cluster_command, hap_number,logger)
+    section_7 = adjust_r_and_cluster((min_r+section_length*6 + min_r+section_length*7)/2, min_r+section_length*6, min_r+section_length*7, step, cluster_file, cluster_command, hap_number,logger)
+    section_8 = adjust_r_and_cluster((min_r+section_length*7 + max_r)/2, min_r+section_length*7, max_r, step, cluster_file, cluster_command, hap_number,logger)
+
+
+    if section_1 or section_2 or section_3 or section_4 or section_5 or section_6 or section_7 or section_8:
+        list_ = [section_1, section_2, section_3, section_4, section_5, section_6, section_7, section_8]
+        r = min([ r for r in list_ if r > 0])
+        return r
+    raise 
+
+
 
 def process_chromosome(chr_num, args, pwd, partig_file,logger):
     try:
@@ -225,20 +247,25 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         script_path_add = os.path.join(script_path, "multilevel_cluster.py")
         cluster_output = f"{args.output_prefix}.chr{chr_num}.cluster.txt"
         cluster_command = (
-            f"python {script_path_add} -c louvain_nei.csv -o {cluster_output} -r {{r}}"
+            f"python {script_path_add} -c louvain_nei.csv -o {cluster_output} -r {{r}} --check --RE_file {utg_rescue_file}"
         )
         try:
-            optimal_r = adjust_r_and_cluster(
+            optimal_r = multiple_adjust_r_and_cluster(
                 initial_r=1.0,
                 min_r=0.01,
-                max_r=5.0,
+                max_r=4,
                 step=0.01,
                 cluster_file=cluster_output,
                 cluster_command=cluster_command,
                 hap_number=args.hap_number, logger=logger
             )
             logger.info(f"Optimal r for chromosome {chr_num}: {optimal_r}")
-        except ValueError as e:
+            cluster_command = (
+                f"python {script_path_add} -c louvain_nei.csv -o {cluster_output} -r {optimal_r} --check --RE_file {utg_rescue_file}"
+            )
+            execute_command(cluster_command, f"Failed to clustering for louvain_nei.csv ",logger)
+
+        except:
             logger.error(f"Chr:{chr_num} louvain_nei clustering error!")
             # 无法聚类正确单倍型数目时
             chr_num_collapse_num_file = f"{args.output_prefix}.chr{chr_num}.utgs.uncollapse.txt"
@@ -254,24 +281,29 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                 f"{chr_num_collapse_num_file} {args.HiC_file} > {chr_num_uncollapse_hic_file}"
             )
             execute_command(command, f"Failed to filter hic for {chr_num_uncollapse_hic_file}",logger)
+            execute_command(f"sed '1isource,target,links' -i {chr_num_uncollapse_hic_file}", f"Failed to add header to {chr_num_uncollapse_hic_file}",logger)
 
             # Adjust r and run multilevel_cluster.py
             script_path_add = os.path.join(script_path, "multilevel_cluster.py")
             cluster_output = f"{args.output_prefix}.chr{chr_num}.cluster.txt"
             cluster_command = (
-                f"python {script_path_add} -c {chr_num_uncollapse_hic_file} -o {cluster_output} -r {{r}}"
+                f"python {script_path_add} -c {chr_num_uncollapse_hic_file} -o {cluster_output} -r {{r}} --check --RE_file {utg_rescue_file}"
             )
             try:
-                optimal_r = adjust_r_and_cluster(
+                optimal_r = multiple_adjust_r_and_cluster(
                     initial_r=1.0,
                     min_r=0.01,
-                    max_r=5.0,
+                    max_r=4,
                     step=0.01,
                     cluster_file=cluster_output,
                     cluster_command=cluster_command,
                     hap_number=args.hap_number, logger=logger
                 )
                 logger.info(f"Optimal r for chromosome {chr_num}: {optimal_r}")
+                cluster_command = (
+                    f"python {script_path_add} -c {chr_num_uncollapse_hic_file} -o {cluster_output} -r {optimal_r} --check --RE_file {utg_rescue_file}"
+                )
+                execute_command(cluster_command, f"Failed to clustering for {chr_num_collapse_num_file}",logger)
                 return
             except ValueError as e:
                 logger.error(f"Chr:{chr_num} clustering error!")
@@ -299,14 +331,14 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
             f"--clusters {cluster_file} --isolated_threshold {args.isolated_threshold} -op {args.output_prefix}",
             "Failed to run louvain_reassign_allele.py",logger
         )
-        # for i in range(3):
-        #     execute_command(
-        #         f"python {script_path_add} -c {args.collapse_num_file} "
-        #         f"-chr {utg_rescue_file} -l {links_file} -r {args.RE_file} -a {partig_file} "
-        #         f"--clusters {args.output_prefix}.reassign.cluster.txt "
-        #         f"--isolated_threshold {args.isolated_threshold} -op {args.output_prefix}",
-        #         "Failed run",logger
-        #     )
+        for i in range(3):
+            execute_command(
+                f"python {script_path_add} -c {args.collapse_num_file} "
+                f"-chr {utg_rescue_file} -l {links_file} -r {args.RE_file} -a {partig_file} "
+                f"--clusters {args.output_prefix}.reassign.cluster.txt "
+                f"--isolated_threshold {args.isolated_threshold} -op {args.output_prefix}",
+                "Failed run",logger
+            )
 
         
         return f"Successfully processed chromosome {chr_num}"
@@ -362,8 +394,8 @@ def main():
     log_start(logger, "cluster_hap.py", "1.0.0", args)
 
     # Step 1: Run partig
-    run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
-    convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
+    # run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
+    # convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
     partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.csv"
 
     # Step 2: Run cluster2group.py

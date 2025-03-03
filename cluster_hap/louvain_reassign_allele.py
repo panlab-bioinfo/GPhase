@@ -38,14 +38,19 @@ def read_c(c):
                 utg_group_dict[utg].append(line[0])
     return cluster_dict, utg_group_dict
 
-def correct_collapse_num(collapse_num_dict, cluster_dict):
+def correct_collapse_num(utgs_list, collapse_num_dict, cluster_dict, utg_group_dict):
 
-    correct_collapse_num = copy.deepcopy(collapse_num_dict)
+    correct_collapse_num_dict = copy.deepcopy(collapse_num_dict)
+
+    for utg in utgs_list:
+        if utg not in utg_group_dict and collapse_num_dict[utg] <= 1:
+            correct_collapse_num_dict[utg] = -1
+
     for group in cluster_dict:
         for ctg in cluster_dict[group]:
-            if ctg in correct_collapse_num:
-                correct_collapse_num[ctg] -= 1
-    return correct_collapse_num
+            if ctg in correct_collapse_num_dict:
+                correct_collapse_num_dict[ctg] -= 1
+    return correct_collapse_num_dict
 
 def read_l(l):
     hic_nei_dict = defaultdict(set)
@@ -100,10 +105,10 @@ def allele_sort(unreassign_groups_hic):
 
 
 
-def run(correct_collapse_num, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold, output_prefix):
+def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold, output_prefix):
 
-    log_file = open("reassign_collapse.log", 'w')
-    collapse_utgs_list = [ utg for utg in correct_collapse_num if correct_collapse_num[utg] > 1 and utg in utgs_list]
+    log_file = open("reassign_collapse.log", 'a')
+    collapse_utgs_list = [ utg for utg in correct_collapse_num_dict if (correct_collapse_num_dict[utg] > 1 or correct_collapse_num_dict[utg] == -1)and utg in utgs_list]
 
     # 计算collapse utg 对每个cluster的hic信号总数和allele的片段总长
     collapse_utg_group_links_dict = defaultdict(lambda: defaultdict(float))
@@ -140,7 +145,7 @@ def run(correct_collapse_num, utgs_list, hic_links_dict, hic_nei_dict, cluster_d
 
 
         reassign_list = list()
-        for i in range(correct_collapse_num[collapse_utg]):
+        for i in range(abs(correct_collapse_num_dict[collapse_utg])):
 
             if i >= n_hap:
                 break
@@ -260,9 +265,9 @@ if __name__ == '__main__':
     ctg_RE_len = read_REs(r)
     allele_dict, ctg_allele_dict = read_allele(a)
 
-    correct_collapse_num = correct_collapse_num(collapse_num_dict, cluster_dict)
+    correct_collapse_num_dict = correct_collapse_num(utgs_list, collapse_num_dict, cluster_dict, utg_group_dict)
 
 
-    run(correct_collapse_num, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold,output_prefix)
+    run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold,output_prefix)
 
 
