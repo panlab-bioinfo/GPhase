@@ -168,4 +168,3 @@ dependencies:
       - urllib3==2.3.0
       - werkzeug==3.1.3
       - zipp==3.21.0
-prefix: /data/duwenjie/miniconda3/envs/anhic
