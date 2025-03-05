@@ -380,7 +380,7 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
                             outfile.write(f"-{cols[5]}")
 
                 # Step 4: Join using agptools
-                subprocess.run(f"agptools join chr{i}g{j}.joins.txt <(grep 'chr{i}g{j}' ../{args.output_prefix}.merge.agp) | "
+                subprocess.run(f"agptools join chr{i}g{j}.joins.txt <(grep 'chr{i}g{j}' ../{args.output_prefix}.merge.agp) -n 100 -e proximity_ligation | "
                             f"awk -v i={i} -v j={j} 'BEGIN{{OFS=\"\\t\"}}{{$1=\"Chr\"i\"g\"j; print $0}}' >> {args.output_prefix}.final.agp", shell=True)
         
         return True

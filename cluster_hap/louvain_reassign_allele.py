@@ -214,10 +214,42 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
             file.write("\n")
 
 
+    # 计算 cluster 中每个簇的长度方差
+    group_len_sum_list = list()
+    for group, ctgs in cluster_dict.items():
+        group_len_sum = sum([ ctg_RE_len[ctg][1] for ctg in ctgs if ctg in ctg_RE_len ])
+        group_len_sum_list.append(group_len_sum)
+    variance_stats  = statistics.variance(group_len_sum_list)
+
+    return float(variance_stats)
 
 
 
 
+def louvain_reassign_allele(collapse_num_file, chr_file, l, c ,r, a, output_prefix, find_best_isolated,isolated_threshold=5):
+
+    collapse_num_dict = read_collapse_num(collapse_num_file)
+    utgs_list = read_chr_utgs(chr_file)
+    hic_links_dict, hic_nei_dict = read_l(l)
+    cluster_dict, utg_group_dict = read_c(c)
+    ctg_RE_len = read_REs(r)
+    allele_dict, ctg_allele_dict = read_allele(a)
+
+    correct_collapse_num_dict = correct_collapse_num(utgs_list, collapse_num_dict, cluster_dict, utg_group_dict)
+    if find_best_isolated:
+        variance_list = list()
+        for isolated in range(10):
+            cluster_dict, utg_group_dict = read_c(c)
+            variance = run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated, output_prefix)
+            variance_list.append(variance)
+        
+        min_variance_idx = variance_list.index(min(variance_list))
+        cluster_dict, utg_group_dict = read_c(c)
+        run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, min_variance_idx, output_prefix)
+        return min_variance_idx
+    else:
+        cluster_dict, utg_group_dict = read_c(c)
+        run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold, output_prefix)
 
 
 
@@ -238,8 +270,9 @@ if __name__ == '__main__':
                         help='<filepath>clusters for utgs')
     parser.add_argument('-op','--output_prefix',required=True,
                         help='output file prefix')
+    parser.add_argument('--find_best_isolated', action='store_true', help='Iterate to find the best isolated_threshold')
     parser.add_argument('--isolated_threshold',type=float,default=5,
-                        help='<int>Detect whether the intensity of the hic signal is an outlier')
+                        help='<int>Detect whether the intensity of the hic signal is an outlier(required when --iter is disabled)')
 
 
     # argcomplete.autocomplete(parser)
@@ -258,16 +291,9 @@ if __name__ == '__main__':
     output_prefix = args.output_prefix
     isolated_threshold = args.isolated_threshold
 
-    collapse_num_dict = read_collapse_num(collapse_num_file)
-    utgs_list = read_chr_utgs(chr_file)
-    hic_links_dict, hic_nei_dict = read_l(l)
-    cluster_dict, utg_group_dict = read_c(c)
-    ctg_RE_len = read_REs(r)
-    allele_dict, ctg_allele_dict = read_allele(a)
+    # if args.find_best_isolated and args.isolated_threshold:
+    #     parser.error("--isolated_threshold is disable when --find_best_isolated is enabled")
 
-    correct_collapse_num_dict = correct_collapse_num(utgs_list, collapse_num_dict, cluster_dict, utg_group_dict)
-
-
-    run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold,output_prefix)
+    louvain_reassign_allele(collapse_num_file, chr_file, l, c ,r, a, output_prefix, args.find_best_isolated,isolated_threshold)
 
 

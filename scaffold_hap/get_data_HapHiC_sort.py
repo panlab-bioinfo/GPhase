@@ -20,7 +20,8 @@ def read_agp(agp_file):
                 ctg_scaffold_dict[line[5]].append((int(line[6]), int(line[7]), line[0]))
 
     for scaffold, ctgs in scaffold_ctgs_dict.items():
-        scaffold_length_dict[scaffold] = ctgs[list(ctgs.keys())[-1]][1]
+        # scaffold_length_dict[scaffold] = ctgs[list(ctgs.keys())[-1]][1]
+        scaffold_length_dict[scaffold] = max([ int(ctg[1]) for ctg in ctgs.values()])
 
     return scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict
 

@@ -118,7 +118,6 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
     script_path_add = os.path.join(script_path,"multilevel_cluster.py")
 
     for utg in utgs_list:
-        # print(utg)
 
         nei_utg = list(hic_nei_dict[utg])
         nei_uncollapse_utg = list(set(nei_utg) & set(uncollapse_list))

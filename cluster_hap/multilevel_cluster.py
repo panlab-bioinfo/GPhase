@@ -19,7 +19,16 @@ def read_REs(REFile):
             ctg_RE_len[line[0]] = (int(line[1]), int(line[2]))
     return ctg_RE_len
 
-def run(csv_file, output_file, resolution,check, RE_file):
+def read_Allele(Allele_file):
+    allele_dict = defaultdict()
+    with open(Allele_file, 'r') as file:
+        for line in file:
+            line = line.strip().split(',')
+            if line[0].startswith("u") and line[1].startswith("u"):
+                allele_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
+    return allele_dict
+
+def multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele_file):
 
     df = pd.read_csv(csv_file)
     df['source'] = df['source'].astype(str)
@@ -78,7 +87,10 @@ def run(csv_file, output_file, resolution,check, RE_file):
     if check:
         # 检查有效聚类簇数目
         # 阈值设置为平均聚类簇长度的 1/10
+        
         ctg_RE_len = read_REs(RE_file)
+        allele_dict = read_Allele(Allele_file)
+        cluster_dict = defaultdict(list)
         group_len_dict = defaultdict()
 
         for idx, community in enumerate(communities):
@@ -96,7 +108,23 @@ def run(csv_file, output_file, resolution,check, RE_file):
                 if idx in save_group:
                     flag += 1
                     utgs = [g.vs[i]['name'] for i in communities[idx]]
+                    cluster_dict[flag] = utgs
                     file.write(f"group{flag}\t{len(utgs)}\t{' '.join(utgs)}\n")
+        
+        # 计算聚类簇中最大同源contigs长度
+        group_allele_list = list()
+        for group, ctgs in cluster_dict.items():
+            allele_sum = 0
+            for idx1, ctg_1 in enumerate(ctgs):
+                for idx2, ctg_2 in enumerate(ctgs):
+                    if idx1 < idx2:
+                        if tuple(sorted([ctg_1, ctg_2])) in allele_dict:
+                            allele_sum += ctg_RE_len[ctg_1][1]
+                            allele_sum += ctg_RE_len[ctg_2][1]
+            group_allele_list.append(allele_sum)
+        
+        return max(group_allele_list)
+
 
 
 
@@ -118,10 +146,16 @@ if __name__ == '__main__':
     parser.add_argument('--check', action='store_true', help='get the number of vaild clusters')
     parser.add_argument('--RE_file',help='File required when --check is enabled')
 
+    parser.add_argument('--Allele_file',help='File required when --check is enabled')
+
+
     # argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
     if args.check and args.RE_file is None:
         parser.error("--RE_file is required when --check is enabled")
+    
+    if args.check and args.Allele_file is None:
+        parser.error("--Allele_file is required when --check is enabled")
 
-    run(args.csv_file, args.output_file, args.resolution, args.check, args.RE_file)
+    multilevel_cluster(args.csv_file, args.output_file, args.resolution, args.check, args.RE_file, args.Allele_file)
