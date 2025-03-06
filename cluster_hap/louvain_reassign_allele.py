@@ -43,7 +43,7 @@ def correct_collapse_num(utgs_list, collapse_num_dict, cluster_dict, utg_group_d
     correct_collapse_num_dict = copy.deepcopy(collapse_num_dict)
 
     for utg in utgs_list:
-        if utg not in utg_group_dict and collapse_num_dict[utg] <= 1:
+        if utg not in utg_group_dict and collapse_num_dict[utg] == 1:
             correct_collapse_num_dict[utg] = -1
 
     for group in cluster_dict:

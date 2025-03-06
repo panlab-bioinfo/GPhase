@@ -124,7 +124,7 @@ def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ct
 
     return save_dict
 
-def expand_allele(save_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
+def expand_allele(digraph, save_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
 
     expand_dict = defaultdict()
 
@@ -142,6 +142,23 @@ def expand_allele(save_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
                 for sub_utg1 in subgraph1:
                     for sub_utg2 in subgraph2:
                         expand_dict[tuple(sorted([sub_utg1, sub_utg2]))] = 1
+
+    # 根据图结构来识别同源contig
+    for utg in list(digraph.nodes()):
+        predecessors_utg = set(digraph.predecessors(utg))
+        # 
+        successors_utg = set(digraph.successors(utg))
+
+        if len(predecessors_utg) > 1 or len(predecessors_utg) == 0 or len(successors_utg) > 1 or len(successors_utg) == 0:
+            continue
+
+        successors_utg_predecessors = set(digraph.predecessors(list(successors_utg)[0]))
+        predecessors_utg_successors = set(digraph.successors(list(predecessors_utg)[0]))
+
+        intersection = list(predecessors_utg_successors.intersection(successors_utg_predecessors))
+
+        if len(intersection) ==  2:
+            expand_dict[tuple(sorted([intersection[0], intersection[1]]))] = 1
 
 
     with open("merge.partig.csv", 'w') as file:
@@ -222,7 +239,7 @@ if __name__ == '__main__':
     subgraph_ctgs_dict, ctg_subgraph_dict = read_subgraph(subgraph_file)
 
     save_dict = filter_allele(digraph, partig_dict, subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_dict)
-    expand_allele(save_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
+    expand_allele(digraph, save_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
 
 
 

@@ -5,14 +5,18 @@ usage() {
     echo "-------------------------------------------------------------------------------------------------------"
     echo "|Usage: $0 -f <fa_file> -g <gfa> -c <collapse_num_file> -m <map_file> --n_chr <n_chr> --n_hap <n_hap> -p <output_prefix>"
     echo "|"
-    echo "|Required Parameters:"
-    echo "|  -f     <fa_file>                : The FASTA file containing the genome sequences."
-    echo "|  -g     <gfa>                    : The GFA file representing the assembly graph."
-    echo "|  -c     <collapse_num_file>      : The file that number information for collapse unitigs."
-    echo "|  -m     <map_file>               : The mapping file used to map the Hi-C reads."
-    echo "|  --n_chr <n_chr>                  : The number of chromosomes (integer)."
-    echo "|  --n_hap <n_hap>                  : The number of haplotypes (integer)."
-    echo "|  -p     <output_prefix>          : The prefix for the output files."
+    echo "|>>> Required Parameters:"
+    echo "|  -f                 <fa_file>                : The FASTA file containing the genome sequences."
+    echo "|  -g                 <gfa>                    : The GFA file representing the assembly graph."
+    echo "|  -c                 <collapse_num_file>      : The file that number information for collapse unitigs."
+    echo "|  -m                 <map_file>               : The mapping file used to map the Hi-C reads."
+    echo "|  --n_chr            <n_chr>                  : The number of chromosomes (integer)."
+    echo "|  --n_hap            <n_hap>                  : The number of haplotypes (integer)."
+    echo "|  -p                 <output_prefix>          : The prefix for the output files."
+    echo "|"
+    echo "|>>> cluster hap Parameters:"
+    echo "|  --rescue           <rescue>                 : Whether to rescue the subgraph (default: False)."
+    echo "|  --reassign_number  <reassign_number>        : Number of reassign step (default: 1)."
     echo "|"
     echo "|Example:"
     echo "|  bash $0 -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.pairs --n_chr 12 --n_hap 4 -p output_prefix"
@@ -30,7 +34,7 @@ n_hap=""
 output_prefix=""
 
 
-TEMP=$(getopt -o f:g:c:m:p: --long n_chr:,n_hap:,f:,g:,c:,m:,p: -- "$@")
+TEMP=$(getopt -o f:g:c:m:p: --long n_chr:,n_hap:,f:,g:,c:,m:,p:,rescue,reassign_number: -- "$@")
 
 if [ $? != 0 ]; then
     echo "Error: Invalid arguments."
@@ -49,6 +53,15 @@ while true; do
         --n_chr) n_chr="$2"; shift 2 ;;
         --n_hap) n_hap="$2"; shift 2 ;;
         -p) output_prefix="$2"; shift 2 ;;
+        --reassign_number) 
+            if [[ "$2" =~ ^[1-3]+$ ]]; then  # 确保是整数
+                reassign_number="$2"
+            else
+                echo "Error: --reassign_number must be an integer between 1 and 3."
+                usage
+            fi
+            shift 2 ;;
+        --rescue) rescue="rescue"; shift ;;
         --) shift; break ;;
         *) usage ;;
     esac
@@ -70,6 +83,11 @@ for file in "$fa_file" "$gfa" "$collapse_num_file" "$map_file"; do
         ln -s "$file" "$(basename "$file")"
     fi
 done
+
+if [[ -z "$reassign_number" ]]; then
+    reassign_number=1
+fi
+
 
 fa_file="$(basename "$fa_file")"
 gfa="$(basename "$gfa")"
@@ -165,7 +183,15 @@ ln -s "../cluster_chr/${output_prefix}.chr.cluster.ctg.txt"
 
 
 LOG_INFO ${log_file} "run" "Running cluster_hap.py..."
-python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr rescue.cluster.ctg.txt  --expand -pm 0.6
+
+if [[ -z "$rescue" ]]; then
+    cr=${output_prefix}.chr.cluster.ctg.txt
+else
+    cr="rescue.cluster.ctg.txt"
+fi
+
+python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr}  --expand -pm 0.6 --reassign_number ${reassign_number} --${rescue}
+
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_hap.py failed."
     exit 1

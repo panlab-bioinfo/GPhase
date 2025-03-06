@@ -76,11 +76,16 @@ def parse_arguments() -> argparse.Namespace:
                        help=f"Number of parallel processes (default: 20)")
     performance_group.add_argument("--thread_num", metavar='\b',type=int,default=20,
                        help=f"Number of threads per process (default: 20)")
+    
+    reassign_group = parser.add_argument_group('>>> Parameters for reassign step')
+    reassign_group.add_argument("--reassign_number", metavar='\b',type=int, default=1,
+                       help=f"Number of reassign step (default: 1)")
 
     Optional_group  = parser.add_argument_group('>>> Optional parameters')
     Optional_group.add_argument('--correct', action='store_true', help='correct the cluster')
     Optional_group.add_argument('--expand', action='store_true', help='expand the allele')
-    Optional_group.add_argument('--isolated_threshold', default=5,help='<int>Detect whether the intensity of the hic signal is an outlier')
+    Optional_group.add_argument('--rescue', action='store_true', help='rescue filtered subgraph ')
+
 
     return parser.parse_args()
 
@@ -248,9 +253,13 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
 
         utg_file = f"{args.output_prefix}.chr{chr_num}.utgs.txt"
-        utg_rescue_file = f"{args.output_prefix}.chr{chr_num}.utgs.rescue.txt"
         create_symlink(f"../group{chr_num}.txt", utg_file, logger)
-        create_symlink(f"../group{chr_num}_rescue.txt", utg_rescue_file, logger)
+
+        if args.rescue:
+            utg_rescue_file = f"{args.output_prefix}.chr{chr_num}.utgs.rescue.txt"
+            create_symlink(f"../group{chr_num}_rescue.txt", utg_rescue_file, logger)
+        else:
+            utg_rescue_file = utg_file
 
         # Process files with ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=args.thread_num) as executor:
@@ -417,8 +426,8 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         min_variance_idx = louvain_reassign_allele(args.collapse_num_file, utg_rescue_file, filtered_links_file, cluster_file , args.RE_file, partig_file, args.output_prefix, find_best_isolated, isolated_threshold)
         logger.info(f"Chr:{chr_num} louvain_reassign_allele find best isolated : {min_variance_idx}")
 
-        # for i in range(3):
-        #     min_variance_idx = louvain_reassign_allele(args.collapse_num_file, utg_rescue_file, filtered_links_file, f"{args.output_prefix}.reassign.cluster.txt", args.RE_file, partig_file, args.output_prefix, find_best_isolated, isolated_threshold)
+        for i in range(int(args.reassign_number)-1):
+            min_variance_idx = louvain_reassign_allele(args.collapse_num_file, utg_rescue_file, filtered_links_file, f"{args.output_prefix}.reassign.cluster.txt", args.RE_file, partig_file, args.output_prefix, find_best_isolated, isolated_threshold)
 
         
         return f"Successfully processed chromosome {chr_num}"
@@ -485,10 +494,12 @@ def main():
         f"python {script_path_add} -c {args.chr_cluster_file} -r {args.RE_file}",
         "Failed to run cluster2group.py",logger
     )
-    execute_command(
-        f"python {script_path_add} -c {args.chr_cluster_rescue_file} -r {args.RE_file} -m rescue",
-        "Failed to run cluster2group.py",logger
-    )
+
+    if args.rescue:
+        execute_command(
+            f"python {script_path_add} -c {args.chr_cluster_rescue_file} -r {args.RE_file} -m rescue",
+            "Failed to run cluster2group.py",logger
+        )
 
     script_path_add = os.path.join(script_path, "filter_expand_partig.py")
     execute_command(
