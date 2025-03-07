@@ -182,6 +182,9 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
 
     edges = list(G.edges(data=True))
 
+    if len(edges) < 50:
+        return False
+
     # 转换为 DataFrame
     df_edges = pd.DataFrame(edges, columns=['source', 'target', 'links'])
     if not df_edges['links'].empty:
@@ -192,6 +195,25 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
     # 保存为 CSV
     df_edges.to_csv('louvain_nei.csv', index=False)
     louvin_nei_log_file.close()
+
+    return True
+
+
+def louvain_nei(collapse_num_file, chr_file, l, allele_file):
+
+    # collapse_num_file = args.collase_num
+    # chr_file = args.chromosome
+    # l = args.links
+    # allele_file = args.allele
+
+    collapse_num_dict = read_collapse_num(collapse_num_file)
+    utgs_list = read_chr_utgs(chr_file)
+    hic_links_dict, hic_nei_dict = read_l(l)
+    allele_utg_dict, allele_key_dict = read_allele(allele_file)
+
+    louvain_nei_result = run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_dict, allele_key_dict)
+    return louvain_nei_result
+
 
 
 
@@ -208,25 +230,14 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--allele', required=True,
                         help='<filepath>allele utgs pair for chromosome')
 
-    # argcomplete.autocomplete(parser)
     args = parser.parse_args()
-
-    # collapse_num_file = "06.genes.round.cn"
-    # chr_file = "chr06.txt"
-    # l = "rice4.links.nor.csv"
-    # allele_file =  "chr06.allel.csv"
 
     collapse_num_file = args.collase_num
     chr_file = args.chromosome
     l = args.links
     allele_file = args.allele
 
-    collapse_num_dict = read_collapse_num(collapse_num_file)
-    utgs_list = read_chr_utgs(chr_file)
-    hic_links_dict, hic_nei_dict = read_l(l)
-    allele_utg_dict, allele_key_dict = read_allele(allele_file)
-
-    run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_dict, allele_key_dict)
+    louvain_nei(collapse_num_file, chr_file, l, allele_file)
         
 
 

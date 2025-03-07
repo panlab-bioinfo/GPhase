@@ -12,6 +12,7 @@ from collections import defaultdict
 from find_knees import find_best_knee
 from multilevel_cluster import multilevel_cluster
 from louvain_reassign_allele import louvain_reassign_allele
+from louvain_nei import louvain_nei
 
 
 def setup_logging(log_file: str = "cluster_hap.log") -> logging.Logger:
@@ -216,6 +217,7 @@ def multiple_adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output,
 
 
 def process_chromosome(chr_num, args, pwd, partig_file,logger):
+    script_path = os.path.abspath(sys.path[0])
     try:
 
         chr_dir = os.path.join(pwd, f"chr{chr_num}")
@@ -303,21 +305,13 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
             )
             execute_command(command, f"Failed to filter allele links for {cut_links_file}",logger)
 
-            # # Run louvain_nei.py
-            script_path = os.path.abspath(sys.path[0])
-            script_path_add = os.path.join(script_path, "louvain_nei.py")
-            execute_command(
-                f"python {script_path_add} -c {args.collapse_num_file} -chr {utg_file} "
-                f"-l {cut_links_file} -a {partig_file}",
-                "Failed to run louvain_nei.py",logger
-            )
-
-            max_group_allele_value = multilevel_cluster("louvain_nei.csv",cluster_output,1 , "check", utg_file, partig_file)
-
-
-
-
             try:
+                # # Run louvain_nei.py
+                louvain_nei_result = louvain_nei(args.collapse_num_file, utg_rescue_file, cut_links_file, partig_file)
+                if not louvain_nei_result:
+                    raise
+                max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, 1, "check", utg_rescue_file, partig_file)
+
                 optimal_r = multiple_adjust_r_and_cluster(
                     initial_r=1.0,
                     min_r=0.01,
@@ -329,8 +323,8 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                     partig_file=partig_file,
                     hap_number=args.hap_number, logger=logger
                 )
-                logger.info(f"Optimal r for chromosome {chr_num}: {optimal_r}")
-                max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, optimal_r, "check", utg_file, partig_file)
+                # logger.info(f"Optimal r for chromosome {chr_num}: {optimal_r}")
+                max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, optimal_r, "check", utg_rescue_file, partig_file)
                 
                 # Check the number of clusters
                 with open(cluster_output, 'r') as f:
@@ -348,12 +342,11 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
             except:
 
                 logger.error(f"Chr:{chr_num} louvain_nei clustering error!")
-                script_path_add = os.path.join(script_path, "multilevel_cluster.py")
                 # 无法聚类正确单倍型数目时
                 chr_num_collapse_num_file = f"{args.output_prefix}.chr{chr_num}.utgs.uncollapse.txt"
                 command = (
                     "awk -F '[, \\t]' 'NR==FNR{lines[$1]=$2;next}{if(lines[$1]<=1){print $0}}' "
-                    f"{args.collapse_num_file} {utg_file} > {chr_num_collapse_num_file}"
+                    f"{args.collapse_num_file} {utg_rescue_file} > {chr_num_collapse_num_file}"
                 )
                 execute_command(command, f"Failed to filter collapse Contig for {chr_num_collapse_num_file}",logger)
 
@@ -366,7 +359,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                 execute_command(f"sed '1isource,target,links' -i {chr_num_uncollapse_hic_file}", f"Failed to add header to {chr_num_uncollapse_hic_file}",logger)
 
                 # Adjust r and run multilevel_cluster.py
-                max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_file, cluster_output, 1, "check", utg_file, partig_file)
+                max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_file, cluster_output, 1, "check", utg_rescue_file, partig_file)
 
                 try:
                     optimal_r = multiple_adjust_r_and_cluster(
@@ -380,8 +373,8 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                         partig_file=partig_file,
                         hap_number=args.hap_number, logger=logger
                     )
-                    logger.info(f"Optimal r for chromosome {chr_num}: {optimal_r}")
-                    max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_file, cluster_output, optimal_r, "check", utg_file, partig_file)
+                    # logger.info(f"Optimal r for chromosome {chr_num}: {optimal_r}")
+                    max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_file, cluster_output, optimal_r, "check", utg_rescue_file, partig_file)
 
                     # Check the number of clusters
                     with open(cluster_output, 'r') as f:
