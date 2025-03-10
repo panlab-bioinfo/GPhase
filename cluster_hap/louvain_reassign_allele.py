@@ -181,8 +181,10 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
                 cluster_dict[max_hic_group].append(collapse_utg)
             else:  
                 list_ = list(unreassign_groups_hic_sorted.values())
-                list_.remove(float(list(unreassign_groups_hic_sorted.values())[0]))
+                if len(list_) == 2:
+                    list_.remove(float(list(unreassign_groups_hic_sorted.values())[0]))
                 mean = statistics.mean(list_)
+                # print(f"{collapse_utg}\t{max_hic_group}\t{mean*isolated_threshold}")
 
                 if unreassign_groups_hic[max_hic_group] > mean*isolated_threshold:
                     reassign_list.append(max_hic_group)
