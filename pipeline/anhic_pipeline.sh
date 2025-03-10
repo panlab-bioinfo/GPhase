@@ -61,7 +61,7 @@ while true; do
                 usage
             fi
             shift 2 ;;
-        --rescue) rescue="rescue"; shift ;;
+        --rescue) rescue="--rescue"; shift ;;
         --) shift; break ;;
         *) usage ;;
     esac
@@ -161,7 +161,7 @@ ln -s "../preprocessing/${output_prefix}.RE_counts.txt"
 ln -s "../preprocessing/${output_prefix}.chromap.links.nor.csv"
 
 LOG_INFO ${log_file} "run" "Running cluster_chr.py..."
-python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa} -n 5 -pm 0.95
+python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa} -n 2 -pm 0.95
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_chr.py failed."
@@ -185,12 +185,13 @@ ln -s "../cluster_chr/${output_prefix}.chr.cluster.ctg.txt"
 LOG_INFO ${log_file} "run" "Running cluster_hap.py..."
 
 if [[ -z "$rescue" ]]; then
+    rescue=""
     cr=${output_prefix}.chr.cluster.ctg.txt
 else
     cr="rescue.cluster.ctg.txt"
 fi
 
-python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr}  --expand -pm 0.6 --reassign_number ${reassign_number} --${rescue}
+python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr}  --expand -pm 0.8 --reassign_number ${reassign_number} ${rescue}
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_hap.py failed."

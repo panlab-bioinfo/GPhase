@@ -92,15 +92,16 @@ def multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
         allele_dict = read_Allele(Allele_file)
         cluster_dict = defaultdict(list)
         group_len_dict = defaultdict()
+        cluster_num = len(communities)
 
         for idx, community in enumerate(communities):
             utgs = [g.vs[i]['name'] for i in communities[idx]]
             utgs_len = sum([ int(ctg_RE_len[utg][1]) for utg in utgs])
             group_len_dict[idx] = utgs_len
         
-        all_len = sum(group_len_dict.values())
+        avg_len = sum(group_len_dict.values()) / cluster_num
 
-        save_group = [ k for k,v in group_len_dict.items() if v > float(all_len)/10]
+        save_group = [ k for k,v in group_len_dict.items() if v > float(avg_len)/10]
 
         with open(output_file, 'w') as file:
             flag = 0
@@ -119,8 +120,7 @@ def multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
                 for idx2, ctg_2 in enumerate(ctgs):
                     if idx1 < idx2:
                         if tuple(sorted([ctg_1, ctg_2])) in allele_dict:
-                            allele_sum += ctg_RE_len[ctg_1][1]
-                            allele_sum += ctg_RE_len[ctg_2][1]
+                            allele_sum += min(ctg_RE_len[ctg_1][1], ctg_RE_len[ctg_2][1])
             group_allele_list.append(allele_sum)
         
         return max(group_allele_list)

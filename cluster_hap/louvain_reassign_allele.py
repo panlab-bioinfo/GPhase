@@ -2,6 +2,7 @@ from collections import defaultdict
 import argparse
 import statistics
 import copy
+import numpy as np
 
 def read_collapse_num(collapse_num_file):
 
@@ -238,15 +239,16 @@ def louvain_reassign_allele(collapse_num_file, chr_file, l, c ,r, a, output_pref
     correct_collapse_num_dict = correct_collapse_num(utgs_list, collapse_num_dict, cluster_dict, utg_group_dict)
     if find_best_isolated:
         variance_list = list()
-        for isolated in range(10):
+        isolated_list = np.arange(0, 10.5, 0.5).tolist()
+        for isolated in isolated_list:
             cluster_dict, utg_group_dict = read_c(c)
             variance = run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated, output_prefix)
             variance_list.append(variance)
         
         min_variance_idx = variance_list.index(min(variance_list))
         cluster_dict, utg_group_dict = read_c(c)
-        run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, min_variance_idx, output_prefix)
-        return min_variance_idx
+        run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_list[min_variance_idx], output_prefix)
+        return isolated_list[min_variance_idx]
     else:
         cluster_dict, utg_group_dict = read_c(c)
         run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold, output_prefix)
