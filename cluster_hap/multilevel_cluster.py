@@ -7,6 +7,7 @@ from matplotlib.colors import to_hex
 import networkx as nx
 import community as louvain
 from collections import defaultdict
+import statistics
 # import argcomplete
 
 def read_REs(REFile):
@@ -86,22 +87,26 @@ def multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
 
     if check:
         # 检查有效聚类簇数目
-        # 阈值设置为平均聚类簇长度的 1/10
+        # 1:阈值设置为平均聚类簇长度的 1/10
+        # 2: 簇中平均contigs长度小于平均contig长度中位数的1/10 （防止聚类到核糖体）
         
         ctg_RE_len = read_REs(RE_file)
         allele_dict = read_Allele(Allele_file)
         cluster_dict = defaultdict(list)
         group_len_dict = defaultdict()
         cluster_num = len(communities)
+        avg_contig_len= defaultdict()
 
         for idx, community in enumerate(communities):
             utgs = [g.vs[i]['name'] for i in communities[idx]]
             utgs_len = sum([ int(ctg_RE_len[utg][1]) for utg in utgs])
             group_len_dict[idx] = utgs_len
+            avg_contig_len[idx] = utgs_len/len(list(community))
         
         avg_len = sum(group_len_dict.values()) / cluster_num
+        median_avg_contig_len = statistics.median(avg_contig_len.values())
 
-        save_group = [ k for k,v in group_len_dict.items() if v > float(avg_len)/10]
+        save_group = [ k for k,v in group_len_dict.items() if v > float(avg_len)/10 and avg_contig_len[k] > median_avg_contig_len/7]
 
         with open(output_file, 'w') as file:
             flag = 0

@@ -44,7 +44,8 @@ def get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix):
     with open(f"{output_prefix}.scaffold.txt", 'w') as file:
         file.write("#Contig\tRECounts\tLength\n")
         for scaffold, value in scaffold_RE_dict.items():
-            file.write(f"{scaffold}\t{int(value)}\t{scaffold_length_dict[scaffold]}\n")
+            if scaffold_length_dict[scaffold] > 500000:
+                file.write(f"{scaffold}\t{int(value)}\t{scaffold_length_dict[scaffold]}\n")
 
 
     return scaffold_RE_dict

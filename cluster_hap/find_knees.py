@@ -49,8 +49,8 @@ def find_best_knee(csv_file, output_prefix):
     output_file.write(f"all_knees_y:{kl.all_knees_y}\n")
     output_file.close()
 
-
-    plt.style.use("ggplot")
+    plt.style.use("default")  
+    # plt.style.use("ggplot")
     fig, ax = plt.subplots(figsize=(10, 8))
     plt.plot(x, y, zorder=1)
     plt.axvline(x=kl.knee, color='orange', linestyle='--', label='best_knee_x', zorder=2)
@@ -58,10 +58,29 @@ def find_best_knee(csv_file, output_prefix):
     # plt.axhline(y=knees_y_median, color='red', linestyle='--', label='knees_y_median', zorder=4)
     # plt.axhline(y=knees_y_mean, color='blue', linestyle='--', label='knees_y_mean', zorder=5)
 
+    plt.xlabel("Index",  fontsize=16)
+    plt.ylabel("HiC signal after standardization",  fontsize=16)
+    plt.title("Knee Point Detection",  fontsize=18)
+
     yticks = plt.gca().get_yticks()
     new_yticks = list(yticks) + [kl.knee_y]
+    new_yticks.remove(0)
     plt.gca().set_yticks(new_yticks)
     plt.gca().set_yticklabels([f'{tick:.2f}' for tick in new_yticks])
+
+    # ax.spines['top'].set_visible(False)  # 去掉上边框
+    # ax.spines['right'].set_visible(False)  # 去掉右边框
+
+    # xticks = plt.gca().get_xticks()
+    # new_xticks = list(xticks) + [kl.knee]
+    # plt.gca().set_xticks(new_xticks)
+    # plt.gca().set_xticklabels([f'{tick:.0f}' for tick in new_xticks])
+
+
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+
+    plt.legend(fontsize=12)
 
 
 

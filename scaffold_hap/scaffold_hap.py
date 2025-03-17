@@ -216,7 +216,7 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
                 f"chr{chr_num}g{hap_num}.pairs",
                 "-a", "subgraphGroup.agp",
                 "-o", "subgraph_yahs",
-                "--file-type", "pa5"
+                "--file-type", "pa5", "--no-scaffold-ec", "--no-contig-ec"
             ], logger=logger):
                 return False
 

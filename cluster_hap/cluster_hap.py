@@ -294,10 +294,10 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         cluster_output = f"{args.output_prefix}.chr{chr_num}.cluster.txt"
         # 计算 uncollapse 的长度和
         avg_uncollapse_num = get_avg_uncollapse_num(utg_rescue_file, args.collapse_num_file, args.hap_number)
+        logger.info(f"chr_num:{chr_num}\tbest_knee:{best_knee}")
 
 
-
-        while cut_value < best_knee/5:
+        while cut_value < best_knee/2:
 
             cut_links_file = f"{args.output_prefix}.chr{chr_num}.links.nor.filterAllele.c{float(cut_value)}.csv"
             command = (
@@ -338,6 +338,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                     logger.error(f"chr_num:{chr_num}\tmax_group_allele_value: {max_group_allele_value}\t{avg_uncollapse_num/10}")
                     raise
                 else:
+                    logger.info(f"Chr:{chr_num}:max_group_allele_value:{max_group_allele_value}\tavg_uncollapse_num/10:{avg_uncollapse_num/10}")
                     break
 
             except:
@@ -367,9 +368,8 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                 execute_command(command, f"Failed to filter hic links for {chr_num_uncollapse_hic_cut_file}",logger)
 
                 # Adjust r and run multilevel_cluster.py
-                max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, 1, "check", utg_rescue_file, no_expand_partig_file)
-
                 try:
+                    max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, 1, "check", utg_rescue_file, no_expand_partig_file)
                     optimal_r = multiple_adjust_r_and_cluster(
                         initial_r=1.0,
                         min_r=0.01,
@@ -398,6 +398,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                         cut_value += cut_value_step
                         raise
                     else:
+                        logger.info(f"Chr:{chr_num}:max_group_allele_value:{max_group_allele_value}\tavg_uncollapse_num/10:{avg_uncollapse_num/10}")
                         break
                 except:
                     continue

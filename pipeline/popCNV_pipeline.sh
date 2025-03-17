@@ -22,7 +22,7 @@ output_prefix=""
 threads=""
 default_threads=32
 
-TEMP=$(getopt -o f:p:t:: -- "$@")
+TEMP=$(getopt -o f:p:t: -- "$@")
 
 if [ $? != 0 ]; then
     echo "Error: Invalid arguments."
@@ -35,16 +35,22 @@ while true; do
     case "$1" in
         -f) fa_file="$2"; shift 2 ;;
         -p) output_prefix="$2"; shift 2 ;;
-        -t) threads="$2"; shift 2 ;;
+        -t) 
+            case "$2" in
+                "" | --)  # 如果 $2 为空或 "--"，则使用默认值
+                    threads=$default_threads
+                    shift 1
+                    ;;
+                *)  # 否则使用用户输入的值
+                    threads="$2"
+                    shift 2
+                    ;;
+            esac
+            ;;
         --) shift; break ;;
-        *) usage ;;
+        *) usage; exit 1 ;; 
     esac
 done
-
-# If threads is not set, use the default value
-if [ -z "$threads" ]; then
-    threads=$default_threads
-fi
 
 # Validate that all required arguments are provided
 if [ -z "$fa_file" ] || [ -z "$output_prefix" ]; then
@@ -57,7 +63,7 @@ if [ ! -f "$fa_file" ]; then
     echo "Error: File '$file' does not exist."
     exit 1
 fi
-
+set -e
 log_path=$(pwd)
 log_file="${log_path}/popCNV_pipeline.log"
 

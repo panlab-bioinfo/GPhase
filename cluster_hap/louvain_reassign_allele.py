@@ -177,8 +177,10 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
             hic_list = list(unreassign_groups_hic_sorted.keys())
             allele_list = list(unreassign_groups_allele_sorted.values())
 
+
             if len(hic_list) == 1:
                 cluster_dict[max_hic_group].append(collapse_utg)
+                reassign_group = max_hic_group
             else:  
                 list_ = list(unreassign_groups_hic_sorted.values())
                 if len(list_) > 2:
@@ -189,6 +191,7 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
                 if unreassign_groups_hic[max_hic_group] > mean*isolated_threshold:
                     reassign_list.append(max_hic_group)
                     cluster_dict[max_hic_group].append(collapse_utg)
+                    reassign_group = max_hic_group
                     if i==0:
                         cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
                 
@@ -197,8 +200,22 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
 
                     reassign_list.append(min_allele_group)
                     cluster_dict[min_allele_group].append(collapse_utg)
+                    reassign_group = min_allele_group
                     if i==0:
                         cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
+            # 更新 同源信息
+
+            # collapse_utg_group_allele_dict[collapse_utg][reassign_group] += ctg_RE_len[collapse_utg][0]
+
+            for utg in collapse_utg_group_links_dict:
+                if tuple(sorted([collapse_utg, utg])) in allele_dict:
+                    collapse_utg_group_allele_dict[utg][reassign_group] += ctg_RE_len[collapse_utg][1]
+            
+            for utg in collapse_utg_group_links_dict:
+                if tuple(sorted([collapse_utg, utg])) in hic_links_dict:
+                    collapse_utg_group_links_dict[utg][reassign_group] += hic_links_dict[tuple(sorted([collapse_utg, utg]))]
+
+
 
 
     
