@@ -201,16 +201,16 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
                 break_points_set.add(i+1)
                 continue
 
-            # paths = list(nx.all_simple_paths(graph, topo_order[i], topo_order[i+1]))
-            # if len(paths) > 1:
-            #     break_points_set.add(i+1)
+            paths = list(nx.all_simple_paths(graph, topo_order[i], topo_order[i+1]))
+            if len(paths) > 1:
+                break_points_set.add(i+1)
 
             # 检测是否有相连的同源节点
-            # successors = list(graph.successors(topo_order[i]))
-            # predecessors = list(graph.predecessors(topo_order[i+1]))
+            successors = list(graph.successors(topo_order[i]))
+            predecessors = list(graph.predecessors(topo_order[i+1]))
 
-            # if len(successors) > 1 or len(predecessors) > 1:
-            #     break_points_set.add(i+1)
+            if len(successors) > 1 or len(predecessors) > 1:
+                break_points_set.add(i+1)
 
         # 根据断点打断
         start = 0
@@ -220,9 +220,23 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
         topo_order_list.append(topo_order[start:])
 
 
-    print(f"Final : {topo_order_list}")
+    # print(f"Final : {topo_order_list}")
+    # check topo_order_list:
+    topo_order_list_cp = cp.deepcopy(topo_order_list)
+    for idx1, list1 in enumerate(topo_order_list):
+        for idx2, list2 in enumerate(topo_order_list):
+            if idx1 < idx2:
+                overlap = set(list1) & set(list2)
+                if len(overlap) > 0:
+                    for subgraph in list(overlap):
+                        topo_order_list_cp[idx1].remove(subgraph)
+    
+    print(f"Final : {topo_order_list_cp}")
 
-    return topo_order_list
+
+
+
+    return topo_order_list_cp
 
 def get_filter_subgraph_digraph(filter_subgraph_ctgs_dict, filter_ctg_subgraph_dict, gfa_filePath, topo_order_list, digraph_dict):
 
@@ -377,6 +391,7 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
         
 
         ctgs_dir_path_filter_dict[str(idx)] = list(ctgs_dir_path_filter)
+    # print(ctgs_dir_path_filter_dict)
 
     return ctgs_dir_path_filter_dict
     
@@ -390,6 +405,7 @@ def get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict, global_di
     
     subgraphGroup_idx = 1
     for graph in graphs_dict.values():
+        # print(','.join(list(graph.nodes())))
 
         if len(graph.nodes()) == 0:
             continue

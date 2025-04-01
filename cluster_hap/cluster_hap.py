@@ -334,7 +334,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                     if num_clusters != args.hap_number:
                         raise
 
-                if max_group_allele_value > min([avg_uncollapse_num/20, 1000000]):
+                if max_group_allele_value > min([int(avg_uncollapse_num/20), 1000000]):
                     logger.error(f"chr_num:{chr_num}\tmax_group_allele_value: {max_group_allele_value}\t{avg_uncollapse_num/10}")
                     raise
                 else:
@@ -426,11 +426,11 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
         # Run louvain_reassign_allele.py
         find_best_isolated, isolated_threshold = True, 0
-        min_variance_idx = louvain_reassign_allele(args.collapse_num_file, utg_rescue_file, filtered_links_file, cluster_file , args.RE_file, partig_file, args.output_prefix, find_best_isolated, isolated_threshold)
+        min_variance_idx = louvain_reassign_allele(args.collapse_num_file, utg_rescue_file, filtered_links_file, cluster_file , args.RE_file, partig_file, args.output_prefix, find_best_isolated, no_expand_partig_file, isolated_threshold)
         logger.info(f"Chr:{chr_num} louvain_reassign_allele find best isolated : {min_variance_idx}")
 
         for i in range(int(args.reassign_number)-1):
-            min_variance_idx = louvain_reassign_allele(args.collapse_num_file, utg_rescue_file, filtered_links_file, f"{args.output_prefix}.reassign.cluster.txt", args.RE_file, partig_file, args.output_prefix, find_best_isolated, isolated_threshold)
+            min_variance_idx = louvain_reassign_allele(args.collapse_num_file, utg_rescue_file, filtered_links_file, f"{args.output_prefix}.reassign.cluster.txt", args.RE_file, partig_file, args.output_prefix, find_best_isolated, no_expand_partig_file, isolated_threshold)
 
         
         return f"Successfully processed chromosome {chr_num}"
