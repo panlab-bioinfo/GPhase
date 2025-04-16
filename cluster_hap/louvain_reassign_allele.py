@@ -106,18 +106,19 @@ def allele_sort(unreassign_groups_hic):
 
 
 
-def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, no_expand_allele_dict, isolated_threshold, output_prefix):
+def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, no_expand_allele_dict, isolated_threshold, output_prefix, write_flag=False):
 
     log_file = open("reassign_collapse.log", 'a')
-    collapse_utgs_list = [ utg for utg in correct_collapse_num_dict if (correct_collapse_num_dict[utg] > 1 or correct_collapse_num_dict[utg] == -1)and utg in utgs_list]
+    reassign_utg_list = [ utg for utg in correct_collapse_num_dict if (correct_collapse_num_dict[utg] > 1 or correct_collapse_num_dict[utg] == -1)and utg in utgs_list]
 
     # 计算collapse utg 对每个cluster的hic信号总数和allele的片段总长
     collapse_utg_group_links_dict = defaultdict(lambda: defaultdict(float))
     collapse_utg_group_allele_dict = defaultdict(lambda: defaultdict(float))
     cluster_uncollapse_dict = copy.deepcopy(cluster_dict)
+    cluster_output_dict = copy.deepcopy(cluster_dict)
     n_hap = len(cluster_dict)
 
-    for collapse_utg in collapse_utgs_list:
+    for collapse_utg in reassign_utg_list:
         for group in cluster_dict:
             group_links, allele_links = 0, 0
             for utg in cluster_dict[group]:
@@ -179,27 +180,26 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
 
 
             if len(hic_list) == 1:
-                cluster_dict[max_hic_group].append(collapse_utg)
+                cluster_output_dict[max_hic_group].append(collapse_utg)
                 reassign_group = max_hic_group
             else:  
                 list_ = list(unreassign_groups_hic_sorted.values())
                 if len(list_) > 2:
                     list_.remove(float(list(unreassign_groups_hic_sorted.values())[0]))
                 mean = statistics.mean(list_)
-                # print(f"{collapse_utg}\t{max_hic_group}\t{min_allele_group}\t{mean*isolated_threshold}\t{len(list_)}")
 
                 if unreassign_groups_hic[max_hic_group] > mean*isolated_threshold:
                     reassign_list.append(max_hic_group)
-                    cluster_dict[max_hic_group].append(collapse_utg)
+                    cluster_output_dict[max_hic_group].append(collapse_utg)
                     reassign_group = max_hic_group
-                    if i==0:
-                        cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
+                    # if i==0:
+                    #     cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
                 
                 # 不显著离群，使用 allele 信息 
                 else:
 
                     reassign_list.append(min_allele_group)
-                    cluster_dict[min_allele_group].append(collapse_utg)
+                    cluster_output_dict[min_allele_group].append(collapse_utg)
                     reassign_group = min_allele_group
                     if i==0:
                         cluster_uncollapse_dict[max_hic_group].append(collapse_utg)
@@ -217,21 +217,20 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
 
 
 
+    if write_flag:
+        with open(f"{output_prefix}.reassign.cluster.txt", 'w') as file:
+            for group in cluster_output_dict:
+                file.write(f"{group}\t{len(cluster_output_dict[group])}\t")
+                for utg in cluster_output_dict[group]:
+                    file.write(f"{utg} ")
+                file.write("\n")
 
-    
-    with open(f"{output_prefix}.reassign.cluster.txt", 'w') as file:
-        for group in cluster_dict:
-            file.write(f"{group}\t{len(cluster_dict[group])}\t")
-            for utg in cluster_dict[group]:
-                file.write(f"{utg} ")
-            file.write("\n")
-
-    with open(f"{output_prefix}.reassign.uncopy.cluster.txt", 'w') as file:
-        for group in cluster_uncollapse_dict:
-            file.write(f"{group}\t{len(cluster_uncollapse_dict[group])}\t")
-            for utg in cluster_uncollapse_dict[group]:
-                file.write(f"{utg} ")
-            file.write("\n")
+        with open(f"{output_prefix}.reassign.uncopy.cluster.txt", 'w') as file:
+            for group in cluster_uncollapse_dict:
+                file.write(f"{group}\t{len(cluster_uncollapse_dict[group])}\t")
+                for utg in cluster_uncollapse_dict[group]:
+                    file.write(f"{utg} ")
+                file.write("\n")
 
 
     # 计算 cluster 中每个簇的长度方差
@@ -243,7 +242,7 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
 
     # 计算簇中同源contig长度
     variance_stats = 0
-    for group, ctgs in cluster_dict.items():
+    for group, ctgs in cluster_output_dict.items():
        for idx1, ctg1 in enumerate(ctgs):
             for idx2, ctg2 in enumerate(ctgs):
                 if idx1 < idx2 and tuple(sorted([ctg1, ctg2])) in no_expand_allele_dict:
@@ -269,14 +268,16 @@ def louvain_reassign_allele(collapse_num_file, chr_file, l, c ,r, a, output_pref
         variance_list = list()
         isolated_list = np.arange(0, 10.5, 0.5).tolist()
         for isolated in isolated_list:
+            del cluster_dict
             cluster_dict, utg_group_dict = read_c(c)
             variance = run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, no_expand_allele_dict, isolated, output_prefix)
             variance_list.append(variance)
         
         min_variance_idx = variance_list.index(min(variance_list))
-        print(variance_list)
+        # print(variance_list)
+        del cluster_dict
         cluster_dict, utg_group_dict = read_c(c)
-        run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, no_expand_allele_dict, isolated_list[min_variance_idx], output_prefix)
+        run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, no_expand_allele_dict, isolated_list[min_variance_idx], output_prefix, write_flag=True)
         return isolated_list[min_variance_idx]
     else:
         cluster_dict, utg_group_dict = read_c(c)

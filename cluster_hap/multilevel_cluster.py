@@ -88,7 +88,7 @@ def multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
     if check:
         # 检查有效聚类簇数目
         # 1:阈值设置为平均聚类簇长度的 1/10
-        # 2: 簇中平均contigs长度小于平均contig长度中位数的1/10 （防止聚类到核糖体）
+        # 2: 簇中平均contigs长度小于平均contig长度中位数的1/7 （防止聚类到核糖体）
         
         ctg_RE_len = read_REs(RE_file)
         allele_dict = read_Allele(Allele_file)
@@ -128,7 +128,7 @@ def multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
                             allele_sum += min(ctg_RE_len[ctg_1][1], ctg_RE_len[ctg_2][1])
             group_allele_list.append(allele_sum)
         
-        return max(group_allele_list)
+        return cluster_dict, max(group_allele_list)
 
 
 

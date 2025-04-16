@@ -238,7 +238,7 @@ def parse_arguments() -> argparse.Namespace:
 
     split_GFA_group  = parser.add_argument_group('>>> Parameter for split GFA')
     split_GFA_group.add_argument("-g", "--gfa", required=True, help="Path to the GFA file.")
-    split_GFA_group.add_argument("-n", "--split_gfa_n", type=int, default=2, help="Number of common neighbors when splitting GFA. Default: 2.")
+    split_GFA_group.add_argument("-n", "--split_gfa_n", type=int, default=5, help="Number of common neighbors when splitting GFA. Default: 5.")
     split_GFA_group.add_argument("-i", "--split_gfa_iter", type=int, default=3, help="Number of iterations when splitting GFA. Default: 3.")
 
     return parser.parse_args()
