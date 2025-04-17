@@ -40,7 +40,6 @@ def read_l(l):
     hic_links_dict = defaultdict()
     with open(l, 'r') as file:
         for line in file:
-            # if line.startswith("utg") or line.startswith("utig") :
             if not line.startswith("source"):
                 line = line.strip().split(',')
                 hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
@@ -54,7 +53,7 @@ def get_chr_cluster(subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict, r
     subgraph_unClusterRm_hicGroup_dict = defaultdict(lambda: defaultdict(int))
     hicGroup_cluster_re_dict = copy.deepcopy(hicGroup_cluster_dict)
 
-    # 合并没有等位和之前被过滤掉的subgraph
+    # merge subgraph
     merge_ctg_subgraph_dict = {**ctg_subgraph_unCluster_dict, **ctg_rmSubgraph_dict}
     merge_subgraph_ctg_dict = {**subgraph_unCluster_ctgs_dict, **rmSubgraph_ctgs_dict}
 
@@ -90,7 +89,6 @@ def get_chr_cluster(subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict, r
                 print("error...")
 
     for group, dict_ in subgraph_unClusterRm_hicGroup_dict.items():
-        # print(f"{group}\t{dict_}")
         sorted_dict_ = dict(sorted(dict_.items(), key=lambda item: item[1], reverse=True))
 
         if not sorted_dict_:

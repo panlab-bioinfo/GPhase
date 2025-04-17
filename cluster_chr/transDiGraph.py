@@ -8,17 +8,14 @@ import argparse
 def read_gfa(gfa_filePath):
 
     utgs_list = list()
-    # graph = nx.MultiDiGraph()
     graph = nx.Graph()
     with open(gfa_filePath, 'r') as file:
         for line in file:
             line = line.strip().split()
             if(line[0] == "S"):
                 utgs_list.append(line[1])
-                # graph.add_node(line[1], length = len(line[2]), seq = line[2], coverage = int(line[4][5:]), visit_count = 1, out=set(), enter=set(), type=None)
                 graph.add_node(line[1], length = len(line[2]), seq = line[2], visit_count = 1, out=set(), enter=set(), type=None)
-            elif(line[0] == "L"): # no self loop
-                # gfa.add_edge(line[1],line[3])
+            elif(line[0] == "L"): 
                 graph.add_edge(line[1],line[3],strand1=line[2], strand2=line[4], match=int(line[5][:-1]))
                 if line[2] == '+' :
                     graph.nodes[line[1]]['out'].add(line[3]) 
@@ -29,9 +26,7 @@ def read_gfa(gfa_filePath):
 
 
 
-#将无向图转换为有向图
 def trans_digraph(graph, digraph, start_node):
-    # 双向传播
     pair = (start_node, 1)
 
     queue = deque([pair])  
@@ -42,7 +37,6 @@ def trans_digraph(graph, digraph, start_node):
 
     while queue:
         # + : 1 : out ; - : 0 : enter
-        # 通过 比较邻居节点的交集确认连接节点的方向 
 
         (utg, utg_dir) = queue.popleft() 
 
@@ -82,10 +76,7 @@ def run_trans_digraph(gfa_filePath, gfa_file, flag_output_csv=False):
     if flag_output_csv:
         with open(f"{gfa_file}.digraph.csv", 'w', newline='') as file:
             writer = csv.writer(file)
-            # 写入CSV文件头部
             writer.writerow(['source', 'target'])
-
-            # 遍历图中的所有边并写入CSV文件
             for u, v in digraph.edges():
                 writer.writerow([u, v])
 

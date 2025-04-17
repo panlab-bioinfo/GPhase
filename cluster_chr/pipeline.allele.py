@@ -109,7 +109,7 @@ def trans_net(utgs_list, graph, ctg_RE_dict):
     for idx,component in enumerate(nx.connected_components(graph), 1):
 
         group_list = list(component)
-        # 子图中所有节点全小于N80
+        # all node < N80
         if all(int(ctg_RE_dict[ctg][1]) < all_N80 for ctg in group_list if ctg in ctg_RE_dict):
             group_ctg_filter_dict[idx] = {'ctgs':group_list,'length':1}
             continue
@@ -141,8 +141,6 @@ def trans_net(utgs_list, graph, ctg_RE_dict):
         for group in group_ctg_filter_dict:
             file.write(f"{group}\t{group_ctg_filter_dict[group]['length']}\t{','.join(list(group_ctg_filter_dict[group]['ctgs']))}\n")
 
-
-    # 使用subprocess.run来执行cat命令，并将输出重定向到文件
     with open("group_ctgs_All.txt", 'w') as f:
         subprocess.run(['cat', 'group_ctgs_save.txt', 'group_ctgs_filter.txt'], stdout=f, text=True)
     
@@ -151,7 +149,6 @@ def trans_net(utgs_list, graph, ctg_RE_dict):
 
 def cluster(group_ctg_dict, ctg_group_dict, hic_links_dict, allele_dict):
     
-    # 计算group 之间的信号
     group_links_dict = defaultdict(float)
     group_allele_dict = defaultdict(float)
 
@@ -195,7 +192,6 @@ def expand_cluster(csv_file, group_ctg_dict, output_prefix):
     # expand
     len_iter = len(cluster_dict)
     for group in group_ctg_dict:
-    # for group in group_ctg_dict:
         if group not in utg_group_dict:
             cluster_dict["group"+str(len_iter+1)].append(str(group))
             len_iter += 1

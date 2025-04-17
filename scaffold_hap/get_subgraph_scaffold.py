@@ -8,14 +8,14 @@ import matplotlib.pyplot as plt
 
 def read_group(group_file):
 
-    ctgs_list = list()
+    ctgs_set = set()
     with open(group_file, 'r') as file:
         for line in file:
             if line.startswith('u'):
                 line = line.strip().split()
-                ctgs_list.append(line[0])
+                ctgs_set.add(line[0])
 
-    return ctgs_list
+    return list(ctgs_set)
 
 def read_digraph(digraph_file):
 
@@ -109,8 +109,7 @@ def get_subgraph_link(digraph_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
 
 # 找有向图N阶前驱
 def n_hop_predecessors(G, node, N):
-    """用 ancestors() + BFS 找 N 阶前驱"""
-    ancestors = nx.ancestors(G, node)  # 所有前驱
+    ancestors = nx.ancestors(G, node) 
     return {p for p in ancestors if nx.shortest_path_length(G, p, node) == N}
 
 # 在包含group中ctg的子图上进行连接
@@ -130,19 +129,6 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
         graph.add_node(subgraph)
 
 
-    # N_neighbors = 3
-    # for node in graph.nodes():
-    #     neighbors = list(n_hop_predecessors(subgraph_digraph, node, N_neighbors))
-    #     neighbors_filter = [ node for node in neighbors if node in graph.nodes()]
-    #     for nei_node in neighbors_filter:
-    #         graph.add_edge(node, nei_node)
-
-    # for node in graph.nodes():
-    #     neighbors = list(n_hop_predecessors(subgraph_digraph, node, N_neighbors))
-    #     neighbors_filter = [ node for node in neighbors if node in graph.nodes()]
-    #     for nei_node in neighbors_filter:
-    #         graph.add_edge(node, nei_node)
-
 
     Path_Length_T = 5
 
@@ -155,8 +141,6 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
                 if not nx.has_path(graph, node1, node2):
                     if nx.has_path(subgraph_digraph, node1, node2): 
                         
-                        # paths = list(nx.all_simple_paths(subgraph_digraph, source=node1, target=node2))
-                        # for path in paths:
                         path = nx.shortest_path(subgraph_digraph, source=node1, target=node2)
                         last_node_in_path = [ node for node in path if node in graph.nodes()][-2]
                         last_node_in_path_idx = list(path).index(last_node_in_path)
@@ -181,16 +165,13 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
         # 执行拓扑排序
         while True:
             try:
-                # 查找一个环
                 cycle = nx.find_cycle(subgraph_digraph)
-                # 删除环中的第一条边
                 subgraph_digraph.remove_edge(*cycle[0])
             except nx.NetworkXNoCycle:
-                # 没有环时退出循环
                 break
 
         topo_order = list(nx.topological_sort(subgraph_digraph))
-        print(f"topo_order:{topo_order}")
+        # print(f"topo_order:{topo_order}")
 
         # check : 相邻两点是否只存在一条路径, 如果没有路径或者存在多条路径则打断,并且无同源节点
         for i in range(len(topo_order)-1):
@@ -229,20 +210,20 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
                 overlap = set(list1) & set(list2)
                 if len(overlap) > 0:
                     for subgraph in list(overlap):
-                        topo_order_list_cp[idx1].remove(subgraph)
+                        if subgraph in topo_order_list_cp[idx1]:
+                            topo_order_list_cp[idx1].remove(subgraph)
     
-    print(f"Final : {topo_order_list_cp}")
-
-
-
-
+    # print(f"Final : {topo_order_list_cp}")
     return topo_order_list_cp
+
+    return topo_order_list
+
+
 
 def get_filter_subgraph_digraph(filter_subgraph_ctgs_dict, filter_ctg_subgraph_dict, gfa_filePath, topo_order_list, digraph_dict):
 
     global_digraph = nx.DiGraph()
 
-    # 添加边和权重
     for (node1, node2) in digraph_dict.keys():
         global_digraph.add_edge(node1, node2)
     
@@ -326,7 +307,6 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
     while True:
         try:
             cycle = nx.find_cycle(digraph_copy)
-            # print("找到环:", cycle)
             # topo_order = list(nx.topological_sort(digraph))
             edge_to_remove = min(cycle, key=lambda x: digraph_copy.edges[x]['weight'])
             digraph_copy.remove_edge(*edge_to_remove)
@@ -350,7 +330,6 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
     ctgs_sort_check = list()
     break_points_list = list()
     for i in range(len(ctgs_sort) - 1):
-        # print(f"source:{ctgs_sort[i]}\ttarget:{ctgs_sort[i+1]}")
         try:
             if not nx.has_path(digraph, source=ctgs_sort[i], target=ctgs_sort[i+1]):
                 break_points_list.append(i+1)
@@ -405,7 +384,6 @@ def get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict, global_di
     
     subgraphGroup_idx = 1
     for graph in graphs_dict.values():
-        # print(','.join(list(graph.nodes())))
 
         if len(graph.nodes()) == 0:
             continue
@@ -428,20 +406,6 @@ def get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict, global_di
             filter_subgraph_sort_dict[subgraphGroup_idx] = list(ctgs_path_filter_list)
             subgraphGroup_idx += 1
 
-
-
-    # with open(f"group.subgraph.sort.dir.cluster.txt", 'w') as file: 
-    #     for subgraph, ctgs_dir_list in filter_subgraph_sort_dir_dict.items():
-    #         ctgs_dir_trans_list = [ str(ctg)  + str('+' if str(ctg_dir)=='1' else '-') for ctg, ctg_dir in ctgs_dir_list]
-    #         file.write(f"{subgraph}\t{len(ctgs_dir_trans_list)}\t{' '.join(ctgs_dir_trans_list)}\n")
-    
-    # with open(f"group.subgraph.sort.cluster.txt", 'w') as file: 
-    #     for subgraph, ctgs_list in filter_subgraph_sort_dict.items():
-    #         file.write(f"{subgraph}\t{len(ctgs_dir_list)}\t{' '.join(ctgs_list)}\n")
-
-    # with open(f"subgraphGroup.counts_GATC.txt", 'w') as file: 
-    #     for subgraph, pair in subgraphGroup_RE_dict.items():
-    #         file.write(f"{subgraph}\t{pair[0]}\t{pair[1]}\n")
 
     return filter_subgraph_sort_dir_dict, filter_subgraph_sort_dict
 

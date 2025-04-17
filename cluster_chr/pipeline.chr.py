@@ -24,7 +24,6 @@ def read_l(l):
     hic_links_dict = defaultdict()
     with open(l, 'r') as file:
         for line in file:
-            # if line.startswith("utg") or line.startswith("utig") :
             if not line.startswith("source"):
                 line = line.strip().split(',')
                 hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])

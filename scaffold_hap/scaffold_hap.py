@@ -10,6 +10,8 @@ import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import List, Tuple, Optional, Union
+from get_subgraph_scaffold_v2 import Get_subgraph_scaffold_v2
+from get_data_HapHiC_sort import Get_data_HapHiC_sort
 
 def setup_logging(log_file: str = "scaffold.log") -> logging.Logger:
     """Configure logging to both file and console."""
@@ -20,11 +22,9 @@ def setup_logging(log_file: str = "scaffold.log") -> logging.Logger:
     fh = logging.FileHandler(log_file)
     fh.setLevel(logging.INFO)
     
-    # Console handler
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     
-    # Formatter with timestamp and script name (based on your example format)
     formatter = logging.Formatter('%(asctime)s <%(module)s.py> [%(funcName)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
@@ -64,10 +64,24 @@ def parse_arguments() -> argparse.Namespace:
 
     performance_group  = parser.add_argument_group('>>> Parameters for performance')
     performance_group .add_argument("-t", "--thread_number", metavar='\b', type=int, default=1, help="Number of parallel processes")
+
+    yahs_group  = parser.add_argument_group('>>> Parameters for YaHS')
+    yahs_group .add_argument("--no_contig_ec", action='store_true', help="do not do contig error correction")
+    yahs_group .add_argument("--no_scaffold_ec", action='store_true', help="do not do scaffold error correction")
+
+    haphic_group  = parser.add_argument_group('>>> Parameters for HapHiC sort')
+    haphic_group .add_argument("--min_len", metavar='\b',type=int, default=0, help="minimum scaffold length, default: 0")
+    haphic_group .add_argument("--mutprob", metavar='\b', type=float, default=0.6, help="mutation probability in the genetic algorithm, default: 0.6")
+    haphic_group .add_argument("--ngen", metavar='\b', type=int, default=20000, help="number of generations for convergence, default: 20000")
+    haphic_group .add_argument("--npop", metavar='\b', type=int, default=200, help="mopulation size, default: 200")
+    haphic_group .add_argument("--processes", metavar='\b', type=int, default=32, help="processes for fast sorting and ALLHiC optimization, default: 32")
+
+
+
     
     return parser.parse_args()
 
-def run_command(cmd: List[str], logger, cwd: Optional[str] = None, shell: bool = False) -> bool:
+def run_command(cmd: List[str], logger, cwd: Optional[str] = None, shell: bool = False, stdout=None) -> bool:
     """Execute a shell command."""
     try:
         logger.info(f"Running command: {cmd}")
@@ -122,7 +136,6 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
         os.makedirs(hap_dir, exist_ok=True)
         os.chdir(hap_dir)
 
-        # Create symbolic links
         src_files = [
             f"chr{chr_num}/group{hap_num}.txt",
             args.subgraph_file,
@@ -139,22 +152,9 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
             except FileExistsError:
                 pass
 
-        # Run scaffold.subgraph.py
+        # Run get subgraph sort result
         script_path = os.path.abspath(sys.path[0])
-        script_path_add = os.path.join(script_path, "get_subgraph_scaffold.py")
-
-        cmd = [
-            "python", script_path_add,
-            "-c", f"group{hap_num}.txt",
-            "-subgraph", args.subgraph_file,
-            "-graph", args.gfa_file,
-            "-digraph", args.digraph_file,
-            "-r", args.RE_file,
-            "-l", args.HiC_file
-        ]
-
-        if not run_command(cmd,logger):
-            return False
+        Get_subgraph_scaffold_v2(args.gfa_file, args.RE_file, args.digraph_file, f"group{hap_num}.txt", args.subgraph_file)
 
         # split asm.fa
         tmp_file = f"tmp_{hap_num}.txt"
@@ -173,26 +173,6 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
         if not run_command(["samtools", "faidx", f"chr{chr_num}g{hap_num}.fa"], logger=logger):
             return False
 
-        # Process bam or pairs file
-        if args.map_file_type == "bam":
-            command = f"cut -f1 group{hap_num}.txt | xargs -I T echo T | tr '\n' ' ' "
-            cut_output = subprocess.check_output(command, shell=True).decode('utf-8').strip()
-
-            # Use it in the samtools command
-            samtools_cmd = f"samtools view -b {args.map_file} {cut_output} -o chr{chr_num}g{hap_num}.bam"
-            if not run_command([samtools_cmd], shell=True, logger=logger):
-                return False
-
-            # Run YAHS
-            if not run_command([
-                "yahs",
-                f"chr{chr_num}g{hap_num}.fa",
-                f"chr{chr_num}g{hap_num}.bam",
-                "-a", "subgraphGroup.agp",
-                "-o", "subgraph_yahs"
-            ], logger=logger):
-                return False
-
         if args.map_file_type == "pa5":
 
             tmp_file = f"tmp_{hap_num}.txt"
@@ -200,7 +180,6 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
             if not run_command([cut_command], shell=True,logger=logger):
                 return False
 
-            # 使用 awk 命令
             awk_cmd = f"""awk 'NR==FNR{{lines[$1];next}}{{if(NF < 8 && $2 in lines){{print $0;next}}if($2 in lines && $4 in lines){{print $1"\\t"$2"\\t"$3"\\t"$4"\\t"$5}}}}' {tmp_file} {args.map_file} > chr{chr_num}g{hap_num}.pairs"""
             if not run_command([awk_cmd], shell=True, logger=logger):
                 return False
@@ -210,23 +189,32 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
                 return False
 
             # Run YAHS
+            contig_ec = "--no-contig-ec" if args.no_contig_ec else ""
+            scaffold_ec = "--no-scaffold-ec" if args.no_scaffold_ec else ""
             if not run_command([
                 "yahs",
                 f"chr{chr_num}g{hap_num}.fa",
                 f"chr{chr_num}g{hap_num}.pairs",
                 "-a", "subgraphGroup.agp",
                 "-o", "subgraph_yahs",
-                "--file-type", "pa5", "--no-scaffold-ec", "--no-contig-ec"
+                "--file-type", "pa5", f"{contig_ec}" f"{scaffold_ec}"
             ], logger=logger):
                 return False
 
         # Update scaffold names
         for file_pattern, sed_cmd in [
             ("subgraph_yahs_scaffolds_final.agp", f"s/^/chr{chr_num}g{hap_num}_/g"),
-            ("subgraph_yahs_scaffolds_final.fa", f"s/>/>chr{chr_num}g{hap_num}_/g")
+            ("subgraph_yahs_scaffolds_final.fa", f"s/>/>chr{chr_num}g{hap_num}_/g"),
+            ("subgraphGroup.agp", f"s/^/chr{chr_num}g{hap_num}_/g"),
         ]:
             if not run_command(["sed", "-i", sed_cmd, file_pattern], logger=logger):
                 return False
+        
+        # get subgraphGroup.fa
+        cmd = f"/data/duwenjie/AnHiC/src/HapHiC/utils/agp_to_fasta subgraphGroup.agp chr{chr_num}g{hap_num}.fa > subgraphGroup.fa"
+        if not run_command(cmd, logger=logger, shell=True):
+            return False
+
 
         # Set up scaffold_HapHiC_sort directory
         scaffold_dir = os.path.join(hap_dir, "scaffold_HapHiC_sort")
@@ -237,6 +225,7 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
         links_list = [f"chr{chr_num}g{hap_num}/subgraph_yahs.bin", \
                     f"chr{chr_num}g{hap_num}/chr{chr_num}g{hap_num}.fa", \
                     f"chr{chr_num}g{hap_num}/subgraph_yahs_scaffolds_final.agp", \
+                    f"chr{chr_num}g{hap_num}/subgraphGroup.agp", \
                     args.RE_file]
 
         if args.map_file_type == "bam":
@@ -251,25 +240,12 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
                 pass
 
         # Run get_data_HapHiC_sort.py
-        script_path_add = os.path.join(script_path, "get_data_HapHiC_sort.py")
-        if args.map_file_type == "bam":
-            if not run_command([
-                "python", f"{script_path_add}",
-                "-m", f"chr{chr_num}g{hap_num}.bam",
-                "-a", "subgraph_yahs_scaffolds_final.agp",
-                "-r", args.RE_file,
-                "-o", f"{args.output_prefix}.chr{chr_num}g{hap_num}"
-            ],logger=logger):
-                return False
         if args.map_file_type == "pa5":
-            if not run_command([
-                "python", f"{script_path_add}",
-                "-m", f"chr{chr_num}g{hap_num}.pairs",
-                "-a", "subgraph_yahs_scaffolds_final.agp",
-                "-r", args.RE_file,
-                "-o", f"{args.output_prefix}.chr{chr_num}g{hap_num}"
-            ], logger=logger):
-                return False
+            flag = Get_data_HapHiC_sort(f"chr{chr_num}g{hap_num}.pairs", "pa5",  "subgraph_yahs_scaffolds_final.agp", args.RE_file, f"{args.output_prefix}.chr{chr_num}g{hap_num}", args.min_len)
+            if not flag:
+                logger.error(f"Error : Chr{chr_num}g{hap_num} get data for HapHiC -> {str(e)}")
+                return False 
+
 
         logger.info(f"Haplotype {hap_num} of chromosome {chr_num} processing completed.")
         return True
@@ -326,18 +302,12 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
                 with open(scaffold_file) as infile:
                     outfile.write(infile.read())
 
-        # # Merge pairs files
-        # with open(f"{args.output_prefix}.merge.map.bin", 'wb') as outfile:
-        #     for pairs_file in glob.glob(os.path.join(pwd, "chr*/chr*/subgraph_yahs.bin")):
-        #         with open(pairs_file, 'rb') as infile:
-        #             outfile.write(infile.read())
-
-        # Create and execute final commands script
+        # HapHiC sort & build
         script_path_add = os.path.join(script_path, "../src/HapHiC/haphic")
         script_content = f"""
             cd {haphic_dir}
-            {script_path_add} sort {args.output_prefix}.merge.fa {args.output_prefix}.merge.HT.pkl split_clms/ groups_REs/* 
-            {script_path_add} build {args.output_prefix}.merge.fa {args.output_prefix}.merge.fa {args.output_prefix}.merge.map.bin final_tours/*tour
+            {script_path_add} sort {args.output_prefix}.merge.fa {args.output_prefix}.merge.HT.pkl split_clms/ groups_REs/* --mutprob {args.mutprob} --ngen {args.ngen} --npop {args.npop}  --processes {args.processes}
+            {script_path_add} build {args.output_prefix}.merge.fa {args.output_prefix}.merge.fa {args.output_prefix}.merge.fa final_tours/*tour
             seqkit sort scaffolds.fa > scaffolds.sort.fa
             samtools faidx scaffolds.sort.fa
 
@@ -356,7 +326,7 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
         os.chdir(haphic_dir)
         os.makedirs(os.path.join(haphic_dir, "final_agp"), exist_ok=True)
         os.chdir(os.path.join(haphic_dir, "final_agp"))
-        # Loop through i and j values
+
         for i in range(1, int(args.chr_number) + 1):
             for j in range(1, int(args.hap_number) + 1):
                 # Step 1: Extract rows from scaffolds.agp
@@ -396,8 +366,8 @@ def log_start(logger: logging.Logger, script_name: str, version: str, args: argp
     logger.info(f"Arguments: {args}")
 
 def main():
-    logger = setup_logging('scaffold_hap.log')  # Set up logging
     args = parse_arguments()
+    logger = setup_logging('scaffold_hap.log') 
     pwd = os.getcwd()
     
     # Log program start

@@ -13,7 +13,7 @@ def read_agp(agp_file):
     with open(agp_file, 'r') as file:
         for line in file:
             line = line.strip().split()
-            if line[5][0]=="u":
+            if line[5][0]=="u" or line[5][0]=="s" or line[4][0]=="W":
 
                 # scaffold_idx_1, scaffold_idx_2, contig_idx_1, contig_idx_1
                 scaffold_ctgs_dict[line[0]][line[5]] = (int(line[1]), int(line[2]), int(line[6]), int(line[7]))
@@ -25,7 +25,7 @@ def read_agp(agp_file):
 
     return scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict
 
-def get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix):
+def get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix, min_len=0):
 
     ctg_RE_dict = defaultdict(tuple)
     scaffold_RE_dict = defaultdict(int)
@@ -44,7 +44,7 @@ def get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix):
     with open(f"{output_prefix}.scaffold.txt", 'w') as file:
         file.write("#Contig\tRECounts\tLength\n")
         for scaffold, value in scaffold_RE_dict.items():
-            if scaffold_length_dict[scaffold] > 500000:
+            if scaffold_length_dict[scaffold] > min_len:
                 file.write(f"{scaffold}\t{int(value)}\t{scaffold_length_dict[scaffold]}\n")
 
 
@@ -194,7 +194,19 @@ def read_map_file(map_file, map_file_type, scaffold_ctgs_dict, ctg_scaffold_dict
 
     return scaffold_HT_dict, scaffold_clm_dict
 
-def main():
+def Get_data_HapHiC_sort(map_file, map_file_type, agp_file, RE_file, output_prefix, min_len=0):
+    try:
+        scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict = read_agp(agp_file)
+        read_map_file(map_file, map_file_type, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict, output_prefix)
+        get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix, min_len)
+
+        return True
+    except:
+        False
+
+
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gets the data for running HapHiC sort.")
 
     # Required arguments
@@ -203,6 +215,7 @@ def main():
     parser.add_argument("-a", "--agp", required=True, help="agp files.")
     parser.add_argument("-r", "--RE_file", required=True, help="Path to the restriction enzyme file.")
     parser.add_argument("-o", "--output_prefix", required=True, help="Prefix for output files.")
+    parser.add_argument("--min_len", type=int, default=0, help="minimum scaffold length, default: 0")
 
 
     # pairs_file = "chr1g1.pairs"
@@ -215,12 +228,7 @@ def main():
     agp_file = args.agp
     RE_file = args.RE_file
     output_prefix = args.output_prefix
+    min_len = args.min_len if args.min_len else 0
 
+    result = Get_data_HapHiC_sort(map_file, map_file_type, agp_file, RE_file, output_prefix, min_len=0)
 
-    scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict = read_agp(agp_file)
-    read_map_file(map_file, map_file_type, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_length_dict, output_prefix)
-    get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix)
-
-
-if __name__ == "__main__":
-    main()

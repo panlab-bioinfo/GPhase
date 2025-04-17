@@ -7,7 +7,6 @@ import os
 import argparse
 
 
-# n阶邻居节点
 def find_n_nei(digraph, utg, n, dir):
     neighbors = set()
     current_level = {utg}
@@ -27,9 +26,7 @@ def find_n_nei(digraph, utg, n, dir):
     
 def check_end_point(digraph, utg):
 
-    # 前驱节点
     predecessors = set(digraph.predecessors(utg))
-    # 后继节点
     successors = set(digraph.successors(utg)) 
 
     if (not predecessors or not successors) and len(predecessors | successors) == 1:
@@ -50,17 +47,12 @@ def split_GFA(gfa_filePath, digraph, nei_level:2, output_prefix):
 
     for utg in digraph.nodes():
 
-        # 前驱节点
+
         predecessors = set(digraph.predecessors(utg))
-        # 后继节点
         successors = set(digraph.successors(utg)) 
 
 
         if len(successors) > 1:
-
-            # 若邻居全为端点
-            # if all(check_end_point(digraph, successor) == True for successor in successors):
-            #     continue
 
 
             successors_nei_dict = {utg:find_n_nei(digraph, utg, nei_level, "successors") for utg in successors}
@@ -69,20 +61,13 @@ def split_GFA(gfa_filePath, digraph, nei_level:2, output_prefix):
                                     for utg2, set2 in successors_nei_dict.items()
                                     if utg1 != utg2}
             
-
-            # 存在交集为空
             has_empty_set = any(len(value) == 0 for value in successors_re_dict.values())
             if has_empty_set:
-                # print(f"{utg}\t{successors_re_dict}")
                 successors_rmEdges_set.update([(utg, successor) for successor in successors])
                 split_utg_set.update([successor for successor in successors])
                 split_utg_set.add(utg)
 
         if len(predecessors) > 1:
-
-            # 若邻居全为端点
-            # if all(check_end_point(digraph, predecessor) == True for predecessor in predecessors):
-            #     continue
 
             predecessors_nei_dict = {utg:find_n_nei(digraph, utg, nei_level, "predecessors") for utg in predecessors}
             
@@ -91,20 +76,15 @@ def split_GFA(gfa_filePath, digraph, nei_level:2, output_prefix):
                                     for utg2, set2 in predecessors_nei_dict.items()
                                     if utg1 != utg2}
 
-
-            # 存在交集为空
             has_empty_set = any(len(value) == 0 for value in predecessors_re_dict.values())
             if has_empty_set:
-                # print(f"{utg}\t{successors_re_dict}")
                 predecessors_rmEdges_set.update([(predecessor, utg) for predecessor in predecessors])
                 split_utg_set.update([predecessor for predecessor in predecessors])
                 split_utg_set.add(utg)
 
 
-    # print(','.join(split_utg_set))
     all_rmEdges_set = successors_rmEdges_set | predecessors_rmEdges_set
 
-    # 生成GFA
     with open(gfa_filePath, 'r') as file, open(f"{output_prefix}.rmTip.split.gfa",  'w') as output_file:
         for line in file:
             line = line.strip().split()
