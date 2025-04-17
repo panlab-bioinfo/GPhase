@@ -97,10 +97,8 @@ def allele_sort(unreassign_groups_hic):
     def sort_key(item):
         key, value = item
         if value == 0:
-            # 如果值为0，使用dict2中的值进行逆序排序
             return (-unreassign_groups_hic.get(key, float('inf')), key)
         else:
-            # 如果值不为0，按照升序排序
             return (value, key)
     return sort_key
 

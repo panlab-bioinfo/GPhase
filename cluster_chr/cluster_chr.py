@@ -21,7 +21,6 @@ def setup_logging(log_file: str = "cluster_chr.log") -> logging.Logger:
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     
-    # Formatter with timestamp and script name (based on your example format)
     formatter = logging.Formatter('%(asctime)s <%(module)s.py> [%(funcName)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)

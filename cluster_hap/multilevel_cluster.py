@@ -8,7 +8,7 @@ import networkx as nx
 import community as louvain
 from collections import defaultdict
 import statistics
-# import argcomplete
+
 
 def read_REs(REFile):
     ctg_RE_len = defaultdict(tuple)
@@ -39,7 +39,7 @@ def multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
     nodes = list(set(df['source']).union(set(df['target'])))
     g.add_vertices(nodes)
 
-    # 添加边和节点，并设置权重
+
     for i, row in df.iterrows():
         source = row['source']
         target = row['target']
@@ -47,43 +47,7 @@ def multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
         g.add_edge(source, target, weight=weight)
 
 
-
-    # 图的联通分量个数
-    # components = g.connected_components()
-    # print(components)
-
-    # g = components.subgraphs()[0]
-
-
-
-    # 使用community_multilevel进行社区检测
     communities = g.community_multilevel(weights='weight',resolution=float(resolution)) 
-
-    # palette = plt.get_cmap("tab20")
-    # community_colors = [palette(i / len(communities)) for i in range(len(communities))]
-
-    # # 创建颜色映射
-    # node_colors = [community_colors[communities.membership[v]] for v in range(len(g.vs))]
-
-    # 绘制图形并保存
-    # g.vs['label'] = nodes
-    # layout = g.layout_fruchterman_reingold(
-    #     niter=1000,       # 迭代次数
-    #     dim=2,
-    #     # weights='weight'
-    # )
-    # visual_style = {
-    #     "vertex_color": node_colors,
-    #     "vertex_size": 20,
-    #     "edge_width": 1,
-    #     "layout": layout,
-    #     "bbox": (1200, 800),
-    #     "margin": 20
-    # }
-    # plot = ig.plot(g, **visual_style)
-    # plot.save("clusters.png")
-
-
 
     if check:
         # 检查有效聚类簇数目
@@ -154,7 +118,6 @@ if __name__ == '__main__':
     parser.add_argument('--Allele_file',help='File required when --check is enabled')
 
 
-    # argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
     if args.check and args.RE_file is None:

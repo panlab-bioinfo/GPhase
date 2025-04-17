@@ -48,7 +48,6 @@ if __name__ == '__main__':
     # hic_groups_cluster = "PT4.chr.cluster.txt"
     # allele_ctgs_cluster = "PT4.allele.cluster.ctg.txt"
 
-    # allele ，hic 聚类过后的cluster
     hic_groups_cluster_dict, group_hic_dict = read_c(hic_groups_cluster)
 
     # allele 的聚类cluster ,value 为ctgs

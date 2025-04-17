@@ -11,16 +11,13 @@ import argparse
 def find_best_knee(csv_file, output_prefix):
 
     try:
-        # 先读取第一行，看看是否存在header
         with open(csv_file, 'r') as file:
             first_line = file.readline()
             has_header = 1 if first_line == "source,target,links\n" else 0
             
-        # 如果有header
         if has_header:
             data = pd.read_csv(csv_file, sep=",")
         else:
-            # 如果没有header，手动加上默认header
             data = pd.read_csv(csv_file, sep=",", header=None)
             data.columns = ["source", "target", "links"]
 
@@ -68,8 +65,8 @@ def find_best_knee(csv_file, output_prefix):
     plt.gca().set_yticks(new_yticks)
     plt.gca().set_yticklabels([f'{tick:.2f}' for tick in new_yticks])
 
-    # ax.spines['top'].set_visible(False)  # 去掉上边框
-    # ax.spines['right'].set_visible(False)  # 去掉右边框
+    # ax.spines['top'].set_visible(False) 
+    # ax.spines['right'].set_visible(False) 
 
     # xticks = plt.gca().get_xticks()
     # new_xticks = list(xticks) + [kl.knee]

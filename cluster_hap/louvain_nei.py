@@ -122,10 +122,8 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
         nei_utg = list(hic_nei_dict[utg])
         nei_uncollapse_utg = list(set(nei_utg) & set(uncollapse_list))
 
-        # 对坍缩节点进行邻居非坍缩节点聚类
         if collapse_num_dict[utg] > 1 and nei_utg and len(nei_uncollapse_utg) > 3 :
 
-            # 获取 nei_uncollapse_utg 之间信号
             nei_uncollapse_utg_links = { pair:value  for pair, value in hic_links_dict.items() if pair[0] in nei_uncollapse_utg and pair[1] in nei_uncollapse_utg }
             with open(f"utgs_cluster/{utg}.links.nor.csv", 'w') as file:
                 file.write("source,target,links\n")
@@ -141,10 +139,8 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
             except:
                 louvin_nei_log_file.write(f"error: {utg}\t{','.join(nei_utg)}\t{','.join(nei_uncollapse_utg)}\n")
                 cluster_dict = defaultdict()
-                # print(f"error: {utg}\t{','.join(nei_utg)}\t{','.join(nei_uncollapse_utg)}")
 
             
-            # cluster filter : 对聚类结果进行过滤，过滤掉等位的基因组（和不等位的基因links小的过滤掉）
             if not nei_uncollapse_utg_links or not cluster_dict:
                 continue
             for group_ in cluster_dict:
@@ -167,9 +163,9 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
                             cluster_dict[group_].remove(min_utg)
                         except:
                             louvin_nei_log_file.write(f"error:{min_utg} not in {utg}.cluster.txt {group_}\n")
-                            # print(f"error:{min_utg} not in {utg}.cluster.txt {group_}")
+
                 louvin_nei_log_file.write(f"{utg}\t{group_}\t{','.join(cluster_dict[group_])}\n")
-            #     # print(f"{utg}\t{group_}\t{','.join(cluster_dict[group_])}")
+
 
             for group_ in cluster_dict:
                 for idx1, utg_1 in enumerate(cluster_dict[group_]):
@@ -185,14 +181,14 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
     if len(edges) < 50:
         return False
 
-    # 转换为 DataFrame
+
     df_edges = pd.DataFrame(edges, columns=['source', 'target', 'links'])
     if not df_edges['links'].empty:
         if df_edges['links'].iloc[0] is not None:
             attributes_df = pd.json_normalize(df_edges['links'])
             df_edges = pd.concat([df_edges[['source', 'target']], attributes_df], axis=1)
 
-    # 保存为 CSV
+
     df_edges.to_csv('louvain_nei.csv', index=False)
     louvin_nei_log_file.close()
 

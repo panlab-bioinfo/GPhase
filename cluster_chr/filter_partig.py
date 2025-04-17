@@ -14,8 +14,6 @@ import argparse
 def read_digraph(digraph_file):
 
     df = pd.read_csv(digraph_file)
-
-    # Create a directed graph and load the edge list with weights
     G = nx.from_pandas_edgelist(df, source='source', target='target', create_using=nx.DiGraph())
     
     return G

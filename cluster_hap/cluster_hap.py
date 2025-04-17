@@ -28,7 +28,6 @@ def setup_logging(log_file: str = "cluster_hap.log") -> logging.Logger:
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     
-    # Formatter with timestamp and script name (based on your example format)
     formatter = logging.Formatter('%(asctime)s <%(module)s.py> [%(funcName)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
@@ -139,7 +138,6 @@ def adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output, csv_file
     check_cluster_dict = defaultdict(list)
     while min_r <= r <= max_r:
         logger.info(f"Running clustering with r={r}")
-        # execute_command(cluster_command.format(r=r), f"Failed to run clustering with r={r}",logger)
         check_cluster_dict, max_group_allele_value = multilevel_cluster(csv_file, cluster_output, r , "check", utg_file, partig_file)
 
         num_clusters = len(check_cluster_dict)
@@ -249,7 +247,6 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                 dest = os.path.join(chr_dir, os.path.basename(filepath))
                 futures.append(executor.submit(create_symlink, filepath, dest, logger))
             
-            # Wait for all symlinks to be created
             for future in futures:
                 future.result()
 

@@ -133,7 +133,6 @@ def merge_allele(allele_dict, filted_dict, subgraph_ctgs_dict, ctg_subgraph_dict
 
     re_allele_dict = defaultdict()
     allele_filter_dict = defaultdict()
-    # print(f"{len(allele_dict)}\t{len(filted_dict)}\t{len(expand_dict)}")
 
     for (utg1, utg2) in allele_dict:
 

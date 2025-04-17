@@ -87,7 +87,6 @@ def find_other_group(hic_links_dict, cluster_modify_dict, min_utg):
     links_dict = defaultdict(float)
 
     for group in cluster_modify_dict:
-        # print(cluster_modify_dict[group])
 
         if min_utg in cluster_modify_dict[group]:
             continue
@@ -112,7 +111,6 @@ def find_other_group(hic_links_dict, cluster_modify_dict, min_utg):
 
 def run_cor_cluster(collapse_num_dict, hic_links_dict, cluster_dict, utg_group_dict, allele_key_dict, utgs_list, n_hap):
 
-    # cluster_dict = rescue(hic_links_dict, cluster_dict, utg_group_dict, allele_key_dict, utgs_list)
     cluster_modify_dict = copy.deepcopy(cluster_dict)
     cluster_copy_dict = defaultdict()
 
@@ -131,7 +129,6 @@ def run_cor_cluster(collapse_num_dict, hic_links_dict, cluster_dict, utg_group_d
                         )
         Allele_utgs = set( utg for pair in Allele_utg_pair for utg in pair )
         unAllele_utgs = set(utg for utg in cluster_modify_dict[group_] if utg not in Allele_utgs)
-        # print(Allele_utg_pair)
 
         for (utg1, utg2) in Allele_utg_pair:
             if utg1 in cluster_modify_dict[group_] and utg2 in cluster_modify_dict[group_]:

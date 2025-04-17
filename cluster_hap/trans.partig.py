@@ -9,7 +9,6 @@ def read_fai(fai_file):
         idx = 1
         for line in file:
             line = line.strip().split()
-            # if line[0].startswith('u') or line[0].startswith('c'):
             fai_dict[str(idx)] = line[0]
             fai_reverse_dict[line[0]] = idx
             idx += 1

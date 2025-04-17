@@ -19,33 +19,17 @@ def run(csv_file, output_file, resolution):
     nodes = list(set(df['source']).union(set(df['target'])))
     g.add_vertices(nodes)
 
-    # 添加边和节点，并设置权重
     for i, row in df.iterrows():
         source = row['source']
         target = row['target']
         weight = row['links']
         g.add_edge(source, target, weight=weight)
 
-
-
-    # 图的联通分量个数
-    # components = g.connected_components()
-    # print(components)
-
-    # g = components.subgraphs()[0]
-
-
-
-    # 使用community_multilevel进行社区检测
     communities = g.community_multilevel(weights='weight',resolution=float(resolution)) 
 
     # palette = plt.get_cmap("tab20")
     # community_colors = [palette(i / len(communities)) for i in range(len(communities))]
-
-    # # 创建颜色映射
     # node_colors = [community_colors[communities.membership[v]] for v in range(len(g.vs))]
-
-    # 绘制图形并保存
     # g.vs['label'] = nodes
     # layout = g.layout_fruchterman_reingold(
     #     niter=1000,       # 迭代次数
