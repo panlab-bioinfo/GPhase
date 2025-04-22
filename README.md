@@ -66,10 +66,10 @@ pip install .
 ```
 
 # Output file
-path: gphase_output/gphase_final
-file:   
-1. `*.scaffolds.fasta` : final genome assembly fasta file
-2.  `*.final.agp` : final genome assembly agp file
+- path: gphase_output/gphase_final
+- file:   
+    1. `*.scaffolds.fasta` : final genome assembly fasta file
+    2.  `*.final.agp` : final genome assembly agp file
 
 
 
