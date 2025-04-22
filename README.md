@@ -4,7 +4,7 @@ Gphase: A phasing assembly tool using assembly graphs and Hi-C data
 
 ```
 git clone https://gitee.com/qztanging/Gphase.git
-conda env create -f Gphase/anhic_environment.yaml
+conda env create -f Gphase/gphase_environment.yaml
 conda activate gphase
 /path/to/Gphase/pipeline/gphase_pipeline.sh -h
 ```
@@ -43,7 +43,7 @@ pip install .
 ```
 
 
-# Running the AnHiC scaffolding pipeline
+# Running the Gphase scaffolding pipeline
 | Scaffolding Pipeline : subGraph_scaffold + YaHs [YaHS](https://github.com/c-zhou/yahs) + HapHiC [HapHiC](https://github.com/zengxiaofei/HapHiC)
 
 1. `asm.fa` :  your genome assembly file in FASTA format (Unitigs).
@@ -64,3 +64,12 @@ pip install .
  --n_hap 4 \
  -p output_prefix
 ```
+
+# Output file
+path: gphase_output/gphase_final
+file:   
+1. `*.scaffolds.fasta` : final genome assembly fasta file
+2.  `*.final.agp` : final genome assembly agp file
+
+
+
