@@ -36,9 +36,6 @@ def main(args):
     clm_file = args.clm 
     cluster_file = args.cluster
 
-    # clm_file = "paired_links.clm"
-    # print(read_clm(clm_file))
-
     utg_utg_pos_dict = read_clm(clm_file)
     group_utgs_dict = read_cluster(cluster_file)
 

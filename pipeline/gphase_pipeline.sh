@@ -2,7 +2,9 @@
 
 # Function for displaying usage
 usage() {
-    echo "|Usage: $0 -f <fa_file> -g <gfa> -c <collapse_num_file> -m <map_file> --n_chr <n_chr> --n_hap <n_hap> -p <output_prefix>"
+    echo "| "
+    echo "|Gphase: A phasing assembly tool using assembly graphs and Hi-C data"
+    echo "|    Usage: $0 -f <fa_file> -g <gfa> -c <collapse_num_file> -m <map_file> --n_chr <n_chr> --n_hap <n_hap> -p <output_prefix>"
     echo "|"
     echo "|>>> Required Parameters:"
     echo "|  -f                 <fa_file>                : The FASTA file containing the genome sequences."
@@ -24,7 +26,7 @@ usage() {
     echo "|  --thread           <thread>                 : Number of parallel processes, default: 12."
     echo "|  --no_contig_ec     <no_contig_ec >          : do not do contig error correction in YaHS, default: False."
     echo "|  --no_scaffold_ec   <no_scaffold_ec >        : do not do scaffold error correction in YaHS, default: False."
-    echo "|  --min_len          <min_len>                : minimum scaffold length(kb) in haphic sort, default: 200."
+    echo "|  --min_len          <min_len>                : minimum scaffold length(kb) in haphic sort, default: 100."
     echo "|  --mutprob          <mutprob>                : mutation probability in the genetic algorithm in haphic sort, default: 0.6."
     echo "|  --ngen             <ngen>                   : number of generations for convergence in haphic sort, default: 20000."
     echo "|  --npop             <npop>                   : mopulation size in haphic sort, default: 200."
@@ -44,15 +46,15 @@ map_file=""
 n_chr=""
 n_hap=""
 output_prefix=""
-split_gfa_n=""
-thread=""
+split_gfa_n="5"
+thread="12"
 no_contig_ec=""
 no_scaffold_ec=""
-min_len="" 
-mutprob=""   
-ngen=""
-npop=""
-processes=""
+min_len="100" 
+mutprob="0.6"   
+ngen="20000"
+npop="200"
+processes="32"
 
 
 

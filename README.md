@@ -1,3 +1,5 @@
+Gphase: A phasing assembly tool using assembly graphs and Hi-C data
+---
 # Installation
 
 ```
@@ -8,6 +10,7 @@ conda activate gphase
 ```
 
 # Aligning Hi-C data to assembly
+#### tips: When the default MAPQ parameters of chromap do not work well, you can appropriately lower the MAPQ-threshold parameter value to obtain more Hi-C alignment data.
 
 ```
 chromap -i -r asm.fa -o index
@@ -52,7 +55,7 @@ pip install .
 7. `p` : The prefix for the output files.
 
 ```
-/path/to/Gphase/pipeline/gphase_pipeline.sh \
+/path/to/Gphase/gphase pipeline\
  -f asm.fa \
  -g genome.bp.p_utg.gfa \
  -c collapse_num.txt \

@@ -2,8 +2,9 @@
 
 # Function for displaying usage
 usage() {
-    echo "-------------------------------------------------------------------------------------------------------"
-    echo "|Usage: $0 -f <fa_file>  -p <output_prefix> -t <threads>"
+    echo "|"
+    echo "|Run the popcnv software using the fasta file and the fastq.gz file in the current directory"
+    echo "|    Usage: $0 -f <fa_file>  -p <output_prefix> -t <threads>"
     echo "|"
     echo "|Required Parameters:"
     echo "|  -f     <fa_file>                : The FASTA file containing the genome sequences."
@@ -12,7 +13,6 @@ usage() {
     echo "|"
     echo "|Example:"
     echo "|  bash $0 -f genome.fa -p output_prefix -t 32"
-    echo "--------------------------------------------------------------------------------------------------------"
     exit 1
 }
 

@@ -13,29 +13,32 @@ def print_gphase_ascii():
         \033[44;37m                   \033[32m\\____/\033[92m | .__/ |_| |_| \\__,_||___/ \\___|                     \033[0m
         \033[44;37m                          |_|                                                  \033[0m
         \033[44;37m                                                                               \033[0m
-        \033[47;32m      Gphase: A phasing assembly tool using assembly graphs and HiC data       \033[0m
+        \033[47;32m      Gphase: A phasing assembly tool using assembly graphs and Hi-C data       \033[0m
     """
     print(TITLE_GPHASE)
 
 def print_HELP_MESSAGE():
     HELP_MESSAGE = """
 \033[1;33mUSAGE:\033[0m
-  gphase <command> [options...]
+  💻  \033[1mgphase\033[0m  <command> [options...]
 
 \033[1;34mCOMMANDS:\033[0m
-  📦  \033[1mpipeline\033[0m       Run the full pipeline, including chromosome clustering, 
-                    haplotype clustering, and haplotype scaffolding steps        (→ pipeline/)
-  🧩  \033[1mcluster_chr\033[0m    Step 1: Cluster contigs into chromosomes                     (→ cluster_chr/)
-  🧩  \033[1mcluster_hap\033[0m    Step 2: Cluster chromosome contigs into haplotypes           (→ cluster_hap/)
-  🧩  \033[1mscaffold_hap\033[0m   Step 3: Scaffold haplotype contigs into phased assemblies    (→ scaffold_hap/)
+  📦  \033[1mpipeline\033[0m       Run the Gphase pipeline, including chromosome clustering, 
+                        haplotype clustering, and haplotype scaffolding steps        (→ pipeline/gphase_pipeline.sh)
+  📦  \033[1mpopcnv\033[0m         Run the popcnv pipeline, estimating of the number of 
+                        collapses of Unitig using hifi data based on popCNV software (→ pipeline/popCNV_pipeline.sh)
+  🧩  \033[1mcluster_chr\033[0m    Step 1: Cluster contigs into chromosomes                        (→ cluster_chr/cluster_chr.py)
+  🧩  \033[1mcluster_hap\033[0m    Step 2: Cluster chromosome contigs into haplotypes              (→ cluster_hap/cluster_hap.py)
+  🧩  \033[1mscaffold_hap\033[0m   Step 3: Scaffold haplotype contigs into phased assemblies       (→ scaffold_hap/scaffold_hap.py)
 
 \033[1;34mEXAMPLE:\033[0m
-  gphase pipeline -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.pairs \\
-        --n_chr 12 --n_hap 4 -p output_prefix
+  💡 gphase pipeline -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt \\
+         -m map_file.pairs --n_chr 12 --n_hap 4 -p output_prefix
 
 \033[1;34mTIPS:\033[0m
   🔹 Use \033[1mgphase --help\033[0m to show this help at any time
   🔹 Run each step manually if you want fine control over outputs
+  🔹 Happy assembly! 🎉
 """
     print(HELP_MESSAGE)
 
