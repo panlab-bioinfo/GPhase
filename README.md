@@ -1,10 +1,10 @@
 # Installation
 
 ```
-git clone https://gitee.com/qztanging/AnHiC.git
-conda env create -f AnHiC/anhic_environment.yaml
-conda activate anhic
-/path/to/AnHiC/pipeline/anhic_pipeline.sh -h
+git clone https://gitee.com/qztanging/Gphase.git
+conda env create -f Gphase/anhic_environment.yaml
+conda activate gphase
+/path/to/Gphase/pipeline/gphase_pipeline.sh -h
 ```
 
 # Aligning Hi-C data to assembly
@@ -25,7 +25,7 @@ By default, popCNV_pipeline.sh will use the file ending with fastaq.gz in the di
 2. `p` : The prefix for the output files.
 3. `t` : The number of threads.
 ```
-/path/to/AnHiC/pipeline/popCNV_pipeline.sh \
+/path/to/Gphase/pipeline/popCNV_pipeline.sh \
 -f asm.fa \
 -p output_prefix \
 -t 32
@@ -35,7 +35,7 @@ By default, popCNV_pipeline.sh will use the file ending with fastaq.gz in the di
 # Installing agptools
 [agptools](https://github.com/WarrenLab/agptools)
 ```
-cd /path/to/AnHiC/src/agptools
+cd /path/to/Gphase/src/agptools
 pip install .
 ```
 
@@ -52,7 +52,7 @@ pip install .
 7. `p` : The prefix for the output files.
 
 ```
-/path/to/AnHiC/pipeline/anhic_pipeline.sh \
+/path/to/Gphase/pipeline/gphase_pipeline.sh \
  -f asm.fa \
  -g genome.bp.p_utg.gfa \
  -c collapse_num.txt \
