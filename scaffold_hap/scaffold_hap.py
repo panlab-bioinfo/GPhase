@@ -222,7 +222,7 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
                 f"chr{chr_num}g{hap_num}.pairs",
                 "-a", "subgraphGroup.agp",
                 "-o", "subgraph_yahs",
-                "--file-type", "pa5", f"{contig_ec}" f"{scaffold_ec}"
+                "--file-type", "pa5", f"{contig_ec}", f"{scaffold_ec}"
             ], logger=logger):
                 return False
 
@@ -234,12 +234,6 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
         ]:
             if not run_command(["sed", "-i", sed_cmd, file_pattern], logger=logger):
                 return False
-        
-        # get subgraphGroup.fa
-        cmd = f"/data/duwenjie/AnHiC/src/HapHiC/utils/agp_to_fasta subgraphGroup.agp chr{chr_num}g{hap_num}.fa > subgraphGroup.fa"
-        if not run_command(cmd, logger=logger, shell=True):
-            return False
-
 
         # Set up scaffold_HapHiC_sort directory
         scaffold_dir = os.path.join(hap_dir, "scaffold_HapHiC_sort")

@@ -4,7 +4,7 @@
 usage() {
     echo "| "
     echo "|Gphase: A phasing assembly tool using assembly graphs and Hi-C data"
-    echo "|    Usage: $0 -f <fa_file> -g <gfa> -c <collapse_num_file> -m <map_file> --n_chr <n_chr> --n_hap <n_hap> -p <output_prefix>"
+    echo "|    Usage: /GPhase/to/path/gphase pipeline -f <fa_file> -g <gfa> -c <collapse_num_file> -m <map_file> --n_chr <n_chr> --n_hap <n_hap> -p <output_prefix>"
     echo "|"
     echo "|>>> Required Parameters:"
     echo "|  -f                 <fa_file>                : The FASTA file containing the genome sequences."
@@ -37,7 +37,7 @@ usage() {
     echo "|  -h, --help         Show this help message"
     echo "|"
     echo "|Example:"
-    echo "|  /Gphase/to/path/gphase pipeline -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.pairs --n_chr 12 --n_hap 4 -p output_prefix"
+    echo "|  /GPhase/to/path/gphase pipeline -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.pairs --n_chr 12 --n_hap 4 -p output_prefix"
     exit 1
 }
 
@@ -164,14 +164,14 @@ current_dir=$(pwd)
 
 
 log_path=$(pwd)
-log_file="${log_path}/AnHiC_pipeline.log"
+log_file="${log_path}/GPhase_pipeline.log"
 
 LOG_INFO() {
     time=$(date "+%Y-%m-%d %H:%M:%S")
     log_file=$1
     flag=$2
     msg=$3
-    echo "${time} <AnHiC_pipeline> [${flag}] ${msg}" >> ${log_file}
+    echo "${time} <GPhase_pipeline> [${flag}] ${msg}" >> ${log_file}
 
 }
 # Directory setup
@@ -223,7 +223,7 @@ ln -s "../preprocessing/${output_prefix}.RE_counts.txt"
 ln -s "../preprocessing/${output_prefix}.chromap.links.nor.csv"
 
 LOG_INFO ${log_file} "run" "Running cluster_chr.py..."
-python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa} -n 2 -pm 0.95 ${split_gfa_n}
+python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa} -n 2 -pm 0.95 --split_gfa_n ${split_gfa_n}
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_chr.py failed."
@@ -273,7 +273,7 @@ ln -s "../../${map_file}"
 
 
 LOG_INFO ${log_file} "run" "Running scaffold_hap.py..."
-python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file} -t ${thread} --no_contig_ec ${no_contig_ec} --no_scaffold_ec ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}
+python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file} -t ${thread} --no_contig_ec ${no_contig_ec}  --no_scaffold_ec ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: scaffold_hap.py failed."
     exit 1

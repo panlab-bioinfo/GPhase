@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import os
 import subprocess
 
 def print_gphase_ascii():
@@ -43,6 +44,8 @@ def print_HELP_MESSAGE():
     print(HELP_MESSAGE)
 
 def main():
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     if len(sys.argv) < 2 or sys.argv[1] in ['-h', '--help']:
         print_gphase_ascii()
         print_HELP_MESSAGE()
@@ -52,10 +55,10 @@ def main():
     args = sys.argv[2:]
 
     mapping = {
-        'pipeline': ['bash', 'pipeline/gphase_pipeline.sh'],
-        'cluster_chr': ['python3', 'cluster_chr/cluster_chr.py'],
-        'cluster_hap': ['python3', 'cluster_hap/cluster_hap.py'],
-        'scaffold_hap': ['python3', 'scaffold_hap/scaffold_hap.py']
+        'pipeline': ['bash', os.path.join(BASE_DIR, 'pipeline/gphase_pipeline.sh')],
+        'cluster_chr': ['python3', os.path.join(BASE_DIR,'cluster_chr/cluster_chr.py')],
+        'cluster_hap': ['python3', os.path.join(BASE_DIR,'cluster_hap/cluster_hap.py')],
+        'scaffold_hap': ['python3', os.path.join(BASE_DIR,'scaffold_hap/scaffold_hap.py')]
     }
 
     if command not in mapping:
