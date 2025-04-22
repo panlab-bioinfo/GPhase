@@ -1,4 +1,4 @@
-# PYTHON_ARGCOMPLETE_OK
+#!/usr/bin/env python3
 
 import os
 import subprocess
@@ -217,36 +217,36 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog='cluster_chr')
 
     base_group  = parser.add_argument_group('>>> Parameters for basic data')
-    base_group.add_argument("-f", "--fa_file", required=True, help="Path to the assembly FASTA file.")
-    base_group.add_argument("-r", "--RE_file", required=True, help="Path to the restriction enzyme file.")
+    base_group.add_argument("-f", "--fa_file", metavar='\b', required=True, help="Path to the assembly FASTA file.")
+    base_group.add_argument("-r", "--RE_file", metavar='\b', required=True, help="Path to the restriction enzyme file.")
 
     hic_group  = parser.add_argument_group('>>> Parameters for HiC data alignment')
-    hic_group.add_argument("-l", "--HiC_file", required=True, help="Path to the Hi-C data file.")
+    hic_group.add_argument("-l", "--HiC_file", metavar='\b', required=True, help="Path to the Hi-C data file.")
 
     output_group  = parser.add_argument_group('>>> Parameter for the prefix of the result file')
-    output_group.add_argument("-op", "--output_prefix", required=True, help="Prefix for output files.")
+    output_group.add_argument("-op", "--output_prefix", metavar='\b', required=True, help="Prefix for output files.")
 
     genome_group  = parser.add_argument_group('>>> Parameters of chromosome numbers')
-    genome_group.add_argument("-n_chr", "--chr_number", type=int, required=True, help="Desired number of clusters corresponding to chromosomes.")
+    genome_group.add_argument("-n_chr", "--chr_number", type=int, metavar='\b', required=True, help="Desired number of clusters corresponding to chromosomes.")
 
     partig_group  = parser.add_argument_group('>>> Parameter for partig')
-    partig_group.add_argument("-pk", "--partig_k", type=int, default=17, help="K-mer size for Partig. Default: 17.")
-    partig_group.add_argument("-pw", "--partig_w", type=int, default=17, help="Minimizer window size for Partig. Default: 17.")
-    partig_group.add_argument("-pc", "--partig_c", type=int, default=60, help="Max occurrance for Partig. Default: 60.")
-    partig_group.add_argument("-pm", "--partig_m", type=float, default=0.95, help="Mini k-mer similarity for Partig. Default: 0.95.")
+    partig_group.add_argument("-pk", "--partig_k", metavar='\b', type=int, default=17, help="K-mer size for Partig. Default: 17.")
+    partig_group.add_argument("-pw", "--partig_w", metavar='\b', type=int, default=17, help="Minimizer window size for Partig. Default: 17.")
+    partig_group.add_argument("-pc", "--partig_c", metavar='\b', type=int, default=60, help="Max occurrance for Partig. Default: 60.")
+    partig_group.add_argument("-pm", "--partig_m", metavar='\b', type=float, default=0.95, help="Mini K-mer similarity for Partig. Default: 0.95.")
 
     split_GFA_group  = parser.add_argument_group('>>> Parameter for split GFA')
-    split_GFA_group.add_argument("-g", "--gfa", required=True, help="Path to the GFA file.")
-    split_GFA_group.add_argument("-n", "--split_gfa_n", type=int, default=5, help="Number of common neighbors when splitting GFA. Default: 5.")
-    split_GFA_group.add_argument("-i", "--split_gfa_iter", type=int, default=3, help="Number of iterations when splitting GFA. Default: 3.")
+    split_GFA_group.add_argument("-g", "--gfa", metavar='\b', required=True, help="Path to the GFA file.")
+    split_GFA_group.add_argument("-n", "--split_gfa_n", metavar='\b', type=int, default=5, help="Number of common neighbors when splitting GFA. Default: 5.")
+    split_GFA_group.add_argument("-i", "--split_gfa_iter", metavar='\b', type=int, default=3, help="Number of iterations when splitting GFA. Default: 3.")
 
     return parser.parse_args()
 
 def main():
-    logger = setup_logging('cluster_chr.log')
     args = parse_arguments()
     argcomplete.autocomplete(args)
     pwd = os.getcwd()
+    logger = setup_logging('cluster_chr.log')
 
     if not index_fasta(args.fa_file, logger):
         logger.error("Split GFA Error: An error occurred while splitting the GFA.")

@@ -63,20 +63,18 @@ def parse_arguments() -> argparse.Namespace:
     output_group.add_argument("-op", "--output_prefix", metavar='\b', required=True, help="output_group")
 
     performance_group  = parser.add_argument_group('>>> Parameters for performance')
-    performance_group .add_argument("-t", "--thread_number", metavar='\b', type=int, default=1, help="Number of parallel processes")
+    performance_group .add_argument("-t", "--thread_number", metavar='\b', type=int, default=12, help="Number of parallel processes, default: 12")
 
     yahs_group  = parser.add_argument_group('>>> Parameters for YaHS')
     yahs_group .add_argument("--no_contig_ec", action='store_true', help="do not do contig error correction")
     yahs_group .add_argument("--no_scaffold_ec", action='store_true', help="do not do scaffold error correction")
 
     haphic_group  = parser.add_argument_group('>>> Parameters for HapHiC sort')
-    haphic_group .add_argument("--min_len", metavar='\b',type=int, default=0, help="minimum scaffold length, default: 0")
+    haphic_group .add_argument("--min_len", metavar='\b',type=int, default=100, help="minimum scaffold length(kb), default: 100")
     haphic_group .add_argument("--mutprob", metavar='\b', type=float, default=0.6, help="mutation probability in the genetic algorithm, default: 0.6")
     haphic_group .add_argument("--ngen", metavar='\b', type=int, default=20000, help="number of generations for convergence, default: 20000")
     haphic_group .add_argument("--npop", metavar='\b', type=int, default=200, help="mopulation size, default: 200")
     haphic_group .add_argument("--processes", metavar='\b', type=int, default=32, help="processes for fast sorting and ALLHiC optimization, default: 32")
-
-
 
     
     return parser.parse_args()
@@ -95,6 +93,33 @@ def run_command(cmd: List[str], logger, cwd: Optional[str] = None, shell: bool =
     except Exception as e:
         logger.error(f"Error executing command: {str(e)}")
         return False
+
+#
+def process_one_Contig(file_path):
+    
+    dir_path = os.path.dirname(file_path)
+    file_name = os.path.basename(file_path)
+    output_path = os.path.dirname(dir_path)
+    new_file_name = file_name.replace(".txt", ".tour")
+    final_output_path = os.path.join(output_path, new_file_name)
+    with open(file_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+        if len(lines) == 2:
+            contig_id = lines[1].strip().split()[0]
+            with open(final_output_path, 'w', encoding='utf-8') as out:
+                out.write(">INIT\n")
+                out.write(contig_id + "+\n")
+                out.write(">FLIPWHOLE1\n")
+                out.write(contig_id + "+\n")
+                out.write(">FLIPONE1\n")
+                out.write(contig_id + "+\n")
+            os.symlink(final_output_path, "../" + new_file_name)  
+            return new_file_name
+        else:
+            os.symlink(file_path, file_name)  
+            return None
+
 
 def process_chromosome(pwd: str, chr_num: int, args: argparse.Namespace,logger) -> bool:
     """Process a single chromosome directory."""
@@ -257,6 +282,7 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
     """Perform final merging steps."""
     logger.info(f"Starting final merge steps...")
     script_path = os.path.abspath(sys.path[0])
+    one_contigs_list = list()
     try:
         os.chdir(pwd)
         haphic_dir = os.path.join(pwd, "HapHiC_sort")
@@ -277,7 +303,9 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
         re_files = glob.glob(os.path.join(pwd, "chr*/chr*/scaffold_HapHiC_sort/", f"{args.output_prefix}.chr*g*scaffold*txt"))
         for re_file in re_files:
             try:
-                os.symlink(re_file, os.path.basename(re_file))
+                re = process_one_Contig(re_file)
+                if re:
+                    one_contigs_list.append(re)
             except FileExistsError:
                 pass
 
@@ -302,25 +330,43 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
                 with open(scaffold_file) as infile:
                     outfile.write(infile.read())
 
+
         # HapHiC sort & build
         script_path_add = os.path.join(script_path, "../src/HapHiC/haphic")
-        script_content = f"""
+        script_content_1 = f"""
             cd {haphic_dir}
-            {script_path_add} sort {args.output_prefix}.merge.fa {args.output_prefix}.merge.HT.pkl split_clms/ groups_REs/* --mutprob {args.mutprob} --ngen {args.ngen} --npop {args.npop}  --processes {args.processes}
+            {script_path_add} sort {args.output_prefix}.merge.fa {args.output_prefix}.merge.HT.pkl split_clms/ groups_REs/* --skip_fast_sort --mutprob {args.mutprob} --ngen {args.ngen} --npop {args.npop}  --processes {args.processes}
+        """
+        script_content_2 = f"""
+            cd {haphic_dir}
             {script_path_add} build {args.output_prefix}.merge.fa {args.output_prefix}.merge.fa {args.output_prefix}.merge.fa final_tours/*tour
             seqkit sort scaffolds.fa > scaffolds.sort.fa
             samtools faidx scaffolds.sort.fa
-
         """
 
         with tempfile.NamedTemporaryFile(delete=False) as temp_script:
-            temp_script.write(script_content.encode())
+            temp_script.write(script_content_1.encode())
             temp_script_path = temp_script.name
 
         cmd = ["bash", temp_script_path]
         if not run_command(cmd, logger=logger):
             return False
         logger.info("HapHiC sort completed.")
+
+        # copy ont Contig scaffold
+        os.chdir(os.path.join(haphic_dir, "final_tours"))
+        for group in one_contigs_list:
+            os.symlink("../" + group, group)  
+
+        os.chdir(haphic_dir)
+        with tempfile.NamedTemporaryFile(delete=False) as temp_script:
+            temp_script.write(script_content_2.encode())
+            temp_script_path = temp_script.name
+
+        cmd = ["bash", temp_script_path]
+        if not run_command(cmd, logger=logger):
+            return False
+        logger.info("HapHiC build completed.")
 
         # get final agp (using agptools)
         os.chdir(haphic_dir)

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import argparse
 import subprocess
@@ -504,10 +506,9 @@ def log_start(logger, script_name: str, version: str, args: argparse.Namespace):
 
 
 def main():
-    logger = setup_logging('cluster_hap.log')
     args = parse_arguments()
     pwd = os.getcwd()
-
+    logger = setup_logging('cluster_hap.log')
     log_start(logger, "cluster_hap.py", "1.0.0", args)
 
     # # Step 1: Run partig

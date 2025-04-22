@@ -38,9 +38,11 @@ def main():
             if matched_lines:
                 if not args.mark:
                     with open(f"{group_name}.txt", 'w') as out_f:
+                        matched_lines = list(set(matched_lines))
                         out_f.write('\n'.join(matched_lines) + '\n')
                 else:
                     with open(f"{group_name}_{args.mark}.txt", 'w') as out_f:
+                        matched_lines = list(set(matched_lines))
                         out_f.write('\n'.join(matched_lines) + '\n')
 
 

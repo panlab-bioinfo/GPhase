@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+
+import sys
+import subprocess
+
+def print_gphase_ascii():
+
+    TITLE_GPHASE = """
+        \033[44;37m                     \033[34m ___ \033[92m        _                                            \033[0m
+        \033[44;37m                     \033[32m/ _ \\\033[92m _ __  | |__    __ _  ___   ___                      \033[0m
+        \033[44;37m                    \033[32m/ /_\\/\033[92m| '_ \\ | '_ \\  / _` |/ __| / _ \\                     \033[0m
+        \033[44;37m                   \033[32m/ /_\\\\ \033[92m| |_) || | | || (_| |\\__ \\|  __/                     \033[0m
+        \033[44;37m                   \033[32m\\____/\033[92m | .__/ |_| |_| \\__,_||___/ \\___|                     \033[0m
+        \033[44;37m                          |_|                                                  \033[0m
+        \033[44;37m                                                                               \033[0m
+        \033[47;32m      Gphase: A phasing assembly tool using assembly graphs and HiC data       \033[0m
+    """
+    print(TITLE_GPHASE)
+
+def print_HELP_MESSAGE():
+    HELP_MESSAGE = """
+\033[1;33mUSAGE:\033[0m
+  gphase <command> [options...]
+
+\033[1;34mCOMMANDS:\033[0m
+  📦  \033[1mpipeline\033[0m       Run the full pipeline, including chromosome clustering, 
+                    haplotype clustering, and haplotype scaffolding steps        (→ pipeline/)
+  🧩  \033[1mcluster_chr\033[0m    Step 1: Cluster contigs into chromosomes                     (→ cluster_chr/)
+  🧩  \033[1mcluster_hap\033[0m    Step 2: Cluster chromosome contigs into haplotypes           (→ cluster_hap/)
+  🧩  \033[1mscaffold_hap\033[0m   Step 3: Scaffold haplotype contigs into phased assemblies    (→ scaffold_hap/)
+
+\033[1;34mEXAMPLE:\033[0m
+  gphase pipeline -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.pairs \\
+        --n_chr 12 --n_hap 4 -p output_prefix
+
+\033[1;34mTIPS:\033[0m
+  🔹 Use \033[1mgphase --help\033[0m to show this help at any time
+  🔹 Run each step manually if you want fine control over outputs
+"""
+    print(HELP_MESSAGE)
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ['-h', '--help']:
+        print_gphase_ascii()
+        print_HELP_MESSAGE()
+        return
+
+    command = sys.argv[1]
+    args = sys.argv[2:]
+
+    mapping = {
+        'pipeline': ['bash', 'pipeline/gphase_pipeline.sh'],
+        'cluster_chr': ['python3', 'cluster_chr/cluster_chr.py'],
+        'cluster_hap': ['python3', 'cluster_hap/cluster_hap.py'],
+        'scaffold_hap': ['python3', 'scaffold_hap/scaffold_hap.py']
+    }
+
+    if command not in mapping:
+        print(f"[ERROR] Unknown command: {command}\n")
+        print_HELP_MESSAGE()
+        return
+
+    full_command = mapping[command] + args
+    subprocess.run(full_command)
+
+if __name__ == "__main__":
+    main()

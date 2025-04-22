@@ -2,7 +2,6 @@
 
 # Function for displaying usage
 usage() {
-    echo "-------------------------------------------------------------------------------------------------------"
     echo "|Usage: $0 -f <fa_file> -g <gfa> -c <collapse_num_file> -m <map_file> --n_chr <n_chr> --n_hap <n_hap> -p <output_prefix>"
     echo "|"
     echo "|>>> Required Parameters:"
@@ -10,17 +9,30 @@ usage() {
     echo "|  -g                 <gfa>                    : The GFA file representing the assembly graph."
     echo "|  -c                 <collapse_num_file>      : The file that number information for collapse unitigs."
     echo "|  -m                 <map_file>               : The mapping file used to map the Hi-C reads."
+    echo "|  -p                 <output_prefix>          : The prefix for the output files."
     echo "|  --n_chr            <n_chr>                  : The number of chromosomes (integer)."
     echo "|  --n_hap            <n_hap>                  : The number of haplotypes (integer)."
-    echo "|  -p                 <output_prefix>          : The prefix for the output files."
     echo "|"
-    echo "|>>> cluster hap Parameters:"
-    echo "|  --rescue           <rescue>                 : Whether to rescue the subgraph (default: False)."
-    echo "|  --reassign_number  <reassign_number>        : Number of reassign step (default: 1)."
+    echo "|>>> clustering chromosomes Parameters:"
+    echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 5"
+    echo "|"
+    echo "|>>> clustering haplotypes Parameters:"
+    echo "|  --rescue           <rescue>                 : Whether to rescue the subgraph, default: False."
+    echo "|  --reassign_number  <reassign_number>        : Number of reassign step, default: 1."
+    echo "|"
+    echo "|>>> scaffolding haplotypes Parameters:"
+    echo "|  --thread           <thread>                 : Number of parallel processes, default: 12."
+    echo "|  --no_contig_ec     <no_contig_ec >          : do not do contig error correction in YaHS, default: False."
+    echo "|  --no_scaffold_ec   <no_scaffold_ec >        : do not do scaffold error correction in YaHS, default: False."
+    echo "|  --min_len          <min_len>                : minimum scaffold length(kb) in haphic sort, default: 200."
+    echo "|  --mutprob          <mutprob>                : mutation probability in the genetic algorithm in haphic sort, default: 0.6."
+    echo "|  --ngen             <ngen>                   : number of generations for convergence in haphic sort, default: 20000."
+    echo "|  --npop             <npop>                   : mopulation size in haphic sort, default: 200."
+    echo "|  --processes        <processes>              : processes for fast sorting and ALLHiC optimization, default: 32."
+    echo "|  -h, --help         Show this help message"
     echo "|"
     echo "|Example:"
-    echo "|  bash $0 -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.pairs --n_chr 12 --n_hap 4 -p output_prefix"
-    echo "--------------------------------------------------------------------------------------------------------"
+    echo "|  /Gphase/to/path/gphase pipeline -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.pairs --n_chr 12 --n_hap 4 -p output_prefix"
     exit 1
 }
 
@@ -32,9 +44,20 @@ map_file=""
 n_chr=""
 n_hap=""
 output_prefix=""
+split_gfa_n=""
+thread=""
+no_contig_ec=""
+no_scaffold_ec=""
+min_len="" 
+mutprob=""   
+ngen=""
+npop=""
+processes=""
 
 
-TEMP=$(getopt -o f:g:c:m:p: --long n_chr:,n_hap:,f:,g:,c:,m:,p:,rescue,reassign_number: -- "$@")
+
+
+TEMP=$(getopt -o f:g:c:m:p:h --long n_chr:,n_hap:,f:,g:,c:,m:,p:split_gfa_n:,rescue,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,processes:,help -- "$@")
 
 if [ $? != 0 ]; then
     echo "Error: Invalid arguments."
@@ -46,15 +69,23 @@ eval set -- "$TEMP"
 
 while true; do
     case "$1" in
-        -f) fa_file="$2"; shift 2 ;;
-        -g) gfa="$2"; shift 2 ;;
-        -c) collapse_num_file="$2"; shift 2 ;;
-        -m) map_file="$2"; shift 2 ;;
+        -f|--f) fa_file="$2"; shift 2 ;;
+        -g|--g) gfa="$2"; shift 2 ;;
+        -c|--c) collapse_num_file="$2"; shift 2 ;;
+        -m|--m) map_file="$2"; shift 2 ;;
         --n_chr) n_chr="$2"; shift 2 ;;
         --n_hap) n_hap="$2"; shift 2 ;;
         -p) output_prefix="$2"; shift 2 ;;
+        --split_gfa_n)
+            if [[ "$2" =~ ^[2-9]+$ ]]; then  # 确保是整数
+                split_gfa_n="$2"
+            else
+                echo "Error: --split_gfa_n must be an integer between 2 and 9."
+                usage
+            fi
+            shift 2 ;;
         --reassign_number) 
-            if [[ "$2" =~ ^[1-3]+$ ]]; then  # 确保是整数
+            if [[ "$2" =~ ^[1-3]+$ ]]; then
                 reassign_number="$2"
             else
                 echo "Error: --reassign_number must be an integer between 1 and 3."
@@ -62,6 +93,30 @@ while true; do
             fi
             shift 2 ;;
         --rescue) rescue="--rescue"; shift ;;
+        --thread) thread="$2"; shift 2 ;;
+        --no_contig_ec) no_contig_ec="--no_contig_ec";shift ;;
+        --no_scaffold_ec) no_scaffold_ec="--no_scaffold_ec";shift ;;
+        --min_len)
+            if [[ "$2" =~ ^(10|[0-9])$ ]]; then 
+                min_len="$2"
+            else
+                echo "Error: --min_len must be a float between 0 and 10."
+                usage
+            fi
+            shift 2 ;;
+        --mutprob) 
+            pattern='^0\.[1-9]*[1-9]+$'  # 允许0.1-0.9
+            if [[ "$2" =~ $pattern ]]; then
+                mutprob="$2"
+                else
+                    echo "Error: --mutprob must be a float between 0.1 and 0.9."
+                    usage
+                fi
+                shift 2 ;;
+        --ngen) ngen="$2"; shift 2 ;;
+        --npop) npop="$2"; shift 2 ;;
+        --processes) processes="$2"; shift 2 ;;
+        -h|--help) usage ;;
         --) shift; break ;;
         *) usage ;;
     esac
@@ -119,8 +174,8 @@ LOG_INFO ${log_file} "path" "Script dir : ${SCRIPT_DIR}"
 # Set up logging
 LOG_INFO ${log_file} "start" "Pipeline start"
 
-mkdir -p anhic_output && cd anhic_output
-LOG_INFO ${log_file} "run" "Created output directory: anhic_output"
+mkdir -p gphase_output && cd gphase_output
+LOG_INFO ${log_file} "run" "Created output directory: gphase_output"
 
 mkdir -p preprocessing && cd preprocessing
 LOG_INFO ${log_file} "run" "Created output directory: preprocessing"
@@ -161,7 +216,7 @@ ln -s "../preprocessing/${output_prefix}.RE_counts.txt"
 ln -s "../preprocessing/${output_prefix}.chromap.links.nor.csv"
 
 LOG_INFO ${log_file} "run" "Running cluster_chr.py..."
-python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa} -n 2 -pm 0.95
+python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa} -n 2 -pm 0.95 ${split_gfa_n}
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_chr.py failed."
@@ -211,15 +266,17 @@ ln -s "../../${map_file}"
 
 
 LOG_INFO ${log_file} "run" "Running scaffold_hap.py..."
-python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file} -t 64
+python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file} -t ${thread} --no_contig_ec ${no_contig_ec} --no_scaffold_ec ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: scaffold_hap.py failed."
     exit 1
 fi
 
+
+
 # Step 5: Final Output
-LOG_INFO ${log_file} "run" "Created output directory: anhic_final"
-cd ../ && mkdir -p anhic_final && cd anhic_final
+LOG_INFO ${log_file} "run" "Created output directory: gphase_final"
+cd ../ && mkdir -p gphase_final && cd gphase_final
 ln -s "../preprocessing/${RE_file}"
 ln -s "../preprocessing/${hic_links}"
 ln -s "../cluster_chr/${output_prefix}.rmTip.split.gfa"

@@ -44,7 +44,7 @@ def get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix, min
     with open(f"{output_prefix}.scaffold.txt", 'w') as file:
         file.write("#Contig\tRECounts\tLength\n")
         for scaffold, value in scaffold_RE_dict.items():
-            if scaffold_length_dict[scaffold] > min_len:
+            if scaffold_length_dict[scaffold] > min_len*1000:
                 file.write(f"{scaffold}\t{int(value)}\t{scaffold_length_dict[scaffold]}\n")
 
 
@@ -228,7 +228,6 @@ if __name__ == "__main__":
     agp_file = args.agp
     RE_file = args.RE_file
     output_prefix = args.output_prefix
-    min_len = args.min_len if args.min_len else 0
 
     result = Get_data_HapHiC_sort(map_file, map_file_type, agp_file, RE_file, output_prefix, min_len=0)
 
