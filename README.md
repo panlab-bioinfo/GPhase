@@ -1,12 +1,12 @@
-Gphase: A phasing assembly tool using assembly graphs and Hi-C data
+GPhase: A phasing assembly tool using assembly graphs and Hi-C data
 ---
 # Installation
 
 ```
-git clone https://gitee.com/qztanging/Gphase.git
-conda env create -f Gphase/gphase_environment.yaml
+git clone https://github.com/panlab-bioinfo/GPhase.git
+conda env create -f GPhase/gphase_environment.yaml
 conda activate gphase
-/path/to/Gphase/pipeline/gphase_pipeline.sh -h
+/path/to/GPhase/pipeline/gphase_pipeline.sh -h
 ```
 
 # Aligning Hi-C data to assembly
@@ -28,7 +28,7 @@ By default, popCNV_pipeline.sh will use the file ending with fastaq.gz in the di
 2. `p` : The prefix for the output files.
 3. `t` : The number of threads.
 ```
-/path/to/Gphase/pipeline/popCNV_pipeline.sh \
+/path/to/GPhase/pipeline/popCNV_pipeline.sh \
 -f asm.fa \
 -p output_prefix \
 -t 32
@@ -38,12 +38,12 @@ By default, popCNV_pipeline.sh will use the file ending with fastaq.gz in the di
 # Installing agptools
 [agptools](https://github.com/WarrenLab/agptools)
 ```
-cd /path/to/Gphase/src/agptools
+cd /path/to/GPhase/src/agptools
 pip install .
 ```
 
 
-# Running the Gphase scaffolding pipeline
+# Running the GPhase scaffolding pipeline
 | Scaffolding Pipeline : subGraph_scaffold + YaHs [YaHS](https://github.com/c-zhou/yahs) + HapHiC [HapHiC](https://github.com/zengxiaofei/HapHiC)
 
 1. `asm.fa` :  your genome assembly file in FASTA format (Unitigs).
@@ -55,7 +55,7 @@ pip install .
 7. `p` : The prefix for the output files.
 
 ```
-/path/to/Gphase/gphase pipeline\
+/path/to/GPhase/gphase pipeline\
  -f asm.fa \
  -g genome.bp.p_utg.gfa \
  -c collapse_num.txt \

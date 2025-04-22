@@ -15,19 +15,22 @@ usage() {
     echo "|  --n_chr            <n_chr>                  : The number of chromosomes (integer)."
     echo "|  --n_hap            <n_hap>                  : The number of haplotypes (integer)."
     echo "|"
+    echo "|>>> Optional parameters:"
+    echo "|  -e                 <enzyme_site>            : The restriction enzyme cutting site, default: GATC."
+    echo "|"
     echo "|>>> clustering chromosomes Parameters:"
     echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 5"
     echo "|"
     echo "|>>> clustering haplotypes Parameters:"
     echo "|  --rescue           <rescue>                 : Whether to rescue the subgraph, default: False."
-    echo "|  --reassign_number  <reassign_number>        : Number of reassign step, default: 1."
+    echo "|  --reassign_number  <reassign_number>        : Number of reassign step, default: 1. [1-3]"
     echo "|"
     echo "|>>> scaffolding haplotypes Parameters:"
     echo "|  --thread           <thread>                 : Number of parallel processes, default: 12."
     echo "|  --no_contig_ec     <no_contig_ec >          : do not do contig error correction in YaHS, default: False."
     echo "|  --no_scaffold_ec   <no_scaffold_ec >        : do not do scaffold error correction in YaHS, default: False."
-    echo "|  --min_len          <min_len>                : minimum scaffold length(kb) in haphic sort, default: 100."
-    echo "|  --mutprob          <mutprob>                : mutation probability in the genetic algorithm in haphic sort, default: 0.6."
+    echo "|  --min_len          <min_len>                : minimum scaffold length(kb) in haphic sort, default: 0. [0-1000]"
+    echo "|  --mutprob          <mutprob>                : mutation probability in the genetic algorithm in haphic sort, default: 0.6. [0.1-0.9]"
     echo "|  --ngen             <ngen>                   : number of generations for convergence in haphic sort, default: 20000."
     echo "|  --npop             <npop>                   : mopulation size in haphic sort, default: 200."
     echo "|  --processes        <processes>              : processes for fast sorting and ALLHiC optimization, default: 32."
@@ -46,11 +49,12 @@ map_file=""
 n_chr=""
 n_hap=""
 output_prefix=""
+enzyme_site="GATC"
 split_gfa_n="5"
 thread="12"
 no_contig_ec=""
 no_scaffold_ec=""
-min_len="100" 
+min_len="0" 
 mutprob="0.6"   
 ngen="20000"
 npop="200"
@@ -59,7 +63,7 @@ processes="32"
 
 
 
-TEMP=$(getopt -o f:g:c:m:p:h --long n_chr:,n_hap:,f:,g:,c:,m:,p:split_gfa_n:,rescue,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,processes:,help -- "$@")
+TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,f:,g:,c:,m:,p:e:,split_gfa_n:,rescue,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,processes:,help -- "$@")
 
 if [ $? != 0 ]; then
     echo "Error: Invalid arguments."
@@ -78,6 +82,7 @@ while true; do
         --n_chr) n_chr="$2"; shift 2 ;;
         --n_hap) n_hap="$2"; shift 2 ;;
         -p) output_prefix="$2"; shift 2 ;;
+        -e) enzyme_site="$2"; shift 2 ;;
         --split_gfa_n)
             if [[ "$2" =~ ^[2-9]+$ ]]; then  # 确保是整数
                 split_gfa_n="$2"
@@ -99,10 +104,10 @@ while true; do
         --no_contig_ec) no_contig_ec="--no_contig_ec";shift ;;
         --no_scaffold_ec) no_scaffold_ec="--no_scaffold_ec";shift ;;
         --min_len)
-            if [[ "$2" =~ ^(10|[0-9])$ ]]; then 
+            if [[ "$2" =~ ^([0-9]{1,3}|1000)$ ]]; then 
                 min_len="$2"
             else
-                echo "Error: --min_len must be a float between 0 and 10."
+                echo "Error: --min_len must be a int between 0 and 1000."
                 usage
             fi
             shift 2 ;;
@@ -188,7 +193,7 @@ ln -s "../../${map_file}"
 
 # Step 1: Run get_RE.py
 LOG_INFO ${log_file} "run" "Running get_RE.py..."
-python ${SCRIPT_DIR}/../cluster_chr/get_RE.py -f ${fa_file} -e GATC -op ${output_prefix}
+python ${SCRIPT_DIR}/../cluster_chr/get_RE.py -f ${fa_file} -e ${enzyme_site} -op ${output_prefix}
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: get_RE.py failed."
@@ -279,10 +284,10 @@ fi
 # Step 5: Final Output
 LOG_INFO ${log_file} "run" "Created output directory: gphase_final"
 cd ../ && mkdir -p gphase_final && cd gphase_final
-ln -s "../preprocessing/${RE_file}"
-ln -s "../preprocessing/${hic_links}"
-ln -s "../cluster_chr/${output_prefix}.rmTip.split.gfa"
-ln -s "../cluster_chr/group_ctgs_All.txt" ${output_prefix}.subgraphs.txt
-ln -s "../cluster_chr/rescue.cluster.ctg.txt" ${output_prefix}.chr.cluster.txt
+# ln -s "../preprocessing/${RE_file}"
+# ln -s "../preprocessing/${hic_links}"
+# ln -s "../cluster_chr/${output_prefix}.rmTip.split.gfa"
+# ln -s "../cluster_chr/group_ctgs_All.txt" ${output_prefix}.subgraphs.txt
+# ln -s "../cluster_chr/rescue.cluster.ctg.txt" ${output_prefix}.chr.cluster.txt
 ln -s ../scaffold_hap/HapHiC_sort/scaffolds.sort.fa ${output_prefix}.scaffolds.fasta
 ln -s ../scaffold_hap/HapHiC_sort/final_agp/${output_prefix}.final.agp
