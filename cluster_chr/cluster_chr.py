@@ -5,7 +5,11 @@ import subprocess
 import argparse
 import logging
 import argcomplete
+import numpy as np
+import pandas as pd
 import sys
+import random
+from multilevel_cluster_v2 import Multilevel_cluster
 from argcomplete.completers import FilesCompleter
 
 def setup_logging(log_file: str = "cluster_chr.log") -> logging.Logger:
@@ -29,6 +33,13 @@ def setup_logging(log_file: str = "cluster_chr.log") -> logging.Logger:
     logger.addHandler(ch)
     
     return logger
+
+def log_start(logger: logging.Logger, script_name: str, version: str, args: argparse.Namespace):
+    """Log the start of the program."""
+    logger.info(f"Program started, {script_name} version: {version}")
+    logger.info(f"Python version: {sys.version}")
+    logger.info(f"Command: {' '.join(sys.argv)}")
+    logger.info(f"Arguments: {args}")
 
 def run_command(command, description, logger):
     try:
@@ -138,34 +149,19 @@ def run_pipeline_chr(output_prefix, HiC_file, logger):
         return True
     return False 
 
-def get_cluster_count(output_prefix, logger):
-    cluster_file = f"{output_prefix}.chr.cluster.txt"
-    if not os.path.exists(cluster_file):
-        logger.error(f"Cluster file {cluster_file} does not exist.")
-        return None
-    with open(cluster_file, 'r') as f:
-        clusters = set(line.strip().split()[0] for line in f if line.strip())
-    return len(clusters)
 
-def run_multilevel_cluster(output_prefix, chr_number, logger):
-    r_min, r_max = 0.01, 5.0
-    r = 1.0
+def run_multilevel_cluster_v1(output_prefix, chr_number, logger):
+    r_min, r_max = 0.01, 30.0
+    r = 1
     while r_min <= r <= r_max:
         logger.info(f"Running multilevel clustering with r={r}")
         script_path = os.path.abspath(sys.path[0])
-        result = run_command([
-            "python", os.path.join(script_path,"multilevel_cluster.py"),
-            "-c", f"{output_prefix}.allele.hic.csv",
-            "-o", f"{output_prefix}.chr.cluster.txt",
-            "-r", str(r)
-        ], "Running multilevel_cluster.py", logger)
 
-        if result is None:
-            return False
 
-        cluster_count = get_cluster_count(output_prefix, logger)
+        cluster_count = Multilevel_cluster(f"{output_prefix}.allele.hic.csv", f"{output_prefix}.chr.cluster.ctg.txt", str(r), True, f"{output_prefix}.RE_counts.txt", f"{output_prefix}.allele.cluster.ctg.txt", chr_number)
+
         if cluster_count is None:
-            return False
+            return r
 
         logger.info(f"Current cluster count: {cluster_count}")
 
@@ -184,19 +180,54 @@ def run_multilevel_cluster(output_prefix, chr_number, logger):
             break
 
     logger.error("Failed to achieve the desired cluster count within the r range.")
-    return False
+    return 0
 
-def run_trans_allele_cluster(output_prefix, logger):
-    script_path = os.path.abspath(sys.path[0])
-    flag = run_command([
-        "python", os.path.join(script_path,"trans_allele_cluster.py"),
-        "-c1", f"{output_prefix}.chr.cluster.txt",
-        "-c2", f"{output_prefix}.allele.cluster.ctg.txt",
-        "-n", output_prefix
-    ], "Running trans_allele_cluster.py", logger)
-    if flag:
-        return True
-    return False 
+def run_multilevel_cluster(output_prefix, chr_number, logger, max_attempts=50):
+    r_min_global, r_max_global = 0.01, 30.0
+
+    for attempt in range(max_attempts):
+        # 每次尝试从全局范围中随机选择一个初始r
+        r = random.uniform(r_min_global, r_max_global)
+        r_min, r_max = r_min_global, r_max_global
+
+        logger.info(f"Attempt {attempt + 1}: Trying initial r={r}")
+
+        while r_min <= r <= r_max:
+            logger.info(f"Running multilevel clustering with r={r}")
+            script_path = os.path.abspath(sys.path[0])
+
+            cluster_count = Multilevel_cluster(
+                f"{output_prefix}.allele.hic.filter.csv",
+                f"{output_prefix}.chr.cluster.ctg.txt",
+                str(r),
+                True,
+                f"{output_prefix}.RE_counts.txt",
+                f"{output_prefix}.allele.cluster.ctg.txt",
+                chr_number
+            )
+
+            if cluster_count is None:
+                logger.warning("Multilevel_cluster returned None, exiting current attempt.")
+                break
+
+            logger.info(f"Current cluster count: {cluster_count}")
+
+            if cluster_count == chr_number:
+                logger.info(f"Success: Desired cluster count {chr_number} achieved with r={r}.")
+                return True
+            elif cluster_count > chr_number:
+                r_max = r
+                r = (r_min + r) / 2
+            else:
+                r_min = r
+                r = (r + r_max) / 2
+
+            if abs(r_max - r_min) < 0.01:
+                logger.warning("r adjustment range is too small to continue in this attempt.")
+                break
+
+    logger.error("Failed to achieve the desired cluster count after all attempts.")
+    return False
 
 def run_rescue_base_subgraph(HiC_file, output_prefix, logger):
     script_path = os.path.abspath(sys.path[0])
@@ -211,6 +242,36 @@ def run_rescue_base_subgraph(HiC_file, output_prefix, logger):
     if flag:
         return True
     return False 
+
+def filter_edges_by_density(chr_num, HiC_file, group_ctgs_save, filter_HiC_file, logger, step=0.5):
+
+    nodes = pd.read_csv(group_ctgs_save, sep='\t' ,header=None)
+    edges = pd.read_csv(HiC_file, sep=',', header=0)
+    edges.columns = ['source', 'target', 'links']
+
+    num_nodes = len(nodes)
+    num_edges = len(edges)
+    density = (2 * num_edges) / (num_nodes * (num_nodes - 1)) if num_nodes > 1 else 0
+    logger.info(f"Chr{chr_num} hic graph info : edges -> {num_edges}\t nodes -> {num_nodes}\t density -> {density}")
+
+    if density < 0.2 and num_nodes < (num_edges / 30):
+        logger.info(f"Chr{chr_num} HiC signal filtering...")
+        threshold = 0.5
+        
+        while True:
+            filtered_edges = edges[edges['links'] > threshold]
+            filtered_num_edges = len(filtered_edges)
+
+            logger.info(f"Chr{chr_num} HiC signal filtering : threshold -> {threshold:.1f}\t edges: -> {filtered_num_edges}")
+
+            if filtered_num_edges < (num_nodes * 30):
+                break
+
+            threshold += step
+
+        filtered_edges.to_csv(filter_HiC_file, sep=',', header=True, index=False)
+    else:
+        edges.to_csv(filter_HiC_file, sep=',', header=True, index=False)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -247,6 +308,7 @@ def main():
     argcomplete.autocomplete(args)
     pwd = os.getcwd()
     logger = setup_logging('cluster_chr.log')
+    log_start(logger, "cluster_chr.py", "1.0.0", args)
 
     if not index_fasta(args.fa_file, logger):
         logger.error("Split GFA Error: An error occurred while splitting the GFA.")
@@ -280,14 +342,17 @@ def main():
     if not run_pipeline_chr(args.output_prefix, args.HiC_file, logger):
         logger.error("Run hic_cluster Error: An error occurred while running hic_cluster.")
         return
+    
+    # filter allele HiC
+    allele_hic_file = f"{args.output_prefix}.allele.hic.csv"
+    groups_file = "group_ctgs_save.txt"
+    filter_HiC_file = "rice4.allele.hic.filter.csv"
+    filter_edges_by_density(args.chr_number, allele_hic_file, groups_file, filter_HiC_file, logger, step=0.5)
 
     if not run_multilevel_cluster(args.output_prefix, args.chr_number, logger):
         logger.error("Run multilevel_cluster Error: An error occurred while running multilevel_cluster.")
         return
 
-    if not run_trans_allele_cluster(args.output_prefix, logger):
-        logger.error("Transform Error: An error occurred while converting hic_cluster results.")
-        return
 
     if not run_rescue_base_subgraph(args.HiC_file, args.output_prefix, logger):
         logger.error("Rescue Error: An error occurred while rescue base subgraph.")

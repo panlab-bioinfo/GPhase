@@ -22,8 +22,7 @@ def read_gfa(gfa_filePath):
             if(line[0] == "S"):
                 utgs_list.append(line[1])
                 graph.add_node(line[1], length = len(line[2]), seq = line[2], coverage = int(line[4][5:]), visit_count = 1, out=set(), enter=set(), type=None)
-            elif(line[0] == "L"): # no self loop
-                # gfa.add_edge(line[1],line[3])
+            elif(line[0] == "L"): 
                 graph.add_edge(line[1],line[3],strand1=line[2], strand2=line[4], match=int(line[5][:-1]))
                 if line[2] == '+' :
                     graph.nodes[line[1]]['out'].add(line[3]) 

@@ -55,14 +55,23 @@ def correct_collapse_num(utgs_list, collapse_num_dict, cluster_dict, utg_group_d
 
 def read_l(l):
     hic_nei_dict = defaultdict(set)
-    hic_links_dict = defaultdict()
+    hic_links_dict = dict()
     with open(l, 'r') as file:
         for line in file:
-            if line.startswith("utg") or line.startswith("utig"):
-                line = line.strip().split(',')
-                hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
-                hic_nei_dict[line[0]].add(line[1])
-                hic_nei_dict[line[1]].add(line[0])
+            if not (line.startswith("utg") or line.startswith("utig")):
+                continue
+            line = line.rstrip('\n')
+            # 手动找逗号分割，避免 split() 慢
+            idx1 = line.find(',')
+            idx2 = line.find(',', idx1 + 1)
+            node1 = line[:idx1]
+            node2 = line[idx1 + 1:idx2]
+            weight = float(line[idx2 + 1:])
+            
+            key = tuple(sorted((node1, node2)))
+            hic_links_dict[key] = weight
+            hic_nei_dict[node1].add(node2)
+            hic_nei_dict[node2].add(node1)
     return hic_links_dict, hic_nei_dict
 
 
@@ -225,12 +234,12 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
                     file.write(f"{utg} ")
                 file.write("\n")
 
-        with open(f"{output_prefix}.reassign.uncopy.cluster.txt", 'w') as file:
-            for group in cluster_uncollapse_dict:
-                file.write(f"{group}\t{len(cluster_uncollapse_dict[group])}\t")
-                for utg in cluster_uncollapse_dict[group]:
-                    file.write(f"{utg} ")
-                file.write("\n")
+        # with open(f"{output_prefix}.reassign.uncopy.cluster.txt", 'w') as file:
+        #     for group in cluster_uncollapse_dict:
+        #         file.write(f"{group}\t{len(cluster_uncollapse_dict[group])}\t")
+        #         for utg in cluster_uncollapse_dict[group]:
+        #             file.write(f"{utg} ")
+        #         file.write("\n")
 
 
     # 计算 cluster 中每个簇的长度方差

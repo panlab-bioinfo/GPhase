@@ -1,4 +1,4 @@
-
+from multilevel_cluster_v2 import multilevel_cluster
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -10,6 +10,7 @@ import argparse
 import copy
 import os
 import sys
+
 
 
 
@@ -50,14 +51,22 @@ def read_c(c):
 
 def read_l(l):
     hic_nei_dict = defaultdict(set)
-    hic_links_dict = defaultdict()
+    hic_links_dict = dict()
     with open(l, 'r') as file:
         for line in file:
-            if line.startswith("utg") or line.startswith("utig") :
-                line = line.strip().split(',')
-                hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
-                hic_nei_dict[line[0]].add(line[1])
-                hic_nei_dict[line[1]].add(line[0])
+            if not (line.startswith("utg") or line.startswith("utig")):
+                continue
+            line = line.rstrip('\n')
+            idx1 = line.find(',')
+            idx2 = line.find(',', idx1 + 1)
+            node1 = line[:idx1]
+            node2 = line[idx1 + 1:idx2]
+            weight = float(line[idx2 + 1:])
+            
+            key = tuple(sorted((node1, node2)))
+            hic_links_dict[key] = weight
+            hic_nei_dict[node1].add(node2)
+            hic_nei_dict[node2].add(node1)
     return hic_links_dict, hic_nei_dict
 
 def read_allele(allele_file):
@@ -131,10 +140,11 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
                     file.write(f"{pair[0]},{pair[1]},{value}\n")
 
             try:
-                script = f"""python {script_path_add} -c utgs_cluster/{utg}.links.nor.csv -o utgs_cluster/{utg}.cluster.txt"""
-                process = subprocess.run(script, shell=True, executable='/bin/bash', capture_output=True, text=True)
-
+                # script = f"""python {script_path_add} -c utgs_cluster/{utg}.links.nor.csv -o utgs_cluster/{utg}.cluster.txt"""
+                # process = subprocess.run(script, shell=True, executable='/bin/bash', capture_output=True, text=True)
+                csv_file = f"utgs_cluster/{utg}.links.nor.csv"
                 cluster_file = f"utgs_cluster/{utg}.cluster.txt"
+                multilevel_cluster(csv_file, cluster_file)
                 cluster_dict, utg_group_dict = read_c(cluster_file)
             except:
                 louvin_nei_log_file.write(f"error: {utg}\t{','.join(nei_utg)}\t{','.join(nei_uncollapse_utg)}\n")

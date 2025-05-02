@@ -4,7 +4,9 @@ import os
 import argparse
 import subprocess
 import logging
+import pandas as pd
 import argcomplete
+import networkx as nx
 from argcomplete.completers import FilesCompleter
 from multiprocessing import Pool, cpu_count
 from concurrent.futures import ThreadPoolExecutor
@@ -12,7 +14,7 @@ import functools
 import sys
 from collections import defaultdict
 from find_knees import find_best_knee
-from multilevel_cluster import multilevel_cluster
+from multilevel_cluster_v2 import multilevel_cluster
 from louvain_reassign_allele import louvain_reassign_allele
 from louvain_nei import louvain_nei
 
@@ -140,7 +142,7 @@ def adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output, csv_file
     check_cluster_dict = defaultdict(list)
     while min_r <= r <= max_r:
         logger.info(f"Running clustering with r={r}")
-        check_cluster_dict, max_group_allele_value = multilevel_cluster(csv_file, cluster_output, r , "check", utg_file, partig_file)
+        check_cluster_dict, max_group_allele_value = multilevel_cluster(csv_file, cluster_output, r , "check", utg_file, partig_file, hap_number)
 
         num_clusters = len(check_cluster_dict)
         logger.info(f"Number of clusters: {num_clusters} (Target: {hap_number})")
@@ -214,6 +216,37 @@ def multiple_adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output,
     raise 
 
 
+def filter_edges_by_density(chr_num, HiC_file, utg_rescue_file, filter_HiC_file, logger, step=0.5):
+
+    nodes = pd.read_csv(utg_rescue_file, header=None)[0].tolist()
+    edges = pd.read_csv(HiC_file, sep=',', header=0)
+    edges.columns = ['source', 'target', 'links']
+
+    num_nodes = len(nodes)
+    num_edges = len(edges)
+    density = (2 * num_edges) / (num_nodes * (num_nodes - 1)) if num_nodes > 1 else 0
+    logger.info(f"Chr{chr_num} hic graph info : edges -> {num_edges}\t nodes -> {num_nodes}\t density -> {density}")
+
+    if  num_nodes < (num_edges / 30):
+        logger.info(f"Chr{chr_num} HiC signal filtering...")
+        threshold = 0.5
+        
+        while True:
+            filtered_edges = edges[edges['links'] > threshold]
+            filtered_num_edges = len(filtered_edges)
+
+            logger.info(f"Chr{chr_num} HiC signal filtering : threshold -> {threshold:.1f}\t edges: -> {filtered_num_edges}")
+
+            if filtered_num_edges < (num_nodes * 30):
+                break
+
+            threshold += step
+
+        filtered_edges.to_csv(filter_HiC_file, sep=',', header=False, index=False)
+    else:
+        edges.to_csv(filter_HiC_file, sep=',', header=False, index=False)
+
+
 
 def process_chromosome(chr_num, args, pwd, partig_file,logger):
     script_path = os.path.abspath(sys.path[0])
@@ -262,10 +295,11 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         else:
             utg_rescue_file = utg_file
 
+
         # Process files with ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=args.thread_num) as executor:
             # Process links file
-            links_file = f"{args.output_prefix}.chr{chr_num}.links.nor.csv"
+            links_file = f"{args.output_prefix}.chr{chr_num}.links.all.nor.csv"
             links_future = executor.submit(filter_links_by_utgs,str(chr_num)+"_links", utg_rescue_file, args.HiC_file, links_file, logger)
             
             # Process partig file
@@ -276,11 +310,14 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
             links_future.result()
             partig_future.result()
 
+        # filter HiC links
+        filter_edge_file = f"{args.output_prefix}.chr{chr_num}.links.nor.csv"
+        filter_edges_by_density(chr_num, links_file, utg_rescue_file, filter_edge_file, logger=logger, step=0.5)
 
         filtered_links_file = f"{args.output_prefix}.chr{chr_num}.links.nor.filterAllele.csv"
         command = (
             f"awk -F '[, \\t]' 'NR==FNR{{lines[$1\",\"$2];next}}!($1\",\"$2 in lines)' "
-            f"{partig_file} {links_file} > {filtered_links_file}"
+            f"{partig_file} {filter_edge_file} > {filtered_links_file}"
         )
         execute_command(command, f"Failed to filter allele links for {filtered_links_file}",logger)
         execute_command(f"sed '1isource,target,links' -i {filtered_links_file}", f"Failed to add header to {filtered_links_file}",logger)
@@ -288,13 +325,13 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
         # # The knee is used to filter HiC signals
         best_knee = find_best_knee(filtered_links_file, f"{args.output_prefix}.chr{chr_num}.knees")
-        cut_value, cut_value_step = 0, 0.5
+        cut_value, cut_value_step = 0, 1
 
         # best_knee [1.5, 4.5]
-        if best_knee > 4.5:
-            cut_value_max = 4.5
-        elif best_knee < 1.5:
+        if best_knee < 1.5:
             cut_value_max = 1.5
+        # elif best_knee > 4.5:
+        #     cut_value_max = 4.5
         else:
             cut_value_max = best_knee
 
@@ -323,7 +360,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                 louvain_nei_result = louvain_nei(args.collapse_num_file, utg_file, cut_links_file, partig_file)
                 if not louvain_nei_result:
                     raise
-                check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, 1, "check", utg_file, no_expand_partig_file)
+                check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, 1, "check", utg_file, no_expand_partig_file, args.hap_number)
 
                 optimal_r = multiple_adjust_r_and_cluster(
                     initial_r=1.0,
@@ -337,7 +374,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                     hap_number=args.hap_number, logger=logger
                 )
                 logger.info(f"Optimal r for chromosome {chr_num}: {optimal_r}")
-                check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, optimal_r, "check", utg_file, no_expand_partig_file)
+                check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, optimal_r, "check", utg_file, no_expand_partig_file, args.hap_number)
 
                 
                 # Check the number of clusters
@@ -382,7 +419,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
                 # Adjust r and run multilevel_cluster.py
                 try:
-                    check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, 1, "check", utg_file, no_expand_partig_file)
+                    check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, 1, "check", utg_file, no_expand_partig_file, args.hap_number)
                     logger.info(f"Chr:{chr_num}: len: {len(check_cluster_dict)} max_group_allele_value:{max_group_allele_value}.")
                     optimal_r = multiple_adjust_r_and_cluster(
                         initial_r=1.0,
@@ -396,7 +433,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                         hap_number=args.hap_number, logger=logger
                     )
                     # logger.info(f"Optimal r for chromosome {chr_num}: {optimal_r}")
-                    check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, optimal_r, "check", utg_file, no_expand_partig_file)
+                    check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, optimal_r, "check", utg_file, no_expand_partig_file, args.hap_number)
                     logger.info(f"Chr:{chr_num}: max_group_allele_value:{max_group_allele_value}.")
 
                     # Check the number of clusters

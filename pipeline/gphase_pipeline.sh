@@ -22,6 +22,7 @@ usage() {
     echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 5"
     echo "|"
     echo "|>>> clustering haplotypes Parameters:"
+    echo "|  --expand           <resexpandcue>           : Whether to expand the allele, default: False."
     echo "|  --rescue           <rescue>                 : Whether to rescue the subgraph, default: False."
     echo "|  --reassign_number  <reassign_number>        : Number of reassign step, default: 1. [1-3]"
     echo "|"
@@ -63,7 +64,7 @@ processes="32"
 
 
 
-TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,f:,g:,c:,m:,p:e:,split_gfa_n:,rescue,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,processes:,help -- "$@")
+TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,f:,g:,c:,m:,p:e:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,processes:,help -- "$@")
 
 if [ $? != 0 ]; then
     echo "Error: Invalid arguments."
@@ -100,6 +101,7 @@ while true; do
             fi
             shift 2 ;;
         --rescue) rescue="--rescue"; shift ;;
+        --expand) expand="--expand"; shift ;;
         --thread) thread="$2"; shift 2 ;;
         --no_contig_ec) no_contig_ec="--no_contig_ec";shift ;;
         --no_scaffold_ec) no_scaffold_ec="--no_scaffold_ec";shift ;;
@@ -253,7 +255,7 @@ else
     cr="rescue.cluster.ctg.txt"
 fi
 
-python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr}  --expand -pm 0.6 --reassign_number ${reassign_number} ${rescue}
+python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr} -pm 0.6 --reassign_number ${reassign_number} ${rescue} ${expand}
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_hap.py failed."

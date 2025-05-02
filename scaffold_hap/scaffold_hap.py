@@ -177,9 +177,13 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
             except FileExistsError:
                 pass
 
-        # Run get subgraph sort result
+        # Run get subgraph sort result  
         script_path = os.path.abspath(sys.path[0])
-        Get_subgraph_scaffold_v2(args.gfa_file, args.RE_file, args.digraph_file, f"group{hap_num}.txt", args.subgraph_file)
+        logger.info(f"Chromosome {chr_num} hap {hap_num} run Get_subgraph_scaffold_v2...")
+        logger.info(f"Chromosome {chr_num} hap {hap_num} run Get_subgraph_scaffold_v2: {args.gfa_file} {args.RE_file} {args.digraph_file} group{hap_num}.txt {args.subgraph_file}")
+        Get_subgraph_scaffold_v2(args.gfa_file, args.RE_file, args.digraph_file,f"group{hap_num}.txt", args.subgraph_file)
+
+        logger.info(f"Chromosome {chr_num} hap {hap_num} run Get_subgraph_scaffold_v2 done...")
 
         # split asm.fa
         tmp_file = f"tmp_{hap_num}.txt"

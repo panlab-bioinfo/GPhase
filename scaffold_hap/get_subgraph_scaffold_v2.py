@@ -200,6 +200,9 @@ def Nth_nei(G, reverse = False):
             node_nei_dict = defaultdict(list)
             node_list = list(G.predecessors(node)) if reverse else list(G.successors(node))
 
+            if not node_list:
+                continue
+
             if reverse:
                 for branch_node in node_list:
                     node_nei_dict[branch_node] = get_nth_order_successors(G, branch_node, 5, return_by_level=False)
@@ -215,8 +218,8 @@ def Nth_nei(G, reverse = False):
             
             # 去除节点与分支节点之间的连接
             # 若 分支中存在 tip节点 则只去除tip节点
-            if node_list == 2 and (len(node_nei_dict[node_list[0]]) == 0 )  !=  (len(node_nei_dict[node_list[1]]) == 0):
-                if len(node_nei_dict[node_list[0]]) == 0:
+            if len(node_list) == 2 and (len(node_nei_dict.get(node_list[0], [])) == 0 )  !=  (len(node_nei_dict.get(node_list[1], [])) == 0):
+                if len(node_nei_dict.get(node_list[0], [])) == 0:
                     if G.has_edge(node, node_list[0]):
                         G.remove_edge(node, node_list[0])
                     if G.has_edge(node_list[0], node):
@@ -261,8 +264,19 @@ def simple_scaffold_Graph(G):
     if matcher.subgraph_is_isomorphic():
         print("找到P1同构子图")
         for subgraph_mapping in matcher.subgraph_isomorphisms_iter():
-            start_node = [ node for node,num in subgraph_mapping.items() if num== 1][0]
-            end_node = [ node for node,num in subgraph_mapping.items() if num== 4][0]
+            start_nodes = [ node for node,num in subgraph_mapping.items() if num== 1]
+            end_nodes = [ node for node,num in subgraph_mapping.items() if num== 4]
+
+            if start_nodes:
+                start_node = start_nodes[0]
+            else:
+                continue
+
+            if end_nodes:
+                end_node = end_nodes[0]
+            else:
+                continue
+
             if G.has_edge(start_node, end_node):
                 G.remove_edge(start_node, end_node)
             if G.has_edge(end_node, start_node):
