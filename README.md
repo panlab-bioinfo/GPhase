@@ -4,10 +4,11 @@ GPhase: A phasing assembly tool using assembly graphs and Hi-C data
 
 ```
 git clone https://github.com/panlab-bioinfo/GPhase.git
+cd GPhase
 git submodule update --init  --recursive
-conda env create -f GPhase/gphase_environment.yaml
+conda env create -f gphase_environment.yaml
 conda activate gphase
-/path/to/GPhase/pipeline/gphase_pipeline.sh -h
+./gphase -h
 ```
 
 # Aligning Hi-C data to assembly

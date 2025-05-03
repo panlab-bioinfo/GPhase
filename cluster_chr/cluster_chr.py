@@ -262,7 +262,7 @@ def filter_edges_by_density(chr_num, HiC_file, group_ctgs_save, filter_HiC_file,
             filtered_edges = edges[edges['links'] > threshold]
             filtered_num_edges = len(filtered_edges)
 
-            logger.info(f"Chr{chr_num} HiC signal filtering : threshold -> {threshold:.1f}\t edges: -> {filtered_num_edges}")
+            logger.info(f"Chr{chr_num} HiC signal filtering : c -> {threshold:.1f}\t edges: -> {filtered_num_edges}")
 
             if filtered_num_edges < (num_nodes * 30):
                 break
@@ -346,7 +346,7 @@ def main():
     # filter allele HiC
     allele_hic_file = f"{args.output_prefix}.allele.hic.csv"
     groups_file = "group_ctgs_save.txt"
-    filter_HiC_file = "rice4.allele.hic.filter.csv"
+    filter_HiC_file = f"{args.output_prefix}.allele.hic.filter.csv"
     filter_edges_by_density(args.chr_number, allele_hic_file, groups_file, filter_HiC_file, logger, step=0.5)
 
     if not run_multilevel_cluster(args.output_prefix, args.chr_number, logger):
