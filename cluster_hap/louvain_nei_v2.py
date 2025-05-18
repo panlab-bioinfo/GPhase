@@ -50,6 +50,21 @@ def read_c(c):
 
 
 def read_l(l):
+
+    df = pd.read_csv(l, header=None, names=['source', 'target', 'links'])
+
+    g = nk.graph.Graph(weighted=True, directed=False)
+    nodes = list(set(df['source']).union(set(df['target'])))
+    node_to_id = {node: idx for idx, node in enumerate(nodes)}
+    id_to_node = {idx: node for node, idx in node_to_id.items()}
+    g.addNodes(len(nodes))
+    for _, row in df.iterrows():
+        u = node_to_id[row['source']]
+        v = node_to_id[row['target']]
+        weight = row['links']
+        if not g.hasEdge(u, v):
+            g.addEdge(u, v, weight)
+
     hic_nei_dict = defaultdict(set)
     hic_links_dict = dict()
     with open(l, 'r') as file:
@@ -67,7 +82,7 @@ def read_l(l):
             hic_links_dict[key] = weight
             hic_nei_dict[node1].add(node2)
             hic_nei_dict[node2].add(node1)
-    return hic_links_dict, hic_nei_dict
+    return g, hic_links_dict, hic_nei_dict
 
 def read_allele(allele_file):
 
@@ -90,19 +105,23 @@ def cal_hic_links(hic_links_dict, utg, utgs_list):
             hic_num += hic_links_dict[tmp]
     return  hic_num
 
+def Louvain_cluster(g, id_to_node, resolution):
+
+    nk.setSeed(42, True)
+    partitioner = nk.community.PLM(g, refine=True, gamma=float(resolution))
+    partitioner.run()
+    partition = partitioner.getPartition()
+
+    communities = defaultdict(list)
+    for node in range(g.numberOfNodes()):
+        cluster_id = partition.subsetOf(node)
+        label = id_to_node[node]
+        communities[cluster_id].append(label)
+
+    return communities
 
 
 def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_dict, allele_key_dict):
-
-    # collapse_num_file = "06.genes.round.cn"
-    # chr_file = "chr06.txt"
-    # l = "rice4.links.nor.csv"
-    # allele_file =  "chr06.allel.csv"
-
-    # collapse_num_dict = read_collapse_num(collapse_num_file)
-    # utgs_list = read_chr_utgs(chr_file)
-    # hic_links_dict, hic_nei_dict = read_l(l)
-    # allele_utg_dict, allele_key_dict = read_allele(allele_file)
 
     for utg in utgs_list:
         if utg not in collapse_num_dict:
@@ -214,7 +233,7 @@ def louvain_nei(collapse_num_file, chr_file, l, allele_file):
 
     collapse_num_dict = read_collapse_num(collapse_num_file)
     utgs_list = read_chr_utgs(chr_file)
-    hic_links_dict, hic_nei_dict = read_l(l)
+    g, hic_links_dict, hic_nei_dict = read_l(l)
     allele_utg_dict, allele_key_dict = read_allele(allele_file)
 
     louvain_nei_result = run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_dict, allele_key_dict)

@@ -183,27 +183,31 @@ def run_multilevel_cluster_v1(output_prefix, chr_number, logger):
     return 0
 
 def run_multilevel_cluster(output_prefix, chr_number, logger, max_attempts=50):
-    r_min_global, r_max_global = 0.01, 30.0
+    r_min_global, r_max_global = 0.1, 30
 
-    for attempt in range(max_attempts):
-        # 每次尝试从全局范围中随机选择一个初始r
-        r = random.uniform(r_min_global, r_max_global)
+    for attempt in range(1, max_attempts):
+
+        # r = random.uniform(r_min_global, r_max_global)
+        r = float(attempt) / 10
         r_min, r_max = r_min_global, r_max_global
 
         logger.info(f"Attempt {attempt + 1}: Trying initial r={r}")
 
-        while r_min <= r <= r_max:
-            logger.info(f"Running multilevel clustering with r={r}")
-            script_path = os.path.abspath(sys.path[0])
+        if attempt < 5:
+            iter_num = 3
+        elif attempt >= 5:
+            iter_num = 5
+
+        for i in range(iter_num):
 
             cluster_count = Multilevel_cluster(
                 f"{output_prefix}.allele.hic.filter.csv",
                 f"{output_prefix}.chr.cluster.ctg.txt",
-                str(r),
+                float(r),
                 True,
                 f"{output_prefix}.RE_counts.txt",
                 f"{output_prefix}.allele.cluster.ctg.txt",
-                chr_number
+                float(chr_number)
             )
 
             if cluster_count is None:
@@ -215,16 +219,7 @@ def run_multilevel_cluster(output_prefix, chr_number, logger, max_attempts=50):
             if cluster_count == chr_number:
                 logger.info(f"Success: Desired cluster count {chr_number} achieved with r={r}.")
                 return True
-            elif cluster_count > chr_number:
-                r_max = r
-                r = (r_min + r) / 2
-            else:
-                r_min = r
-                r = (r + r_max) / 2
-
-            if abs(r_max - r_min) < 0.01:
-                logger.warning("r adjustment range is too small to continue in this attempt.")
-                break
+            
 
     logger.error("Failed to achieve the desired cluster count after all attempts.")
     return False
@@ -243,7 +238,7 @@ def run_rescue_base_subgraph(HiC_file, output_prefix, logger):
         return True
     return False 
 
-def filter_edges_by_density(chr_num, HiC_file, group_ctgs_save, filter_HiC_file, logger, step=0.5):
+def filter_edges_by_density(chr_num, HiC_file, group_ctgs_save, filter_HiC_file, logger, filter_threshold = 30, step=0.5):
 
     nodes = pd.read_csv(group_ctgs_save, sep='\t' ,header=None)
     edges = pd.read_csv(HiC_file, sep=',', header=0)
@@ -252,19 +247,19 @@ def filter_edges_by_density(chr_num, HiC_file, group_ctgs_save, filter_HiC_file,
     num_nodes = len(nodes)
     num_edges = len(edges)
     density = (2 * num_edges) / (num_nodes * (num_nodes - 1)) if num_nodes > 1 else 0
-    logger.info(f"Chr{chr_num} hic graph info : edges -> {num_edges}\t nodes -> {num_nodes}\t density -> {density}")
+    logger.info(f"HiC graph info : edges : {num_edges}, nodes : {num_nodes}, density : {density}")
 
-    if density < 0.2 and num_nodes < (num_edges / 30):
-        logger.info(f"Chr{chr_num} HiC signal filtering...")
+    if density < 0.2 and num_nodes < (num_edges / filter_threshold):
+        logger.info(f"HiC signal filtering...")
         threshold = 0.5
         
         while True:
             filtered_edges = edges[edges['links'] > threshold]
             filtered_num_edges = len(filtered_edges)
 
-            logger.info(f"Chr{chr_num} HiC signal filtering : c -> {threshold:.1f}\t edges: -> {filtered_num_edges}")
+            logger.info(f"HiC signal filtering :  threshold -> {threshold:.1f}\t edges: -> {filtered_num_edges}")
 
-            if filtered_num_edges < (num_nodes * 30):
+            if filtered_num_edges < (num_nodes * filter_threshold):
                 break
 
             threshold += step
@@ -298,7 +293,7 @@ def parse_arguments() -> argparse.Namespace:
 
     split_GFA_group  = parser.add_argument_group('>>> Parameter for split GFA')
     split_GFA_group.add_argument("-g", "--gfa", metavar='\b', required=True, help="Path to the GFA file.")
-    split_GFA_group.add_argument("-n", "--split_gfa_n", metavar='\b', type=int, default=5, help="Number of common neighbors when splitting GFA. Default: 5.")
+    split_GFA_group.add_argument("-n", "--split_gfa_n", metavar='\b', type=int, default=2, help="Number of common neighbors when splitting GFA. Default: 2.")
     split_GFA_group.add_argument("-i", "--split_gfa_iter", metavar='\b', type=int, default=3, help="Number of iterations when splitting GFA. Default: 3.")
 
     return parser.parse_args()
@@ -344,14 +339,19 @@ def main():
         return
     
     # filter allele HiC
-    allele_hic_file = f"{args.output_prefix}.allele.hic.csv"
+    filter_threshold = 20
+    allele_hic_file, filter_HiC_file = f"{args.output_prefix}.allele.hic.csv", f"{args.output_prefix}.allele.hic.filter.csv"
     groups_file = "group_ctgs_save.txt"
-    filter_HiC_file = f"{args.output_prefix}.allele.hic.filter.csv"
-    filter_edges_by_density(args.chr_number, allele_hic_file, groups_file, filter_HiC_file, logger, step=0.5)
+    while filter_threshold:
+        logger.info(f"Chromosome clustering uses the filter_threshold : {filter_threshold}.")
+        filter_edges_by_density(args.chr_number, allele_hic_file, groups_file, filter_HiC_file, logger, filter_threshold=filter_threshold,step=0.5)
 
-    if not run_multilevel_cluster(args.output_prefix, args.chr_number, logger):
-        logger.error("Run multilevel_cluster Error: An error occurred while running multilevel_cluster.")
-        return
+        if not run_multilevel_cluster(args.output_prefix, args.chr_number, logger):
+            logger.error(f"Run Chromosome multilevel_cluster Error -> filter_threshold : {filter_threshold}.")
+            filter_threshold -= 10 
+            continue
+        else:
+            break
 
 
     if not run_rescue_base_subgraph(args.HiC_file, args.output_prefix, logger):

@@ -19,7 +19,7 @@ usage() {
     echo "|  -e                 <enzyme_site>            : The restriction enzyme cutting site, default: GATC."
     echo "|"
     echo "|>>> clustering chromosomes Parameters:"
-    echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 5"
+    echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 2"
     echo "|"
     echo "|>>> clustering haplotypes Parameters:"
     echo "|  --expand           <resexpandcue>           : Whether to expand the allele, default: False."
@@ -51,7 +51,7 @@ n_chr=""
 n_hap=""
 output_prefix=""
 enzyme_site="GATC"
-split_gfa_n="5"
+split_gfa_n="2"
 thread="12"
 no_contig_ec=""
 no_scaffold_ec=""
@@ -225,7 +225,7 @@ ln -s "../preprocessing/${output_prefix}.RE_counts.txt"
 ln -s "../preprocessing/${output_prefix}.chromap.links.nor.csv"
 
 LOG_INFO ${log_file} "run" "Running cluster_chr.py..."
-python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa} -n 2 -pm 0.95 --split_gfa_n ${split_gfa_n}
+python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa}  -pm 0.95 --split_gfa_n ${split_gfa_n}
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_chr.py failed."
@@ -275,7 +275,7 @@ ln -s "../../${map_file}"
 
 
 LOG_INFO ${log_file} "run" "Running scaffold_hap.py..."
-python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file} -t ${thread} --no_contig_ec ${no_contig_ec}  --no_scaffold_ec ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}
+python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file} -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: scaffold_hap.py failed."
     exit 1

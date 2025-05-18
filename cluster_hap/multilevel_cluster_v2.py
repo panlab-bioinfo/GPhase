@@ -130,7 +130,7 @@ if __name__ == '__main__':
                         help='<filepath> csv file of the hic signal')
     parser.add_argument('-o', '--output_file', required=True,
                         help='<filepath> output file')
-    parser.add_argument('-r', '--resolution', default=1,
+    parser.add_argument('-r', '--resolution', default=1,type=float,
                     help='<float> The resolution parameter of multilevel cluster algorithm, the larger the value, the more clusters with fewer nodes')
     parser.add_argument('--check', action='store_true', help='get the number of vaild clusters')
     parser.add_argument('--RE_file',help='File required when --check is enabled')

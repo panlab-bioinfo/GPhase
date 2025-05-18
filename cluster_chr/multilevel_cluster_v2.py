@@ -25,6 +25,8 @@ def read_REs(REFile):
     return ctg_RE_len
 
 def Louvain_cluster(g, id_to_node, resolution):
+
+    nk.setSeed(42, True)
     partitioner = nk.community.PLM(g, refine=True, gamma=float(resolution))
     partitioner.run()
     partition = partitioner.getPartition()
@@ -48,14 +50,24 @@ def Multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
     df['target'] = df['target'].astype(str)
     df['links'] = df['links'].astype(float)
 
-    # 建立节点映射
     g = nk.graph.Graph(weighted=True, directed=False)
     nodes = list(set(df['source']).union(set(df['target'])))
+
+    node_to_id, id_to_node = dict(), dict()
     node_to_id = {node: idx for idx, node in enumerate(nodes)}
     id_to_node = {idx: node for node, idx in node_to_id.items()}
     g.addNodes(len(nodes))
 
-    # 添加边（避免重复添加）
+    if cluster_dict: 
+        ctg_len_All = 0
+        for group in cluster_dict:
+            for ctg in cluster_dict[group]:
+                if ctg in ctg_RE_len:
+                    ctg_len_All += ctg_RE_len[ctg][1]
+
+
+
+
     for _, row in df.iterrows():
         u = node_to_id[row['source']]
         v = node_to_id[row['target']]
@@ -63,10 +75,10 @@ def Multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
         if not g.hasEdge(u, v):
             g.addEdge(u, v, weight)
 
-    # 社区划分
     communities = Louvain_cluster(g, id_to_node, resolution)
 
     if check:
+        filtered_chr_list = list()
         chr_len_dict = defaultdict(int)
         chr_cluster_dict = defaultdict(set)
         for idx, group in communities.items():
@@ -77,7 +89,7 @@ def Multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
                     if utg in ctg_RE_len:
                         sum_length += ctg_RE_len[utg][1]
             chr_len_dict[idx] = sum_length
-        threshold = sum(chr_len_dict.values()) / int(n_chr) / 10
+        threshold = ctg_len_All / int(n_chr) / 5
         filtered_chr_list = [key for key, value in chr_len_dict.items() if value > threshold]
 
         group = 0
