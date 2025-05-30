@@ -227,7 +227,7 @@ def filter_edges_by_density(chr_num, HiC_file, utg_rescue_file, filter_HiC_file,
     density = (2 * num_edges) / (num_nodes * (num_nodes - 1)) if num_nodes > 1 else 0
     logger.info(f"Chr{chr_num} hic graph info : edges -> {num_edges}\t nodes -> {num_nodes}\t density -> {density}")
 
-    if  num_nodes < (num_edges / 20):
+    if  num_nodes < (num_edges / 50):
         logger.info(f"Chr{chr_num} HiC signal filtering...")
         threshold = 0.5
         
@@ -237,7 +237,7 @@ def filter_edges_by_density(chr_num, HiC_file, utg_rescue_file, filter_HiC_file,
 
             logger.info(f"Chr{chr_num} HiC signal filtering : threshold -> {threshold:.1f}\t edges: -> {filtered_num_edges}")
 
-            if filtered_num_edges < (num_nodes * 20):
+            if filtered_num_edges < (num_nodes * 50):
                 break
 
             threshold += step
@@ -542,7 +542,7 @@ def main():
     logger = setup_logging('cluster_hap.log')
     log_start(logger, "cluster_hap.py", "1.0.0", args)
 
-    # # Step 1: Run partig
+    # # # Step 1: Run partig
     run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
     convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger)
     partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.csv"

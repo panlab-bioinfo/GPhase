@@ -89,7 +89,9 @@ def Multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
                     if utg in ctg_RE_len:
                         sum_length += ctg_RE_len[utg][1]
             chr_len_dict[idx] = sum_length
-        threshold = ctg_len_All / int(n_chr) / 5
+
+        # threshold = ctg_len_All / int(n_chr) / 3
+        threshold = sum(chr_len_dict.values()) / int(n_chr) / 2
         filtered_chr_list = [key for key, value in chr_len_dict.items() if value > threshold]
 
         group = 0
@@ -127,4 +129,4 @@ if __name__ == '__main__':
         if args.n_chr is None:
             parser.error("--n_chr is required when --check is enabled")
 
-    Multilevel_cluster(args.csv_file, args.output_file, args.resolution, args.check, args.RE_file, args.Allele_cluster, args.n_chr)
+    Multilevel_cluster(args.csv_file, args.output_file, args.resolution, args.check, args.RE_file, args.Allele_cluster, int(args.n_chr))

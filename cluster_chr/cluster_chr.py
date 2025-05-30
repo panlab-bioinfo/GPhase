@@ -182,19 +182,15 @@ def run_multilevel_cluster_v1(output_prefix, chr_number, logger):
     logger.error("Failed to achieve the desired cluster count within the r range.")
     return 0
 
-def run_multilevel_cluster(output_prefix, chr_number, logger, max_attempts=50):
-    r_min_global, r_max_global = 0.1, 30
+def run_multilevel_cluster(output_prefix, chr_number, logger, max_attempts=30):
 
     for attempt in range(1, max_attempts):
-
-        # r = random.uniform(r_min_global, r_max_global)
         r = float(attempt) / 10
-        r_min, r_max = r_min_global, r_max_global
 
         logger.info(f"Attempt {attempt + 1}: Trying initial r={r}")
 
         if attempt < 5:
-            iter_num = 3
+            iter_num = 1
         elif attempt >= 5:
             iter_num = 5
 
@@ -207,7 +203,7 @@ def run_multilevel_cluster(output_prefix, chr_number, logger, max_attempts=50):
                 True,
                 f"{output_prefix}.RE_counts.txt",
                 f"{output_prefix}.allele.cluster.ctg.txt",
-                float(chr_number)
+                int(chr_number)
             )
 
             if cluster_count is None:
@@ -339,14 +335,14 @@ def main():
         return
     
     # filter allele HiC
-    filter_threshold = 20
+    filter_threshold = 30
     allele_hic_file, filter_HiC_file = f"{args.output_prefix}.allele.hic.csv", f"{args.output_prefix}.allele.hic.filter.csv"
     groups_file = "group_ctgs_save.txt"
     while filter_threshold:
         logger.info(f"Chromosome clustering uses the filter_threshold : {filter_threshold}.")
         filter_edges_by_density(args.chr_number, allele_hic_file, groups_file, filter_HiC_file, logger, filter_threshold=filter_threshold,step=0.5)
 
-        if not run_multilevel_cluster(args.output_prefix, args.chr_number, logger):
+        if not run_multilevel_cluster(args.output_prefix, int(args.chr_number), logger):
             logger.error(f"Run Chromosome multilevel_cluster Error -> filter_threshold : {filter_threshold}.")
             filter_threshold -= 10 
             continue

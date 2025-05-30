@@ -18,6 +18,11 @@ usage() {
     echo "|>>> Optional parameters:"
     echo "|  -e                 <enzyme_site>            : The restriction enzyme cutting site, default: GATC."
     echo "|"
+    echo "|>>> preprocessing Parameters:"
+    echo "|  --cluster_q        <cluster_q>              : Filtered mapQ value ​​when using HiC in the clustering step, default: 1"
+    echo "|  --scaffold_q       <scaffold_q>             : Filter mapQ value when using HiC in the scaffolding step, default: 0"
+    # echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 2"
+    echo "|"
     echo "|>>> clustering chromosomes Parameters:"
     echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 2"
     echo "|"
@@ -38,7 +43,7 @@ usage() {
     echo "|  -h, --help         Show this help message"
     echo "|"
     echo "|Example:"
-    echo "|  /GPhase/to/path/gphase pipeline -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.pairs --n_chr 12 --n_hap 4 -p output_prefix"
+    echo "|  /GPhase/to/path/gphase pipeline -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt -m map_file.bam --n_chr 12 --n_hap 4 -p output_prefix"
     exit 1
 }
 
@@ -51,6 +56,8 @@ n_chr=""
 n_hap=""
 output_prefix=""
 enzyme_site="GATC"
+cluster_q=1
+scaffold_q=0
 split_gfa_n="2"
 thread="12"
 no_contig_ec=""
@@ -64,7 +71,7 @@ processes="32"
 
 
 
-TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,f:,g:,c:,m:,p:e:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,processes:,help -- "$@")
+TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,f:,g:,c:,m:,p:e:,cluster_q:,scaffold_q:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,processes:,help -- "$@")
 
 if [ $? != 0 ]; then
     echo "Error: Invalid arguments."
@@ -84,6 +91,8 @@ while true; do
         --n_hap) n_hap="$2"; shift 2 ;;
         -p) output_prefix="$2"; shift 2 ;;
         -e) enzyme_site="$2"; shift 2 ;;
+        --cluster_q) cluster_q="$2"; shift 2 ;;    
+        --scaffold_q) scaffold_q="$2"; shift 2 ;;
         --split_gfa_n)
             if [[ "$2" =~ ^[2-9]+$ ]]; then  # 确保是整数
                 split_gfa_n="$2"
@@ -202,8 +211,17 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Generate the pairs from bam
+samtools faidx ${fa_file}
+awk 'BEGIN{print "## pairs format v1.0.0\n##columns: readID chrom1 pos1 chrom2 pos2 mapQ"}{print "##chromsize: "$1" "$2}' ${fa_file}.fai > "map.chromap.pairs"
+echo "${scaffold_q}\t${map_file}"
+samtools view -@ 8 "${map_file}" | awk -v scaffold_q="${scaffold_q}" '{if($7=="=")$7=$3;if($5>=scaffold_q)print $1"\t"$3"\t"$4"\t"$7"\t"$8"\t"$5}' >> "map.chromap.pairs"
+
+# sort pairs
+cat <( grep '^#' map.chromap.pairs ) <( grep '^#' -v map.chromap.pairs | sort --parallel=16  -k2,2 -k4,4 ) >map.chromap.sort.pairs
+
 # Generate the links file
-grep '^#' -v ${map_file} | awk '{if($2 != $4){print $2,$4}}' | \
+awk -v cluster_q="$cluster_q" '{if(substr($1,1,1) != "#" && $2 != $4 && $6 >= cluster_q){print $2,$4}}' map.chromap.sort.pairs | \
         uniq -c | awk '{print $2","$3","$1}' > ${output_prefix}.chromap.links.csv
 
 python  ${SCRIPT_DIR}/../cluster_chr/nor_hic.py -f ${output_prefix}.chromap.links.csv -r ${output_prefix}.RE_counts.txt -o ${output_prefix}.chromap.links.nor.csv
@@ -271,11 +289,11 @@ ln -s "../cluster_chr/${hic_links}"
 ln -s "../cluster_chr/${gfa}"
 ln -s "../cluster_chr/group_ctgs_All.txt"
 ln -s "../cluster_chr/${output_prefix}.digraph.csv"
-ln -s "../../${map_file}"
+ln -s "../preprocessing/map.chromap.sort.pairs"
 
 
 LOG_INFO ${log_file} "run" "Running scaffold_hap.py..."
-python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m ${map_file} -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}
+python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m map.chromap.sort.pairs -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: scaffold_hap.py failed."
     exit 1

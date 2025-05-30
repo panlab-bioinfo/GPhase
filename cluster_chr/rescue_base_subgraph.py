@@ -1,12 +1,10 @@
 from collections import defaultdict,Counter
+import copy as cp
 import csv
 import networkx as nx
 import copy
 import argcomplete
 import argparse
-
-
-# 存在一些子图由于没有等位信息，所以未被聚类，对这些子图按照hic信号进行聚类
 
 def read_c(c):
     cluster_dict = defaultdict(list)
@@ -48,6 +46,7 @@ def read_l(l):
     return hic_links_dict, hic_nei_dict
 
 
+
 def get_chr_cluster(subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict, rmSubgraph_ctgs_dict, ctg_rmSubgraph_dict,hicGroup_cluster_dict, ctg_hicGroups_dict, hic_links_dict):
 
     subgraph_unClusterRm_hicGroup_dict = defaultdict(lambda: defaultdict(int))
@@ -70,7 +69,8 @@ def get_chr_cluster(subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict, r
 
                 subgraph1_list = ctg_hicGroups_dict.get(ctg1, None)
                 if not subgraph1_list:
-                    print(f"error... {ctg2} in subgraph{subgraph2}\t{ctg1} not in hic clusters.")
+                    # print(f"error... {ctg2} in subgraph{subgraph2}\t{ctg1} not in hic clusters.")
+                    pass
                 else:
                     subgraph1 = subgraph1_list[0]
 
@@ -80,7 +80,8 @@ def get_chr_cluster(subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict, r
 
                 subgraph2_list = ctg_hicGroups_dict.get(ctg2, None)
                 if not subgraph2_list:
-                    print(f"error... {ctg1} in subgraph{subgraph1}\t{ctg2} not in hic clusters.")
+                    # print(f"error... {ctg1} in subgraph{subgraph1}\t{ctg2} not in hic clusters.")
+                    pass
                 else:
                     subgraph2 = subgraph2_list[0]
 
@@ -90,6 +91,8 @@ def get_chr_cluster(subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict, r
 
     for group, dict_ in subgraph_unClusterRm_hicGroup_dict.items():
         sorted_dict_ = dict(sorted(dict_.items(), key=lambda item: item[1], reverse=True))
+        if group == 166 or group == "166":
+            print(sorted_dict_)
 
         if not sorted_dict_:
             continue
@@ -108,14 +111,26 @@ def get_chr_cluster(subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict, r
 
 
 
-def run_rescue(subgraph_group_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
+def run_rescue(cluster_dict, subgraph_group_dict, subgraph_ctgs_dict, ctg_subgraph_dict, hicGroup_cluster_dict, ctg_hicGroups_dict):
 
-    subgraph_in_clusuter_list = list(subgraph_group_dict)
     subgraph_all_list = list(subgraph_ctgs_dict)
 
+    # check 子图或ctg是否因hic link过滤丢失
+    hicGroup_cluster_dict_cp = cp.deepcopy(hicGroup_cluster_dict)
 
+    for group in hicGroup_cluster_dict_cp:
+        for ctg in hicGroup_cluster_dict_cp[group]:
+            subgraph = ctg_subgraph_dict[ctg]
+            for same_subgraph_ctg in subgraph_ctgs_dict[subgraph]:
+                if same_subgraph_ctg not in ctg_hicGroups_dict:
+                    print(same_subgraph_ctg)
+                    hicGroup_cluster_dict[group].append(same_subgraph_ctg)
+    
+    uncluster_ctg_list = [ ctg for ctg in ctg_subgraph_dict if ctg not in ctg_hicGroups_dict ]
+    subgraph_unCluster_list = [ ctg_subgraph_dict[ctg] for ctg in uncluster_ctg_list ]
 
-    subgraph_unCluster_list = set(subgraph_all_list) - set(subgraph_in_clusuter_list)
+    # subgraph_unCluster_list = set(subgraph_all_list) - set(subgraph_in_clusuter_list)
+
 
     subgraph_unCluster_ctgs_dict = { subgraph_num:ctgs for subgraph_num,ctgs in subgraph_ctgs_dict.items() \
                                                         if subgraph_num in subgraph_unCluster_list}
@@ -162,7 +177,7 @@ if __name__ == '__main__':
     subgraph_ctgs_dict, ctg_subgraph_dict = read_subgraph(subgraph_file)
     rmSubgraph_ctgs_dict, ctg_rmSubgraph_dict = read_subgraph(rm_subgraph_file)
 
-    subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict = run_rescue(subgraph_group_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
+    subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict = run_rescue(cluster_dict, subgraph_group_dict, subgraph_ctgs_dict, ctg_subgraph_dict, hicGroup_cluster_dict,ctg_hicGroups_dict)
 
     get_chr_cluster(subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict, rmSubgraph_ctgs_dict, ctg_rmSubgraph_dict,hicGroup_cluster_dict, ctg_hicGroups_dict, hic_links_dict)
 
