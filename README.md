@@ -37,12 +37,6 @@ By default, popCNV_pipeline.sh will use the file ending with fastaq.gz in the di
 ```
 `collapse_num.txt` : popcnv/06.genes.round.cn
 
-# Installing agptools
-[agptools](https://github.com/WarrenLab/agptools)
-```
-cd /path/to/GPhase/src/agptools
-pip install .
-```
 
 
 # Running the GPhase scaffolding pipeline

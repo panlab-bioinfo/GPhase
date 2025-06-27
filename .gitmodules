@@ -4,6 +4,3 @@
 [submodule "src/popCNV"]
 	path = src/popCNV
 	url = https://github.com/sc-zhang/popCNV.git
-[submodule "src/agptools"]
-	path = src/agptools
-	url = https://github.com/esrice/agptools.git
