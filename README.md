@@ -19,9 +19,7 @@ chromap -i -r asm.fa -o index
 chromap --preset hic -x index -r asm.fa -q 0 \
     -1 hic_R1.fq.gz -2 hic_R2.fq.gz \
     --remove-pcr-duplicates -t 80 --SAM \
-    -o map.chromap.sam
-
-samtools view -@ 32 -bh map.chromap.sam -o map.chromap.bam
+| samtools view -@ 32 -bh -o map.chromap.bam
 
 ```
 
