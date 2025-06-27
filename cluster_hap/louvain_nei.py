@@ -243,7 +243,7 @@ if __name__ == '__main__':
     l = args.links
     allele_file = args.allele
 
-    louvain_nei(collapse_num_file, chr_file, l, allele_file)
+    louvain_nei(collapse_num_file, chr_file, l, allele_file)    
         
 
 

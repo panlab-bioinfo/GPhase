@@ -69,7 +69,7 @@ def Multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
 
         # 检查有效聚类簇数目
         # 1:阈值设置为平均聚类簇长度的 1/10
-        threshold = sum(chr_len_dict.values()) / int(n_chr) / 10
+        threshold = sum(chr_len_dict.values()) / int(n_chr) / 2
         filtered_chr_list = [ key for key, value in chr_len_dict.items() if value > threshold ]
         
         group = 0

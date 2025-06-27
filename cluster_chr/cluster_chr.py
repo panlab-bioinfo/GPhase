@@ -98,13 +98,15 @@ def run_partig(fa_file, partig_k, partig_w, partig_c, partig_m, output_prefix,lo
         return False
 
 
-def convert_partig_output(fa_file, partig_k, partig_w, partig_c, partig_m, output_prefix,logger):
+def convert_partig_output(fa_file, partig_k, partig_w, partig_c, partig_m, output_prefix,RE_file, logger):
     script_path = os.path.abspath(sys.path[0])
     flag = run_command([
         "python", os.path.join(script_path, "trans.partig.py"),
         "-fai", f"{fa_file}.fai",
         "-p", f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt",
-        "-o", f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.csv"
+        "-o", f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.csv",
+        "-r", RE_file,
+        "-d", f"{output_prefix}.digraph.csv"
     ], "Converting Partig output to CSV",logger)
     if flag:
         return True
@@ -243,7 +245,7 @@ def filter_edges_by_density(chr_num, HiC_file, group_ctgs_save, filter_HiC_file,
     num_nodes = len(nodes)
     num_edges = len(edges)
     density = (2 * num_edges) / (num_nodes * (num_nodes - 1)) if num_nodes > 1 else 0
-    logger.info(f"HiC graph info : edges : {num_edges}, nodes : {num_nodes}, density : {density}")
+    logger.info(f"HiC graph info : edges -> {num_edges}, nodes -> {num_nodes}, density -> {density}")
 
     if density < 0.2 and num_nodes < (num_edges / filter_threshold):
         logger.info(f"HiC signal filtering...")
@@ -253,7 +255,7 @@ def filter_edges_by_density(chr_num, HiC_file, group_ctgs_save, filter_HiC_file,
             filtered_edges = edges[edges['links'] > threshold]
             filtered_num_edges = len(filtered_edges)
 
-            logger.info(f"HiC signal filtering :  threshold -> {threshold:.1f}\t edges: -> {filtered_num_edges}")
+            logger.info(f"HiC signal filtering :  threshold -> {threshold:.1f}\t edges -> {filtered_num_edges}")
 
             if filtered_num_edges < (num_nodes * filter_threshold):
                 break
@@ -305,7 +307,6 @@ def main():
         logger.error("Split GFA Error: An error occurred while splitting the GFA.")
         return
 
-
     if not split_gfa(args.gfa, args.split_gfa_n, args.split_gfa_iter, args.output_prefix, logger):
         logger.error("Split GFA Error: An error occurred while splitting the GFA.")
         return
@@ -316,7 +317,7 @@ def main():
         logger.error("Run partig Error: An error occurred while running Partig.")
         return
 
-    if not convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix, logger):
+    if not convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix, args.RE_file,logger):
         logger.error("Conversion partig Error: in Partig output to CSV.")
         return
 
@@ -344,7 +345,7 @@ def main():
 
         if not run_multilevel_cluster(args.output_prefix, int(args.chr_number), logger):
             logger.error(f"Run Chromosome multilevel_cluster Error -> filter_threshold : {filter_threshold}.")
-            filter_threshold -= 10 
+            filter_threshold -= 5
             continue
         else:
             break

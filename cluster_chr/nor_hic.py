@@ -1,7 +1,9 @@
 from collections import defaultdict
 import pandas as pd
+import numpy as np
 import argparse
 from pathlib import Path
+import statsmodels.api as sm
 import sys
 
 
@@ -11,7 +13,7 @@ def read_noNorFile(noNorFile):
         for line in file:
             if line != "source,target,links\n":
                 line = line.strip().split(',')
-                utg_utg_link_dict[tuple([line[0],  line[1]])] = int(line[2])
+                utg_utg_link_dict[tuple([line[0],  line[1]])] = float(line[2])
     return utg_utg_link_dict
 
 
@@ -25,6 +27,38 @@ def read_REs(REFile):
             ctg_RE_len[line[0]] = (int(line[1]), int(line[2]))
     return ctg_RE_len
 
+def normalize_links_v2(utg_utg_link_dict, ctg_RE_len_dict, output_file):
+    rows = []
+
+    for (u, v), links in utg_utg_link_dict.items():
+        len1, re1 = ctg_RE_len_dict[u]
+        len2, re2 = ctg_RE_len_dict[v]
+        
+        rows.append({
+            "source": u,
+            "target": v,
+            "log_len_prod": np.log(len1 * len2 + 1),
+            "log_re_prod": np.log(re1 * re2 + 1),
+            "log_links": np.log(links + 1)
+        })
+
+    df = pd.DataFrame(rows)
+
+    X = df[["log_len_prod", "log_re_prod"]]
+    X = sm.add_constant(X)  
+    y = df["log_links"]
+    model = sm.OLS(y, X).fit()
+
+    df["log_pred"] = model.predict(X)
+    df["residual"] = df["log_links"] - df["log_pred"]
+    df["exp_residual"] = np.exp(df["residual"])  
+
+    with Path(output_file).open("w") as file:
+        file.write("source,target,links\n")
+        for _, row in df.iterrows():
+            file.write(f"{row['source']},{row['target']},{row['exp_residual']:.6f}\n")
+
+    # print(model.summary())
 
 
 def normalize_links(utg_utg_link_dict, ctg_RE_len_dict, output_file):
@@ -37,17 +71,17 @@ def normalize_links(utg_utg_link_dict, ctg_RE_len_dict, output_file):
             # r2 = float(ctg_RE_len_dict[pair[1]][0])
 
 
-            # r1 = float(ctg_RE_len_dict[pair[0]][0]**2 / ctg_RE_len_dict[pair[0]][1]) 
-            # r2 = float(ctg_RE_len_dict[pair[1]][0]**2 / ctg_RE_len_dict[pair[1]][1])
-
             r1 = float(ctg_RE_len_dict[pair[0]][0] / ctg_RE_len_dict[pair[0]][1]) 
             r2 = float(ctg_RE_len_dict[pair[1]][0] / ctg_RE_len_dict[pair[1]][1])
+            
 
             # r1 = float(ctg_RE_len_dict[pair[0]][0] * ctg_RE_len_dict[pair[0]][1]) 
             # r2 = float(ctg_RE_len_dict[pair[1]][0] * ctg_RE_len_dict[pair[1]][1])
 
             links /= (r1 * r2)
             links /= 1e6
+            # links *= 1e6
+
             line = pair[0] + "," + pair[1] + "," + str(links) + "\n"
             file.write(line)
 
@@ -63,7 +97,7 @@ def main():
 
     utg_utg_link_dict = read_noNorFile(csv_file)
     ctg_RE_len_dict = read_REs(res_file)
-    normalize_links(utg_utg_link_dict, ctg_RE_len_dict, output_file)
+    normalize_links_v2(utg_utg_link_dict, ctg_RE_len_dict, output_file)
 
 
 

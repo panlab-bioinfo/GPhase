@@ -16,7 +16,7 @@ conda activate gphase
 
 ```
 chromap -i -r asm.fa -o index
-chromap --preset hic -x index -r asm.fa \
+chromap --preset hic -x index -r asm.fa -q 0 \
     -1 hic_R1.fq.gz -2 hic_R2.fq.gz \
     --remove-pcr-duplicates -t 80 --SAM \
     -o map.chromap.sam
@@ -63,7 +63,7 @@ pip install .
  -f asm.fa \
  -g genome.bp.p_utg.gfa \
  -c collapse_num.txt \
- -m map_file.bam \
+ -m map.chromap.bam \
  --n_chr 12 \
  --n_hap 4 \
  -p output_prefix

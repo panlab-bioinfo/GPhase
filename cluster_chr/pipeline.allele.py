@@ -4,6 +4,7 @@
 #-----------------------------#
 
 from collections import defaultdict,Counter
+from multilevel_cluster_v2 import Multilevel_cluster
 import csv
 import networkx as nx
 import subprocess
@@ -87,7 +88,7 @@ def get_N80(len_list, threshold=0.8):
         if cumulative_length >= threshold * total_length:
             N80_length = length
             break
-    # print(N80_length)
+
     return int(N80_length)
 
 def get_All_N80(utgs_list, ctg_RE_dict):
@@ -180,10 +181,13 @@ def cluster(group_ctg_dict, ctg_group_dict, hic_links_dict, allele_dict):
 
 def expand_cluster(csv_file, group_ctg_dict, output_prefix):
 
-    script_path = os.path.abspath(sys.path[0])
-    script_path_add = os.path.join(script_path,"multilevel_cluster.py")
-    script = f"""python {script_path_add} -c {csv_file} -o {output_prefix}.allele.cluster.txt """
-    process = subprocess.run(script, shell=True, executable='/bin/bash', capture_output=True, text=True)
+    cluster_file = f"{output_prefix}.allele.cluster.txt"
+    Multilevel_cluster(csv_file, cluster_file, 1.5, False)
+
+    # script_path = os.path.abspath(sys.path[0])
+    # script_path_add = os.path.join(script_path,"multilevel_cluster.py")
+    # script = f"""python {script_path_add} -c {csv_file} -o {output_prefix}.allele.cluster.txt  """
+    # process = subprocess.run(script, shell=True, executable='/bin/bash', capture_output=True, text=True)
 
     cluster_file = f"{output_prefix}.allele.cluster.txt"
     cluster_dict, utg_group_dict = read_c(cluster_file)

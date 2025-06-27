@@ -95,9 +95,9 @@ def parse_arguments() -> argparse.Namespace:
 
 def execute_command(command, error_message,logger):
     try:
-        logger.info(f"Running command: {command}")
+        # logger.info(f"Running command: {command}")
         subprocess.run(command, shell=True, check=True, executable='/bin/bash')
-        logger.info(f"Running command successfully: {command}")
+        # logger.info(f"Running command successfully: {command}")
         return True
     except subprocess.CalledProcessError as e:
         logger.error(f"Command failed: {' '.join(command)}")
@@ -329,8 +329,8 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         best_knee = find_best_knee(filtered_links_file, f"{args.output_prefix}.chr{chr_num}.knees")
         cut_value_step = 1
 
-        if best_knee < 5:
-            cut_value_max = 5
+        if best_knee < 10:
+            cut_value_max = 10
         else:
             cut_value_max = best_knee
 
@@ -356,10 +356,12 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
             try:
                 # # Run louvain_nei.py
-                louvain_nei_result = louvain_nei(args.collapse_num_file, utg_file, cut_links_file, partig_file)
+                louvain_nei_result = louvain_nei(args.collapse_num_file, utg_rescue_file, cut_links_file, partig_file)
                 if not louvain_nei_result:
+                    logger.error(f"Chr_num:{chr_num}\t{args.collapse_num_file}\t{utg_rescue_file}\t{cut_links_file}\t{partig_file}")
+                    logger.error(f"Chr_num:{chr_num}\tlouvain_nei error...")
                     raise
-                check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, float(1), "check", utg_file, no_expand_partig_file, int(args.hap_number))
+                check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, float(1), "check", utg_rescue_file, no_expand_partig_file, int(args.hap_number))
 
                 optimal_r = multiple_adjust_r_and_cluster(
                     initial_r=1.0,
@@ -368,11 +370,11 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                     step=0.03,
                     cluster_output=cluster_output,
                     csv_file="louvain_nei.csv", 
-                    utg_file=utg_file,
+                    utg_file=utg_rescue_file,
                     partig_file=partig_file,
                     hap_number=args.hap_number, logger=logger
                 )
-                check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, float(optimal_r), "check", utg_file, no_expand_partig_file, int(args.hap_number))
+                check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, float(optimal_r), "check", utg_rescue_file, no_expand_partig_file, int(args.hap_number))
                 
                 # Check the number of clusters
                 num_clusters = len(check_cluster_dict)
@@ -391,11 +393,10 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
             except:
 
-                logger.error(f"Chr:{chr_num} louvain_nei clustering error!")
                 chr_num_collapse_num_file = f"{args.output_prefix}.chr{chr_num}.utgs.uncollapse.txt"
                 command = (
                     "awk -F '[, \\t]' 'NR==FNR{lines[$1]=$2;next}{if(lines[$1]<=1){print $0}}' "
-                    f"{args.collapse_num_file} {utg_file} > {chr_num_collapse_num_file}"
+                    f"{args.collapse_num_file} {utg_rescue_file} > {chr_num_collapse_num_file}"
                 )
                 execute_command(command, f"Failed to filter collapse Contig for {chr_num_collapse_num_file}",logger)
 
@@ -416,7 +417,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
                 # Adjust r and run multilevel_cluster.py
                 try:
-                    check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, 1, "check", utg_file, no_expand_partig_file, args.hap_number)
+                    check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, 1, "check", utg_rescue_file, no_expand_partig_file, args.hap_number)
                     optimal_r = multiple_adjust_r_and_cluster(
                         initial_r=1.0,
                         min_r=0.01,
@@ -424,11 +425,11 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                         step=0.03,
                         cluster_output=cluster_output,
                         csv_file=chr_num_uncollapse_hic_file, 
-                        utg_file=utg_file,
+                        utg_file=utg_rescue_file,
                         partig_file=partig_file,
                         hap_number=args.hap_number, logger=logger
                     )
-                    check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, optimal_r, "check", utg_file, no_expand_partig_file, args.hap_number)
+                    check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, optimal_r, "check", utg_rescue_file, no_expand_partig_file, args.hap_number)
 
                     # Check the number of clusters
                     num_clusters = len(check_cluster_dict)
@@ -525,7 +526,7 @@ def convert_partig_output(fa_file, partig_k, partig_w, partig_c, partig_m, outpu
     script_path = os.path.abspath(sys.path[0])
     script_path_add = os.path.join(script_path, "trans.partig.py")
     execute_command(
-        f"python {script_path_add} -fai {fa_file}.fai -p {output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt -o {output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.csv", "Converting Partig output to CSV",logger)
+        f"python {script_path_add} -fai {fa_file}.fai -p {output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt -o {output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.csv -d {output_prefix}.digraph.csv", "Converting Partig output to CSV",logger)
 
 def log_start(logger, script_name: str, version: str, args: argparse.Namespace):
     """Log the start of the program."""

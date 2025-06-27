@@ -39,7 +39,7 @@ def Louvain_cluster(g, id_to_node, resolution):
 
     return communities
 
-def Multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele_cluster, n_chr):
+def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=None, Allele_cluster=None, n_chr=None):
     if RE_file:
         ctg_RE_len = read_REs(RE_file)
     if Allele_cluster:
@@ -57,15 +57,6 @@ def Multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele
     node_to_id = {node: idx for idx, node in enumerate(nodes)}
     id_to_node = {idx: node for node, idx in node_to_id.items()}
     g.addNodes(len(nodes))
-
-    if cluster_dict: 
-        ctg_len_All = 0
-        for group in cluster_dict:
-            for ctg in cluster_dict[group]:
-                if ctg in ctg_RE_len:
-                    ctg_len_All += ctg_RE_len[ctg][1]
-
-
 
 
     for _, row in df.iterrows():
@@ -129,4 +120,7 @@ if __name__ == '__main__':
         if args.n_chr is None:
             parser.error("--n_chr is required when --check is enabled")
 
-    Multilevel_cluster(args.csv_file, args.output_file, args.resolution, args.check, args.RE_file, args.Allele_cluster, int(args.n_chr))
+    if not args.check:
+        Multilevel_cluster(args.csv_file, args.output_file, args.resolution)
+    else:
+        Multilevel_cluster(args.csv_file, args.output_file, args.resolution, args.check, args.RE_file, args.Allele_cluster, int(args.n_chr))

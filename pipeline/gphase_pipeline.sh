@@ -19,14 +19,15 @@ usage() {
     echo "|  -e                 <enzyme_site>            : The restriction enzyme cutting site, default: GATC."
     echo "|"
     echo "|>>> preprocessing Parameters:"
-    echo "|  --cluster_q        <cluster_q>              : Filtered mapQ value ​​when using HiC in the clustering step, default: 1"
+    echo "|  --cluster_q        <cluster_q>              : Filtered mapQ value when using HiC in the clustering step, default: 1"
     echo "|  --scaffold_q       <scaffold_q>             : Filter mapQ value when using HiC in the scaffolding step, default: 0"
-    # echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 2"
     echo "|"
     echo "|>>> clustering chromosomes Parameters:"
     echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 2"
+    echo "|  --chr_pm           <partig_chr_pm>          : Similarity of partig when clustering chr, default: 0.9"
     echo "|"
     echo "|>>> clustering haplotypes Parameters:"
+    echo "|  --hap_pm           <partig_hap_pm>          : Similarity of partig when clustering hap, default: 0.60"
     echo "|  --expand           <resexpandcue>           : Whether to expand the allele, default: False."
     echo "|  --rescue           <rescue>                 : Whether to rescue the subgraph, default: False."
     echo "|  --reassign_number  <reassign_number>        : Number of reassign step, default: 1. [1-3]"
@@ -59,6 +60,8 @@ enzyme_site="GATC"
 cluster_q=1
 scaffold_q=0
 split_gfa_n="2"
+chr_pm="0.9"
+hap_pm="0.60"
 thread="12"
 no_contig_ec=""
 no_scaffold_ec=""
@@ -71,7 +74,7 @@ processes="32"
 
 
 
-TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,f:,g:,c:,m:,p:e:,cluster_q:,scaffold_q:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,processes:,help -- "$@")
+TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,f:,g:,c:,m:,p:e:,cluster_q:,scaffold_q:,chr_pm:,hap_pm:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,processes:,help -- "$@")
 
 if [ $? != 0 ]; then
     echo "Error: Invalid arguments."
@@ -94,7 +97,7 @@ while true; do
         --cluster_q) cluster_q="$2"; shift 2 ;;    
         --scaffold_q) scaffold_q="$2"; shift 2 ;;
         --split_gfa_n)
-            if [[ "$2" =~ ^[2-9]+$ ]]; then  # 确保是整数
+            if [[ "$2" =~ ^[2-9]+$ ]]; then 
                 split_gfa_n="$2"
             else
                 echo "Error: --split_gfa_n must be an integer between 2 and 9."
@@ -106,6 +109,22 @@ while true; do
                 reassign_number="$2"
             else
                 echo "Error: --reassign_number must be an integer between 1 and 3."
+                usage
+            fi
+            shift 2 ;;
+        --chr_pm)
+            if [ "$(echo "$2 >= 0.5 && $2 < 1" | bc -l)" -eq 1 ]; then
+                chr_pm="$2"
+            else
+                echo "Error: --chr_pm must be an float between 0.5 and 1."
+                usage
+            fi
+            shift 2 ;;
+        --hap_pm)
+            if [ "$(echo "$2 >= 0.5 && $2 < 1" | bc -l)" -eq 1 ]; then
+                hap_pm="$2"
+            else
+                echo "Error: --hap_pm must be an float between 0.5 and 1."
                 usage
             fi
             shift 2 ;;
@@ -140,6 +159,8 @@ while true; do
     esac
 done
 
+set -e 
+
 # Validate that all required arguments are provided
 if [ -z "$fa_file" ] || [ -z "$gfa" ] || [ -z "$collapse_num_file" ] || [ -z "$map_file" ] || [ -z "$n_chr" ] || [ -z "$n_hap" ] || [ -z "$output_prefix" ]; then
     echo "Error: Missing required arguments."
@@ -157,6 +178,11 @@ for file in "$fa_file" "$gfa" "$collapse_num_file" "$map_file"; do
     fi
 done
 
+if (( $(echo "$cluster_q < $scaffold_q" | bc -l) )); then
+    echo "Error: --cluster_q ($cluster_q) must be greater than or equal to --scaffold_q ($scaffold_q)."
+    exit 1
+fi
+
 if [[ -z "$reassign_number" ]]; then
     reassign_number=1
 fi
@@ -168,7 +194,6 @@ collapse_num_file="$(basename "$collapse_num_file")"
 map_file="$(basename "$map_file")"
 
 
-set -e 
 
 current_dir=$(pwd)
 
@@ -213,12 +238,10 @@ fi
 
 # Generate the pairs from bam
 samtools faidx ${fa_file}
-awk 'BEGIN{print "## pairs format v1.0.0\n##columns: readID chrom1 pos1 chrom2 pos2 mapQ"}{print "##chromsize: "$1" "$2}' ${fa_file}.fai > "map.chromap.pairs"
-echo "${scaffold_q}\t${map_file}"
-samtools view -@ 8 "${map_file}" | awk -v scaffold_q="${scaffold_q}" '{if($7=="=")$7=$3;if($5>=scaffold_q)print $1"\t"$3"\t"$4"\t"$7"\t"$8"\t"$5}' >> "map.chromap.pairs"
-
+awk 'BEGIN{print "## pairs format v1.0.0\n##columns: readID chrom1 pos1 chrom2 pos2 mapQ"}{print "##chromsize: "$1" "$2}' ${fa_file}.fai > map.chromap.pairs
+samtools view -@ 8 "${map_file}" | awk -v scaffold_q="${scaffold_q}" '{if($7=="=")$7=$3;if($5>=scaffold_q)print $1"\t"$3"\t"$4"\t"$7"\t"$8"\t"$5}' >> map.chromap.pairs
 # sort pairs
-cat <( grep '^#' map.chromap.pairs ) <( grep '^#' -v map.chromap.pairs | sort --parallel=16  -k2,2 -k4,4 ) >map.chromap.sort.pairs
+cat <( grep '^#' map.chromap.pairs ) <( grep '^#' -v map.chromap.pairs | sort --parallel=32  -k2,2 -k4,4 ) >map.chromap.sort.pairs
 
 # Generate the links file
 awk -v cluster_q="$cluster_q" '{if(substr($1,1,1) != "#" && $2 != $4 && $6 >= cluster_q){print $2,$4}}' map.chromap.sort.pairs | \
@@ -243,7 +266,7 @@ ln -s "../preprocessing/${output_prefix}.RE_counts.txt"
 ln -s "../preprocessing/${output_prefix}.chromap.links.nor.csv"
 
 LOG_INFO ${log_file} "run" "Running cluster_chr.py..."
-python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa}  -pm 0.95 --split_gfa_n ${split_gfa_n}
+python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa}  -pm ${chr_pm} --split_gfa_n ${split_gfa_n}
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_chr.py failed."
@@ -273,7 +296,7 @@ else
     cr="rescue.cluster.ctg.txt"
 fi
 
-python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr} -pm 0.6 --reassign_number ${reassign_number} ${rescue} ${expand}
+python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr} -pm ${hap_pm} --reassign_number ${reassign_number} ${rescue} ${expand}
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: cluster_hap.py failed."

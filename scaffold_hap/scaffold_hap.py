@@ -10,7 +10,7 @@ import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import List, Tuple, Optional, Union
-from get_subgraph_scaffold_v2 import Get_subgraph_scaffold_v2
+from get_subgraph_scaffold import Get_subgraph_scaffold
 from get_data_HapHiC_sort import Get_data_HapHiC_sort
 
 def setup_logging(log_file: str = "scaffold.log") -> logging.Logger:
@@ -181,7 +181,9 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
         script_path = os.path.abspath(sys.path[0])
         logger.info(f"Chromosome {chr_num} hap {hap_num} run Get_subgraph_scaffold_v2...")
         logger.info(f"Chromosome {chr_num} hap {hap_num} run Get_subgraph_scaffold_v2: {args.gfa_file} {args.RE_file} {args.digraph_file} group{hap_num}.txt {args.subgraph_file}")
-        Get_subgraph_scaffold_v2(args.gfa_file, args.RE_file, args.digraph_file,f"group{hap_num}.txt", args.subgraph_file)
+
+        # Get_subgraph_scaffold_v2(args.gfa_file, args.RE_file, args.digraph_file,f"group{hap_num}.txt", args.subgraph_file)
+        Get_subgraph_scaffold(args.digraph_file, args.RE_file, args.HiC_file, f"group{hap_num}.txt", args.subgraph_file, args.gfa_file)
 
         logger.info(f"Chromosome {chr_num} hap {hap_num} run Get_subgraph_scaffold_v2 done...")
 
