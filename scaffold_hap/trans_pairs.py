@@ -2,37 +2,36 @@ import pandas as pd
 import re
 import argparse
 
-# 读取AGP文件
+
 def read_agp(agp_file):
     try:
-        # 先检查首行是否为标题行
+
         agp = pd.read_csv(agp_file, sep='\t', comment='#', header=None,
                                   names=['scaffold', 'start', 'end', 'part_num', 'type', 
                                          'component_id', 'component_start', 'component_end', 'orientation'])
-        
-        # 如果列名不匹配，强制设置
+
         if agp.columns[0] != 'scaffold':
             agp.columns = ['scaffold', 'start', 'end', 'part_num', 'type', 
                            'component_id', 'component_start', 'component_end', 'orientation']
         
-        # 转换为整数类型，处理可能的非数值
+
         for col in ['start', 'end', 'component_start', 'component_end']:
             agp[col] = pd.to_numeric(agp[col], errors='coerce')
         
-        # 删除包含非数值行的记录
+
         agp = agp.dropna(subset=['start', 'end', 'component_start', 'component_end'])
 
         return agp
     except Exception as e:
         raise
 
-# 构建contig到scaffold的映射并计算scaffold长度
+
 def build_contig_to_scaffold_map(agp):
     contig_map = {}
     scaffold_lengths = {}
     
     for _, row in agp.iterrows():
-        if row['type'] == 'W':  # 只处理contig行
+        if row['type'] == 'W':
             contig_id = row['component_id']
             scaffold = row['scaffold']
             scaffold_start = row['start']
@@ -47,22 +46,20 @@ def build_contig_to_scaffold_map(agp):
                 'length': contig_length
             }
         
-        # 更新scaffold长度
+
         scaffold = row['scaffold']
         end = row['end']
         scaffold_lengths[scaffold] = max(scaffold_lengths.get(scaffold, 0), end)
     
     return contig_map, scaffold_lengths
 
-# 转换pairs文件，包括注释行
+
 def convert_pairs(pairs_file, contig_map, scaffold_lengths, output_file):
     with open(pairs_file, 'r') as f_in, open(output_file, 'w') as f_out:
         scaffold_set = set()
         for line in f_in:
 
             if line.startswith('#'):
-                # 处理注释行
-                # 支持 ##chromsize: 以及其他格式
                 match = re.match(r'#(?:#chromsize|chromosome|chr|contig|sequence):\s*(\S+)(?:\s*(\d+))?', line.strip(), re.IGNORECASE)
                 if match:
                     contig_id = match.group(1)
@@ -75,8 +72,7 @@ def convert_pairs(pairs_file, contig_map, scaffold_lengths, output_file):
                 else:
                     continue
                 continue
-            
-            # 处理数据行
+
             fields = line.strip().split('\t')
             if len(fields) < 6:
                 continue  
