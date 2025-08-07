@@ -17,12 +17,12 @@ dependencies:
   - brotli-python=1.0.9=py311h6a678d5_9
   - bzip2=1.0.8=h5eee18b_6
   - c-ares=1.19.1=h5eee18b_0
-  - ca-certificates=2025.1.31=hbcca054_0
+  - ca-certificates=2025.7.9=hbd8a1cb_0
+  - certifi=2025.7.9=pyhd8ed1ab_0
   - chromap=0.2.7=hdcf5f25_0
   - contourpy=1.3.1=py311hdb19cb5_0
   - cycler=0.11.0=pyhd3eb1b0_0
   - cyrus-sasl=2.1.28=h52b45da_1
-  - certifi==2025.1.31
   - dbus=1.13.18=hb2f20db_0
   - expat=2.6.4=h6a678d5_0
   - fontconfig=2.14.1=h55d465d_3
@@ -97,7 +97,7 @@ dependencies:
   - numpy-base=1.26.4=py311hf175353_0
   - openjpeg=2.5.2=he7f1fd0_0
   - openldap=2.6.4=h42fbc30_0
-  - openssl=3.4.1=h7b32b05_0
+  - openssl=3.5.1=h7b32b05_0
   - packaging=24.2=py311h06a4308_0
   - pandas=2.2.3=py311h6a678d5_0
   - pcre2=10.42=hebb0a14_1

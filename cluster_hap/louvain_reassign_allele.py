@@ -251,13 +251,15 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
 
     # 计算簇中同源contig长度
     variance_stats = 0
+    cluster_length_list = list()
     for group, ctgs in cluster_output_dict.items():
-       for idx1, ctg1 in enumerate(ctgs):
+        cluster_length_list.append(sum([ctg_RE_len[ctg][1] for ctg in ctgs if ctg in ctg_RE_len]))
+        for idx1, ctg1 in enumerate(ctgs):
             for idx2, ctg2 in enumerate(ctgs):
-                if idx1 < idx2 and tuple(sorted([ctg1, ctg2])) in no_expand_allele_dict:
-                    variance_stats += min([ctg_RE_len[ctg1][1], ctg_RE_len[ctg2][1]])
+                # if ctg_RE_len[ctg1][1] > 50000 and ctg_RE_len[ctg2][1] > 50000 and idx1 < idx2 and no_expand_allele_dict.get(tuple(sorted([ctg1, ctg2])),0) >= 0.95 :
+                variance_stats += min([ctg_RE_len[ctg1][1], ctg_RE_len[ctg2][1]])
 
-    return float(variance_stats)
+    return float(variance_stats), cluster_length_list
 
 
 
@@ -279,15 +281,16 @@ def louvain_reassign_allele(collapse_num_file, chr_file, l, c ,r, a, output_pref
         for isolated in isolated_list:
             del cluster_dict
             cluster_dict, utg_group_dict = read_c(c)
-            variance = run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, no_expand_allele_dict, isolated, output_prefix)
+            variance, cluster_length_list = run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, no_expand_allele_dict, isolated, output_prefix)
             variance_list.append(variance)
         
         min_variance_idx = variance_list.index(min(variance_list))
         # print(variance_list)
         del cluster_dict
         cluster_dict, utg_group_dict = read_c(c)
-        run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, no_expand_allele_dict, isolated_list[min_variance_idx], output_prefix, write_flag=True)
-        return isolated_list[min_variance_idx]
+        variance_stats, cluster_length_list = run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, no_expand_allele_dict, isolated_list[min_variance_idx], output_prefix, write_flag=True)
+
+        return isolated_list[min_variance_idx], min(variance_list), cluster_length_list
     else:
         cluster_dict, utg_group_dict = read_c(c)
         run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, isolated_threshold, output_prefix)
@@ -300,7 +303,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--collase_num', required=True,
                         help='<filepath> collapse num for utgs')
     parser.add_argument('-chr', '--chromosome', required=True,
-                        help='<filepath>all utg for chrompsome')
+                        help='<filepath>all utg for chromsome')
     parser.add_argument('-l', '--links', required=True,
                         help='<filepath>hic links for utgs')
     parser.add_argument('-r', '--REs', required=True,

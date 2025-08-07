@@ -33,16 +33,37 @@ def read_subgraph(subgraph_file):
     return subgraph_ctgs_dict, ctg_subgraph_dict
 
 
+# def read_l(l):
+#     hic_nei_dict = defaultdict(set)
+#     hic_links_dict = defaultdict()
+#     with open(l, 'r') as file:
+#         for line in file:
+#             if not line.startswith("source"):
+#                 line = line.strip().split(',')
+#                 hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
+#                 hic_nei_dict[line[0]].add(line[1])
+#                 hic_nei_dict[line[1]].add(line[0])
+#     return hic_links_dict, hic_nei_dict
+
 def read_l(l):
     hic_nei_dict = defaultdict(set)
-    hic_links_dict = defaultdict()
-    with open(l, 'r') as file:
-        for line in file:
-            if not line.startswith("source"):
-                line = line.strip().split(',')
-                hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
-                hic_nei_dict[line[0]].add(line[1])
-                hic_nei_dict[line[1]].add(line[0])
+    hic_links_dict = {}
+
+    with open(l, newline='') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            if not row:
+                continue
+            if row[0].startswith(('utg', 'utig')):
+                a, b, w = row[0], row[1], float(row[2])
+
+                # 用 tuple 排序缓存减少运算
+                key = (a, b) if a < b else (b, a)
+
+                hic_links_dict[key] = w
+                hic_nei_dict[a].add(b)
+                hic_nei_dict[b].add(a)
+
     return hic_links_dict, hic_nei_dict
 
 

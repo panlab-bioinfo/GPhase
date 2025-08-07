@@ -84,7 +84,7 @@ LOG_INFO ${log_file} "run" "samtools faidx ${fa_file}"
 samtools faidx ${fa_file}
 
 LOG_INFO ${log_file} "run" "Mapping HiFi data to ${fa_file} using minimap2"
-minimap2 -t ${threads} -ax map-hifi ${fa_file} *.fastq.gz \
+minimap2 -t ${threads} -ax map-hifi ${fa_file} *.gz \
 	| samtools view -bhS -t ${fa_file}.fai \
     | samtools sort -@ ${threads} > ${output_prefix}.bam
 

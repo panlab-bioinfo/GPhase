@@ -8,7 +8,6 @@ import argcomplete
 import numpy as np
 import pandas as pd
 import sys
-import random
 from multilevel_cluster_v2 import Multilevel_cluster
 from argcomplete.completers import FilesCompleter
 
@@ -105,7 +104,7 @@ def convert_partig_output(fa_file, partig_k, partig_w, partig_c, partig_m, outpu
         "-fai", f"{fa_file}.fai",
         "-p", f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt",
         "-o", f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.csv",
-        "-r", RE_file,
+        "-r", RE_file, 
         "-d", f"{output_prefix}.digraph.csv"
     ], "Converting Partig output to CSV",logger)
     if flag:
@@ -153,7 +152,7 @@ def run_pipeline_chr(output_prefix, HiC_file, logger):
 
 
 def run_multilevel_cluster_v1(output_prefix, chr_number, logger):
-    r_min, r_max = 0.01, 30.0
+    r_min, r_max = 0.01, 5.0
     r = 1
     while r_min <= r <= r_max:
         logger.info(f"Running multilevel clustering with r={r}")
@@ -184,7 +183,7 @@ def run_multilevel_cluster_v1(output_prefix, chr_number, logger):
     logger.error("Failed to achieve the desired cluster count within the r range.")
     return 0
 
-def run_multilevel_cluster(output_prefix, chr_number, logger, max_attempts=30):
+def run_multilevel_cluster(output_prefix, chr_number, logger, max_attempts=50):
 
     for attempt in range(1, max_attempts):
         r = float(attempt) / 10
@@ -248,6 +247,7 @@ def filter_edges_by_density(chr_num, HiC_file, group_ctgs_save, filter_HiC_file,
     logger.info(f"HiC graph info : edges -> {num_edges}, nodes -> {num_nodes}, density -> {density}")
 
     if density < 0.2 and num_nodes < (num_edges / filter_threshold):
+    # if num_nodes < (num_edges / filter_threshold):
         logger.info(f"HiC signal filtering...")
         threshold = 0.5
         
@@ -313,15 +313,18 @@ def main():
 
     split_gfa_file = f"{args.output_prefix}.rmTip.split.gfa"
 
-    if not run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger):
-        logger.error("Run partig Error: An error occurred while running Partig.")
-        return
-
-    if not convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix, args.RE_file,logger):
-        logger.error("Conversion partig Error: in Partig output to CSV.")
-        return
-
     partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.csv"
+
+    if not os.path.isfile(partig_file):
+
+        if not run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger):
+            logger.error("Run partig Error: An error occurred while running Partig.")
+            return
+
+        if not convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix, args.RE_file,logger):
+            logger.error("Conversion partig Error: in Partig output to CSV.")
+            return
+
 
     if not run_pipeline_allele(split_gfa_file, args.HiC_file, args.RE_file, partig_file, args.output_prefix, logger):
         logger.error("Run allele_cluster Error: An error occurred while running allele_cluster.")
@@ -343,17 +346,25 @@ def main():
         logger.info(f"Chromosome clustering uses the filter_threshold : {filter_threshold}.")
         filter_edges_by_density(args.chr_number, allele_hic_file, groups_file, filter_HiC_file, logger, filter_threshold=filter_threshold,step=0.5)
 
-        if not run_multilevel_cluster(args.output_prefix, int(args.chr_number), logger):
+        if not run_multilevel_cluster_v1(args.output_prefix, int(args.chr_number), logger):
             logger.error(f"Run Chromosome multilevel_cluster Error -> filter_threshold : {filter_threshold}.")
             filter_threshold -= 5
             continue
         else:
             break
+    
+    with open(f"{args.output_prefix}.chr.cluster.ctg.txt", "r") as f:
+        line_count = sum(1 for _ in f)
+    
+    if line_count != int(args.chr_number):
+        logger.error("Clustering Chromosome Error: Incorrect number of clusters.")
+        return False
+    
 
 
     if not run_rescue_base_subgraph(args.HiC_file, args.output_prefix, logger):
         logger.error("Rescue Error: An error occurred while rescue base subgraph.")
-        return
+        return True
 
 if __name__ == "__main__":
     main()

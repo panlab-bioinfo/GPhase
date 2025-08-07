@@ -19,16 +19,37 @@ def read_c(c):
                 subgraph_group_dict[utg].append(line[0])
     return cluster_dict, subgraph_group_dict
 
+# def read_l(l):
+#     hic_nei_dict = defaultdict(set)
+#     hic_links_dict = defaultdict()
+#     with open(l, 'r') as file:
+#         for line in file:
+#             if not line.startswith("source"):
+#                 line = line.strip().split(',')
+#                 hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
+#                 hic_nei_dict[line[0]].add(line[1])
+#                 hic_nei_dict[line[1]].add(line[0])
+#     return hic_links_dict, hic_nei_dict
+
 def read_l(l):
     hic_nei_dict = defaultdict(set)
-    hic_links_dict = defaultdict()
-    with open(l, 'r') as file:
-        for line in file:
-            if not line.startswith("source"):
-                line = line.strip().split(',')
-                hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
-                hic_nei_dict[line[0]].add(line[1])
-                hic_nei_dict[line[1]].add(line[0])
+    hic_links_dict = {}
+
+    with open(l, newline='') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            if not row:
+                continue
+            if row[0].startswith(('utg', 'utig')):
+                a, b, w = row[0], row[1], float(row[2])
+
+                # 用 tuple 排序缓存减少运算
+                key = (a, b) if a < b else (b, a)
+
+                hic_links_dict[key] = w
+                hic_nei_dict[a].add(b)
+                hic_nei_dict[b].add(a)
+
     return hic_links_dict, hic_nei_dict
 
 
@@ -58,6 +79,8 @@ def cluster(cluster_dict, subgraph_group_dict, subgraph_ctgs_dict, ctg_subgraph_
         
         allele_group_1 = subgraph_group_dict.get(subgraph1, [])
         allele_group_2 = subgraph_group_dict.get(subgraph2, [])
+
+        print(f"{ctg1}\t{ctg2}\t{allele_group_1}\t{allele_group_2}")
 
         if allele_group_1 and allele_group_2:
             allele_hic_dict[tuple(sorted([allele_group_1[0], allele_group_2[0]]))] += value

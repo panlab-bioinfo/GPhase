@@ -1,4 +1,4 @@
-from multilevel_cluster_v2 import multilevel_cluster
+from multilevel_cluster import multilevel_cluster
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -16,7 +16,7 @@ import sys
 
 def read_collapse_num(collapse_num_file):
 
-    collapse_num_dict = defaultdict()
+    collapse_num_dict = defaultdict(int)
     with open(collapse_num_file, 'r') as file:
         for line in file:
             line = line.strip().split()
@@ -43,9 +43,10 @@ def read_c(c):
     with open(c, 'r') as file:
         for line in file:
             line = line.strip().split('\t')
-            for utg in line[2].split():
-                cluster_dict[line[0]].append(utg)
-                utg_group_dict[utg].append(line[0])
+            if len(line) >= 3:
+                for utg in line[2].split():
+                    cluster_dict[line[0]].append(utg)
+                    utg_group_dict[utg].append(line[0])
     return cluster_dict, utg_group_dict
 
 
@@ -72,7 +73,7 @@ def read_l(l):
 def read_allele(allele_file):
 
     allele_utg_dict = defaultdict(set)
-    allele_key_dict = defaultdict()
+    allele_key_dict = defaultdict(int)
     with open(allele_file, 'r') as file:
         for line in file:
             if line.startswith("utg") or line.startswith("utig"):
@@ -123,15 +124,13 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
 
     os.makedirs("utgs_cluster", exist_ok=True)
 
-    script_path = os.path.abspath(sys.path[0])
-    script_path_add = os.path.join(script_path,"multilevel_cluster.py")
 
     for utg in utgs_list:
 
         nei_utg = list(hic_nei_dict[utg])
         nei_uncollapse_utg = list(set(nei_utg) & set(uncollapse_list))
 
-        if collapse_num_dict[utg] > 1 and nei_utg and len(nei_uncollapse_utg) > 5:
+        if collapse_num_dict[utg] > 1 and nei_utg and len(nei_uncollapse_utg) > 3:
 
             nei_uncollapse_utg_links = { pair:value  for pair, value in hic_links_dict.items() if pair[0] in nei_uncollapse_utg and pair[1] in nei_uncollapse_utg }
             with open(f"utgs_cluster/{utg}.links.nor.csv", 'w') as file:
@@ -140,12 +139,11 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
                     file.write(f"{pair[0]},{pair[1]},{value}\n")
 
             try:
-                # script = f"""python {script_path_add} -c utgs_cluster/{utg}.links.nor.csv -o utgs_cluster/{utg}.cluster.txt"""
-                # process = subprocess.run(script, shell=True, executable='/bin/bash', capture_output=True, text=True)
                 csv_file = f"utgs_cluster/{utg}.links.nor.csv"
                 cluster_file = f"utgs_cluster/{utg}.cluster.txt"
-                multilevel_cluster(csv_file, cluster_file)
+                multilevel_cluster(csv_file, cluster_file, resolution=1)
                 cluster_dict, utg_group_dict = read_c(cluster_file)
+
             except:
                 louvin_nei_log_file.write(f"error: {utg}\t{','.join(nei_utg)}\t{','.join(nei_uncollapse_utg)}\n")
                 cluster_dict = defaultdict()
@@ -227,7 +225,7 @@ def louvain_nei(collapse_num_file, chr_file, l, allele_file):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="louvain nei cluster")
-    parser.add_argument('-c', '--collase_num', required=True,
+    parser.add_argument('-c', '--collapse_num', required=True,
                         help='<filepath> collapse num for utgs')
     parser.add_argument('-chr', '--chromosome', required=True,
                         help='<filepath>all utg for chrompsome')
@@ -238,7 +236,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    collapse_num_file = args.collase_num
+    collapse_num_file = args.collapse_num
     chr_file = args.chromosome
     l = args.links
     allele_file = args.allele

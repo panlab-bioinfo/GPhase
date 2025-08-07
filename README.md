@@ -17,10 +17,9 @@ conda activate gphase
 ```
 chromap -i -r asm.fa -o index
 chromap --preset hic -x index -r asm.fa -q 0 \
-    -1 hic_R1.fq.gz -2 hic_R2.fq.gz \
-    --remove-pcr-duplicates -t 80 --SAM \
-| samtools view -@ 32 -bh -o map.chromap.bam
-
+    -1 HiC_1.fq.gz -2 HiC_2.fq.gz \
+    --remove-pcr-duplicates -t 64 --SAM -o map.chromap.sam
+samtools view -@ 64 -bh -o map.chromap.bam map.chromap.sam
 ```
 
 # Estimating of the number of contig collapses based on HiC data and popCNV

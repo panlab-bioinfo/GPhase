@@ -60,7 +60,7 @@ enzyme_site="GATC"
 cluster_q=1
 scaffold_q=0
 split_gfa_n="2"
-chr_pm="0.9"
+chr_pm="0.95"
 hap_pm="0.60"
 thread="12"
 no_contig_ec=""
@@ -116,7 +116,7 @@ while true; do
             if [ "$(echo "$2 >= 0.5 && $2 < 1" | bc -l)" -eq 1 ]; then
                 chr_pm="$2"
             else
-                echo "Error: --chr_pm must be an float between 0.5 and 1."
+                echo "Error: --chr_pm must be a float between 0.5 and 1."
                 usage
             fi
             shift 2 ;;
@@ -124,7 +124,7 @@ while true; do
             if [ "$(echo "$2 >= 0.5 && $2 < 1" | bc -l)" -eq 1 ]; then
                 hap_pm="$2"
             else
-                echo "Error: --hap_pm must be an float between 0.5 and 1."
+                echo "Error: --hap_pm must be a float between 0.5 and 1."
                 usage
             fi
             shift 2 ;;
@@ -137,7 +137,7 @@ while true; do
             if [[ "$2" =~ ^([0-9]{1,3}|1000)$ ]]; then 
                 min_len="$2"
             else
-                echo "Error: --min_len must be a int between 0 and 1000."
+                echo "Error: --min_len must be an int between 0 and 1000."
                 usage
             fi
             shift 2 ;;
@@ -193,11 +193,7 @@ gfa="$(basename "$gfa")"
 collapse_num_file="$(basename "$collapse_num_file")"
 map_file="$(basename "$map_file")"
 
-
-
 current_dir=$(pwd)
-
-
 
 log_path=$(pwd)
 log_file="${log_path}/GPhase_pipeline.log"
@@ -210,6 +206,19 @@ LOG_INFO() {
     echo "${time} <GPhase_pipeline> [${flag}] ${msg}" >> ${log_file}
 
 }
+
+run_step() {
+    local cmd="$1"
+    local step_name="$2"
+    LOG_INFO "${log_file}" "run" "Running ${step_name}..."
+    eval "${cmd}"
+    local status=$?
+    if [ $status -ne 0 ]; then
+        LOG_INFO "${log_file}" "err" "Error: ${step_name} failed with exit code $status."
+        exit $status
+    fi
+}
+
 # Directory setup
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 LOG_INFO ${log_file} "path" "Script dir : ${SCRIPT_DIR}"
@@ -228,8 +237,7 @@ ln -s "../../${fa_file}"
 ln -s "../../${map_file}"
 
 # Step 1: Run get_RE.py
-LOG_INFO ${log_file} "run" "Running get_RE.py..."
-python ${SCRIPT_DIR}/../cluster_chr/get_RE.py -f ${fa_file} -e ${enzyme_site} -op ${output_prefix}
+run_step "python ${SCRIPT_DIR}/../cluster_chr/get_RE.py -f ${fa_file} -e ${enzyme_site} -op ${output_prefix}"
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: get_RE.py failed."
@@ -240,14 +248,16 @@ fi
 samtools faidx ${fa_file}
 awk 'BEGIN{print "## pairs format v1.0.0\n##columns: readID chrom1 pos1 chrom2 pos2 mapQ"}{print "##chromsize: "$1" "$2}' ${fa_file}.fai > map.chromap.pairs
 samtools view -@ 8 "${map_file}" | awk -v scaffold_q="${scaffold_q}" '{if($7=="=")$7=$3;if($5>=scaffold_q)print $1"\t"$3"\t"$4"\t"$7"\t"$8"\t"$5}' >> map.chromap.pairs
-# sort pairs
-cat <( grep '^#' map.chromap.pairs ) <( grep '^#' -v map.chromap.pairs | sort --parallel=32  -k2,2 -k4,4 ) >map.chromap.sort.pairs
 
-# Generate the links file
-awk -v cluster_q="$cluster_q" '{if(substr($1,1,1) != "#" && $2 != $4 && $6 >= cluster_q){print $2,$4}}' map.chromap.sort.pairs | \
-        uniq -c | awk '{print $2","$3","$1}' > ${output_prefix}.chromap.links.csv
+# cat <( grep '^#' map.chromap.pairs ) <( grep '^#' -v map.chromap.pairs | sort --parallel=32  -k2,2 -k4,4 ) >map.chromap.sort.pairs
+# # Generate the links file
+# awk -v cluster_q="$cluster_q" '{if(substr($1,1,1) != "#" && $2 != $4 && $6 >= cluster_q){print $2,$4}}' map.chromap.sort.pairs | \
+#         uniq -c | awk '{print $2","$3","$1}' > ${output_prefix}.chromap.links.csv
 
-python  ${SCRIPT_DIR}/../cluster_chr/nor_hic.py -f ${output_prefix}.chromap.links.csv -r ${output_prefix}.RE_counts.txt -o ${output_prefix}.chromap.links.nor.csv
+# get hic links from pairs
+run_step "python  ${SCRIPT_DIR}/../cluster_chr/get_links.py -i map.chromap.pairs -o ${output_prefix} -q ${cluster_q}"
+
+run_step "python  ${SCRIPT_DIR}/../cluster_chr/nor_hic.py -f ${output_prefix}.chromap.links.csv -r ${output_prefix}.RE_counts.txt -o ${output_prefix}.chromap.links.nor.csv"
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: nor_hic.py failed."
@@ -265,13 +275,9 @@ ln -s "../../${gfa}"
 ln -s "../preprocessing/${output_prefix}.RE_counts.txt"
 ln -s "../preprocessing/${output_prefix}.chromap.links.nor.csv"
 
-LOG_INFO ${log_file} "run" "Running cluster_chr.py..."
-python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa}  -pm ${chr_pm} --split_gfa_n ${split_gfa_n}
 
-if [ $? -ne 0 ]; then
-    LOG_INFO ${log_file} "err" "Error: cluster_chr.py failed."
-    exit 1
-fi
+run_step "python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa}  -pm ${chr_pm} --split_gfa_n ${split_gfa_n}"
+
 
 # Step 3: Cluster haplotypes
 LOG_INFO ${log_file} "run" "Created output directory: cluster_hap"
@@ -287,8 +293,6 @@ ln -s "../cluster_chr/${output_prefix}.digraph.csv"
 ln -s "../cluster_chr/${output_prefix}.chr.cluster.ctg.txt"
 
 
-LOG_INFO ${log_file} "run" "Running cluster_hap.py..."
-
 if [[ -z "$rescue" ]]; then
     rescue=""
     cr=${output_prefix}.chr.cluster.ctg.txt
@@ -296,12 +300,8 @@ else
     cr="rescue.cluster.ctg.txt"
 fi
 
-python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr} -pm ${hap_pm} --reassign_number ${reassign_number} ${rescue} ${expand}
+run_step "python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file ${collapse_num_file} -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr} -pm ${hap_pm} --reassign_number ${reassign_number} ${rescue} ${expand}"
 
-if [ $? -ne 0 ]; then
-    LOG_INFO ${log_file} "err" "Error: cluster_hap.py failed."
-    exit 1
-fi
 
 # Step 4: Scaffold haplotypes
 LOG_INFO ${log_file} "run" "Created output directory: scaffold_hap"
@@ -312,25 +312,17 @@ ln -s "../cluster_chr/${hic_links}"
 ln -s "../cluster_chr/${gfa}"
 ln -s "../cluster_chr/group_ctgs_All.txt"
 ln -s "../cluster_chr/${output_prefix}.digraph.csv"
-ln -s "../preprocessing/map.chromap.sort.pairs"
+ln -s "../preprocessing/map.chromap.pairs"
 
-
-LOG_INFO ${log_file} "run" "Running scaffold_hap.py..."
-python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m map.chromap.sort.pairs -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}
-if [ $? -ne 0 ]; then
-    LOG_INFO ${log_file} "err" "Error: scaffold_hap.py failed."
-    exit 1
-fi
-
-
+run_step "python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m map.chromap.pairs -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}"
 
 # Step 5: Final Output
-LOG_INFO ${log_file} "run" "Created output directory: gphase_final"
-cd ../ && mkdir -p gphase_final && cd gphase_final
+# LOG_INFO ${log_file} "run" "Created output directory: gphase_final"
+# cd ../ && mkdir -p gphase_final && cd gphase_final
 # ln -s "../preprocessing/${RE_file}"
 # ln -s "../preprocessing/${hic_links}"
 # ln -s "../cluster_chr/${output_prefix}.rmTip.split.gfa"
 # ln -s "../cluster_chr/group_ctgs_All.txt" ${output_prefix}.subgraphs.txt
 # ln -s "../cluster_chr/rescue.cluster.ctg.txt" ${output_prefix}.chr.cluster.txt
-ln -s ../scaffold_hap/HapHiC_sort/scaffolds.sort.fa ${output_prefix}.scaffolds.fasta
-ln -s ../scaffold_hap/HapHiC_sort/final_agp/${output_prefix}.final.agp
+# ln -s ../scaffold_hap/HapHiC_sort/scaffolds.sort.fa ${output_prefix}.scaffolds.fasta
+# ln -s ../scaffold_hap/HapHiC_sort/final_agp/${output_prefix}.final.agp

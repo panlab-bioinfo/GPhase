@@ -101,7 +101,7 @@ def split_GFA(gfa_filePath, digraph, nei_level:2, output_prefix):
 
 if __name__ == '__main__':
 
-    gfa_filePath = "tetra.asm.bp.p_utg.noseq.gfa"
+    # gfa_filePath = "tetra.asm.bp.p_utg.noseq.gfa"
 
 
     parser = argparse.ArgumentParser(description="split gfa", formatter_class=argparse.RawTextHelpFormatter)

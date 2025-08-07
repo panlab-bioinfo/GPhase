@@ -56,11 +56,32 @@ def add_graph_allele(digraph_file):
     return graph_allele_dict
 
 
+def nor_partig(weight, ctg1_len, ctg2_len, method="no"):
 
-def read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, ctg_RE_len, graph_allele_dict):
+    if method ==  "no":
+        sim = weight
+    elif method == "min":
+        sim = weight * min([ctg1_len, ctg2_len])
+    elif method == "len-penalty":
+        L_mean = (ctg1_len + ctg2_len) / 2
+        length_ratio = min([ctg1_len, ctg2_len]) / max([ctg1_len, ctg2_len])
+        beta = 0.1     # 惩罚长度差异的强度
+        gamma = 500000  # 短序列惩罚强度
+        penalty = (1 - length_ratio) * beta
+        # length_weight = L_mean / (L_mean + gamma)
+        sim = weight * (1-penalty) * L_mean
+    else:
+        sim = 0
+    return sim
+
+
+
+
+
+def read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, ctg_RE_len, graph_allele_dict, method="no"):
     
     partig_re = defaultdict()
-
+    flag_list = list()
     with open(partig_file, 'r') as file, open(output_file, 'w') as output_f:
         for line in file:
             line = line.strip().split()
@@ -71,33 +92,27 @@ def read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, ctg_RE_len
                 contig2 = fai_dict[scontig2]
                 if tuple(sorted([contig1, contig2])) in graph_allele_dict:
                     continue
-                if contig1 in ctg_RE_len and contig2 in ctg_RE_len :
-                    # sim = float(line[7]) * min([ctg_RE_len[contig1][1], ctg_RE_len[contig2][1]])
-                    L_mean = (ctg_RE_len[contig1][1] + ctg_RE_len[contig2][1]) / 2
-                    length_ratio = min([ctg_RE_len[contig1][1], ctg_RE_len[contig2][1]]) / max([ctg_RE_len[contig1][1], ctg_RE_len[contig2][1]])
-                    beta = 0.5     # 惩罚长度差异的强度
-                    gamma = 500000  # 短序列惩罚强度
-                    penalty = (1 - length_ratio) * beta
-                    length_weight = L_mean / (L_mean + gamma)
-                    sim = float(line[7]) * (1-penalty) * length_weight
+                if contig1 in ctg_RE_len and contig2 in ctg_RE_len and ctg_RE_len[contig1][1] > 50000 and ctg_RE_len[contig2][1] > 50000:
+                # if contig1 in ctg_RE_len and contig2 in ctg_RE_len:
+                    sim = nor_partig(float(line[7]), ctg_RE_len[contig1][1], ctg_RE_len[contig2][1], method=method)
                 else:
                     continue
-                output_f.write(f"{contig1},{contig2},{sim}\n")
+                _tmp = tuple(sorted([contig1, contig2]))
+                if _tmp not in flag_list:
+                    flag_list.append(tuple(sorted([contig1, contig2])))
+                    output_f.write(f"{contig1},{contig2},{sim}\n")
     
     with open(output_file, 'a') as output_f2:
         for (contig1, contig2) in graph_allele_dict:
-            if contig1 in ctg_RE_len and contig2 in ctg_RE_len :
-                # sim = 1 * min([ctg_RE_len[contig1][1], ctg_RE_len[contig1][1]])
-                L_mean = (ctg_RE_len[contig1][1] + ctg_RE_len[contig2][1]) / 2
-                length_ratio = min([ctg_RE_len[contig1][1], ctg_RE_len[contig2][1]]) / max([ctg_RE_len[contig1][1], ctg_RE_len[contig2][1]])
-                beta = 0.5     # 惩罚长度差异的强度
-                gamma = 500000  # 短序列惩罚强度
-                penalty = (1 - length_ratio) * beta
-                length_weight = L_mean / (L_mean + gamma)
-                sim = float(line[7]) * (1-penalty) * length_weight
+            if contig1 in ctg_RE_len and contig2 in ctg_RE_len and ctg_RE_len[contig1][1] > 50000 and ctg_RE_len[contig2][1] > 50000:
+            # if contig1 in ctg_RE_len and contig2 in ctg_RE_len:
+                sim = nor_partig(1, ctg_RE_len[contig1][1], ctg_RE_len[contig2][1], method=method)
             else:
                 continue
-            output_f2.write(f"{contig1},{contig2},{sim}\n")
+            _tmp = tuple(sorted([contig1, contig2]))
+            if _tmp not in flag_list:
+                flag_list.append(tuple(sorted([contig1, contig2])))
+                output_f2.write(f"{contig1},{contig2},{sim}\n")
 
 
 def main():
@@ -106,6 +121,7 @@ def main():
     parser.add_argument('-r', '--RE_file', required=True, help='length for contig')
     parser.add_argument('-p', '--partig_file', required=True, help='partig file')
     parser.add_argument('-d', '--digraph', required=True, help='digraph file')
+    parser.add_argument('-m', '--method', default="no", help='standardized method: no, min, len-penalty')
     parser.add_argument('-o', '--output', required=True, help='output file')
     
 
@@ -115,11 +131,16 @@ def main():
     output_file = args.output
     digraph_file = args.digraph
     RE_file = args.RE_file
+    method = args.method
+
+    valid_methods = {"no", "min", "len-penalty"}
+    if method not in valid_methods:
+        parser.error(f"Error: Invalid method '{method}'. Must be one of: {', '.join(valid_methods)}")
 
     fai_dict, fai_reverse_dict = read_fai(fai_file)
     ctg_RE_len = read_REs(RE_file)
     graph_allele_dict = add_graph_allele(digraph_file)
-    read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, ctg_RE_len, graph_allele_dict)
+    read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, ctg_RE_len, graph_allele_dict, method)
 
 if __name__ == "__main__":
     main()

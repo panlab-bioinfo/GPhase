@@ -44,16 +44,37 @@ def read_RE(REFile):
     return ctg_RE_dict
 
 
+# def read_l(l):
+#     hic_nei_dict = defaultdict(set)
+#     hic_links_dict = defaultdict()
+#     with open(l, 'r') as file:
+#         for line in file:
+#             if line.startswith("utg") or line.startswith("utig") :
+#                 line = line.strip().split(',')
+#                 hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
+#                 hic_nei_dict[line[0]].add(line[1])
+#                 hic_nei_dict[line[1]].add(line[0])
+#     return hic_links_dict, hic_nei_dict
+
 def read_l(l):
     hic_nei_dict = defaultdict(set)
-    hic_links_dict = defaultdict()
-    with open(l, 'r') as file:
-        for line in file:
-            if line.startswith("utg") or line.startswith("utig") :
-                line = line.strip().split(',')
-                hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
-                hic_nei_dict[line[0]].add(line[1])
-                hic_nei_dict[line[1]].add(line[0])
+    hic_links_dict = {}
+
+    with open(l, newline='') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            if not row:
+                continue
+            if row[0].startswith(('utg', 'utig')):
+                a, b, w = row[0], row[1], float(row[2])
+
+                # 用 tuple 排序缓存减少运算
+                key = (a, b) if a < b else (b, a)
+
+                hic_links_dict[key] = w
+                hic_nei_dict[a].add(b)
+                hic_nei_dict[b].add(a)
+
     return hic_links_dict, hic_nei_dict
 
 def read_allele(allele_file):
@@ -94,7 +115,7 @@ def get_N80(len_list, threshold=0.8):
 def get_All_N80(utgs_list, ctg_RE_dict):
 
     len_list = [int(ctg_RE_dict[utg][1]) for utg in utgs_list if utg in ctg_RE_dict]
-    return get_N80(len_list, threshold=0.8)
+    return get_N80(len_list, threshold=0.9)
     
 
 
@@ -182,15 +203,18 @@ def cluster(group_ctg_dict, ctg_group_dict, hic_links_dict, allele_dict):
 def expand_cluster(csv_file, group_ctg_dict, output_prefix):
 
     cluster_file = f"{output_prefix}.allele.cluster.txt"
-    Multilevel_cluster(csv_file, cluster_file, 1.5, False)
+    with open(csv_file, 'r') as f:
+        row_count = sum(1 for _ in f) - 1 
 
-    # script_path = os.path.abspath(sys.path[0])
-    # script_path_add = os.path.join(script_path,"multilevel_cluster.py")
-    # script = f"""python {script_path_add} -c {csv_file} -o {output_prefix}.allele.cluster.txt  """
-    # process = subprocess.run(script, shell=True, executable='/bin/bash', capture_output=True, text=True)
-
-    cluster_file = f"{output_prefix}.allele.cluster.txt"
-    cluster_dict, utg_group_dict = read_c(cluster_file)
+    if row_count > len(group_ctg_dict):
+        Multilevel_cluster(csv_file, cluster_file, 1, False, None, None, None)
+        cluster_dict, utg_group_dict = read_c(cluster_file)
+    else:
+        cluster_dict = defaultdict(list)
+        utg_group_dict = defaultdict(int)
+        for idx, group in enumerate(group_ctg_dict, 1):
+            cluster_dict["group"+str(idx)].append(str(group))
+            utg_group_dict[group] = "group"+str(idx)
 
     # expand
     len_iter = len(cluster_dict)

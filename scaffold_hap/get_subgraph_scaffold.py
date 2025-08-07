@@ -177,9 +177,6 @@ def n_hop_predecessors(G, node, N):
         if int(distance) == N:
             n_hop_predecessors_set.add(p)
         
-    
-
-    # return {p for p in ancestors if nx.shortest_path_length(G, p, node) == N}
     return n_hop_predecessors_set
 
 # 在包含group中ctg的子图上进行连接
@@ -301,7 +298,7 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
             if has_multiple_paths(graph, topo_order[i], topo_order[i+1]):
                 break_points_set.add(i+1)
 
-            # 检测是否有相连的同源节点
+            #检测是否有相连的同源节点
             successors = list(graph.successors(topo_order[i]))
             predecessors = list(graph.predecessors(topo_order[i+1]))
 
@@ -449,18 +446,6 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
         return ctgs_dir_path_filter_dict
 
 
-    # 执行拓扑排序
-    # while True:
-    #     try:
-    #         cycle = nx.find_cycle(digraph_copy)
-    #         # topo_order = list(nx.topological_sort(digraph))
-    #         edge_to_remove = min(cycle, key=lambda x: digraph_copy.edges[x]['weight'])
-    #         digraph_copy.remove_edge(*edge_to_remove)
-
-    #     except nx.NetworkXNoCycle:
-    #         # print("所有环已处理完毕")
-    #         break
-
     while True:
             digraph_copy_nk, node_map, rev_map = nx_to_nk_graph(digraph_copy, weighted=False)
             scc = nk.components.StronglyConnectedComponents(digraph_copy_nk)
@@ -482,7 +467,7 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
                         else:
                             continue
                         break
-                    break  # 删除一条边后跳出处理一次
+                    break 
 
             if not has_cycle:
                 break
@@ -494,17 +479,22 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
 
     if len(ctgs_sort) != len(ctgs):
         ctgs_sort = list(set(graph.nodes()) & set(ctgs))
-
-
     
-    
-    # 检测相邻节点是否连通，若不连通则打断
+    # 检测相邻节点是否连通，若不连通则打断;如存在同源节点则断开
     ctgs_sort_check = list()
     break_points_list = list()
     for i in range(len(ctgs_sort) - 1):
         try:
             if not nx.has_path(digraph, source=ctgs_sort[i], target=ctgs_sort[i+1]):
                 break_points_list.append(i+1)
+            
+            successors = list(digraph.successors(ctgs_sort[i]))
+            predecessors = list(digraph.predecessors(ctgs_sort[i+1]))
+
+            if len(successors) > 1 or len(predecessors) > 1:
+                break_points_set.add(i+1)
+
+
         except:
             break_points_list.append(i+1)
 
@@ -555,53 +545,16 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
                     ctgs_dir_path.append((node_j, 1))
 
         # 处理末尾节点方向
-        last_ctg = ctgs_sort[-1]
-        if last_ctg in global_digraph.nodes():
-            ctgs_dir_path.append((last_ctg, global_digraph.nodes[last_ctg].get('direction', 1)))
-        else:
-            ctgs_dir_path.append((last_ctg, 1))
+        if ctgs_sort:
+            last_ctg = ctgs_sort[-1]
+            if last_ctg in global_digraph.nodes():
+                ctgs_dir_path.append((last_ctg, global_digraph.nodes[last_ctg].get('direction', 1)))
+            else:
+                ctgs_dir_path.append((last_ctg, 1))
 
-        ctgs_dir_path_filter = [(ctg, dir_) for ctg, dir_ in ctgs_dir_path if ctg in ctgs_sort]
+            ctgs_dir_path_filter = [(ctg, dir_) for ctg, dir_ in ctgs_dir_path if ctg in ctgs_sort]
 
-        ctgs_dir_path_filter_dict[str(idx)] = ctgs_dir_path_filter
-
-
-    # for idx, ctgs_sort in enumerate(ctgs_sort_list):
-
-    #     ctgs_dir_path = list()
-
-    #     for i in range(len(ctgs_sort) - 1):
-
-    #         source_node = ctgs_sort[i]
-    #         target_node = ctgs_sort[i+1]
-    #         source_idx = node_map[source_node]
-    #         target_idx = node_map[target_node]
-
-    #         dijkstra = nk.distance.Dijkstra(digraph_nk, source_idx, storePaths=True)
-    #         dijkstra.run()
-
-    #         distance = dijkstra.distance(target_idx)
-    #         path_indices = dijkstra.getPath(target_idx)
-    #         shortest_path = [rev_map[i] for i in path_indices]
-
-    #         # shortest_path = nx.shortest_path(digraph, source=ctgs_sort[i], target=ctgs_sort[i+1])
-    #         for node_j in shortest_path[:-1]:
-    #             if node_j in global_digraph.nodes():
-    #                 ctgs_dir_path.append((node_j, global_digraph.nodes[node_j]['direction']))
-    #             else:
-    #                 ctgs_dir_path.append((node_j, 1))
-                
-                
-    #     if ctgs_sort[-1] in global_digraph.nodes():
-    #         ctgs_dir_path.append((ctgs_sort[-1], global_digraph[ctgs_sort[-1]]))
-    #     else:
-    #         ctgs_dir_path.append((ctgs_sort[-1], 1))
-
-    
-    #     ctgs_dir_path_filter = [ (ctg, ctg_dir) for ctg, ctg_dir in ctgs_dir_path if ctg in ctgs_sort]
-        
-
-    #     ctgs_dir_path_filter_dict[str(idx)] = list(ctgs_dir_path_filter)
+            ctgs_dir_path_filter_dict[str(idx)] = ctgs_dir_path_filter
 
 
     return ctgs_dir_path_filter_dict
@@ -646,7 +599,7 @@ def get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict, global_di
 
 def get_AGP(filter_subgraph_sort_dir_dict, ctg_RE_dict):
 
-    with open("subgraphGroup.agp", 'w') as file:
+    with open("subgraph_sort.agp", 'w') as file:
         for Group_idx,(subgraphGroup, ctgs_dir) in enumerate(filter_subgraph_sort_dir_dict.items(), 1):
             len_sum = 0
             for idx, (ctg, ctg_dir) in enumerate(ctgs_dir):

@@ -137,25 +137,26 @@ def filter_links_by_utgs(flag, utg_file, input_file, output_file,logger):
         logger.error(f"An error occurred: {e}")
         raise
 
-def adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger):
+
+def adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output, csv_file, utg_file, partig_file, hap_number, chr_num, logger):
     r = initial_r
     check_cluster_dict = defaultdict(list)
     while min_r <= r <= max_r:
-        # logger.info(f"Running clustering with r={r}")
+        # logger.info(f"Chr:{} -> Running clustering with r={r}")
         check_cluster_dict, max_group_allele_value = multilevel_cluster(csv_file, cluster_output, r , "check", utg_file, partig_file, hap_number)
 
         num_clusters = len(check_cluster_dict)
-        # logger.info(f"Number of clusters: {num_clusters} (Target: {hap_number})")
+        # logger.info(f"Chr:{} -> Number of clusters: {num_clusters} (Target: {hap_number})")
 
         if num_clusters == hap_number:
-            # logger.info(f"Optimal r found: {r}")
+            logger.info(f"Chr{chr_num} -> Optimal r found: {r}")
             return r
         elif num_clusters > hap_number:
             max_r = r - step
         else:
             min_r = r + step
 
-        r = (min_r + max_r) / 2
+        r = (min_r + max_r) / 2.0
 
     return None
 
@@ -192,30 +193,67 @@ def get_avg_uncollapse_num(REFile, collapse_num_file, hap_number):
 
     return uncollapse_avg
 
+def reassign(collapse_num_file, utg_rescue_file, filtered_links_file, cluster_dict , RE_file, partig_file, output_prefix, find_best_isolated, no_expand_partig_file, chr_num):
+
+    cluster_file = f"{output_prefix}.chr{chr_num}.cluster.txt"
+    with open(cluster_file, 'w') as file:
+        for group, utgs in cluster_dict.items():
+            file.write(f"group{group}\t{len(utgs)}\t{' '.join(utgs)}\n")
+
+    find_best_isolated, isolated_threshold = True, 0
+    min_variance_idx, min_allele_length, cluster_length_list = louvain_reassign_allele(collapse_num_file, utg_rescue_file, filtered_links_file, cluster_file , RE_file, partig_file, output_prefix, find_best_isolated, no_expand_partig_file, isolated_threshold)
 
 
-def multiple_adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger):
+    return min_variance_idx, min_allele_length, cluster_length_list
+
+def check_cluster_length(cluster_length_list, hap_number):
+
+    # avg = sum(cluster_length_list)/hap_number、
+    # for length in cluster_length_list:
+    #     if length < avg/2:
+    #         return False
+    # return True
+
+    if not cluster_length_list:
+        return False
+    
+    min_val = min(cluster_length_list)
+    max_val = max(cluster_length_list)
+
+    if max_val > 2 * min_val:
+        return False
+    return True
+
+
+def multiple_adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output, csv_file, utg_file, partig_file, hap_number, args, chr_num,logger):
 
     section_length = float((max_r - min_r) / 8)
 
-    section_1 = adjust_r_and_cluster((min_r + min_r+section_length)/2, min_r, min_r+section_length, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger)
-    section_2 = adjust_r_and_cluster((min_r+section_length + min_r+section_length*2)/2, min_r+section_length, min_r+section_length*2, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger)
-    section_3 = adjust_r_and_cluster((min_r+section_length*2 + min_r+section_length*3)/2, min_r+section_length*2, min_r+section_length*3, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger)
-    section_4 = adjust_r_and_cluster((min_r+section_length*3 + min_r+section_length*4)/2, min_r+section_length*3, min_r+section_length*4, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger)
+    r_set = set()
 
-    section_5 = adjust_r_and_cluster((min_r+section_length*4 + min_r+section_length*5)/2, min_r+section_length*4, min_r+section_length*5, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger)
-    section_6 = adjust_r_and_cluster((min_r+section_length*5 + min_r+section_length*6)/2, min_r+section_length*5, min_r+section_length*6, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger)
-    section_7 = adjust_r_and_cluster((min_r+section_length*6 + min_r+section_length*7)/2, min_r+section_length*6, min_r+section_length*7, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger)
-    section_8 = adjust_r_and_cluster((min_r+section_length*7 + max_r)/2, min_r+section_length*7, max_r, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger)
+    for i in range(1):
+        section_1 = adjust_r_and_cluster((min_r + min_r+section_length)/2, min_r, min_r+section_length, step, cluster_output, csv_file, utg_file, partig_file, hap_number, chr_num,logger)
+        section_2 = adjust_r_and_cluster((min_r+section_length + min_r+section_length*2)/2, min_r+section_length, min_r+section_length*2, step, cluster_output, csv_file, utg_file, partig_file, hap_number, chr_num,logger)
+        section_3 = adjust_r_and_cluster((min_r+section_length*2 + min_r+section_length*3)/2, min_r+section_length*2, min_r+section_length*3, step, cluster_output, csv_file, utg_file, partig_file, hap_number, chr_num,logger)
+        section_4 = adjust_r_and_cluster((min_r+section_length*3 + min_r+section_length*4)/2, min_r+section_length*3, min_r+section_length*4, step, cluster_output, csv_file, utg_file, partig_file, hap_number, chr_num,logger)
+
+        section_5 = adjust_r_and_cluster((min_r+section_length*4 + min_r+section_length*5)/2, min_r+section_length*4, min_r+section_length*5, step, cluster_output, csv_file, utg_file, partig_file, hap_number, chr_num,logger)
+        section_6 = adjust_r_and_cluster((min_r+section_length*5 + min_r+section_length*6)/2, min_r+section_length*5, min_r+section_length*6, step, cluster_output, csv_file, utg_file, partig_file, hap_number, chr_num,logger)
+        section_7 = adjust_r_and_cluster((min_r+section_length*6 + min_r+section_length*7)/2, min_r+section_length*6, min_r+section_length*7, step, cluster_output, csv_file, utg_file, partig_file, hap_number, chr_num,logger)
+        section_8 = adjust_r_and_cluster((min_r+section_length*7 + max_r)/2, min_r+section_length*7, max_r, step, cluster_output, csv_file, utg_file, partig_file, hap_number, chr_num,logger)
+        r_set.add(section_1)
+        r_set.add(section_2)
+        r_set.add(section_3)
+        r_set.add(section_4)
+        r_set.add(section_5)
+        r_set.add(section_6)
+        r_set.add(section_7)
+        r_set.add(section_8)
 
 
-    if section_1 or section_2 or section_3 or section_4 or section_5 or section_6 or section_7 or section_8:
-        r_list = [section_1, section_2, section_3, section_4, section_5, section_6, section_7, section_8]
-        # r = max([ r for r in list_ if r and r > 0])
-        r_filter_list = [ r for r in r_list if r and r > 0]
-        r = min(r_filter_list, key=lambda x: abs(x - 1))
-        return r
-    raise 
+    if len([r for r in r_set if r and r > 0]):
+        return r_set
+    raise  Exception("multiple_adjust_r_and_cluster failed")
 
 
 def filter_edges_by_density(chr_num, HiC_file, utg_rescue_file, filter_HiC_file, logger, step=0.5):
@@ -249,6 +287,9 @@ def filter_edges_by_density(chr_num, HiC_file, utg_rescue_file, filter_HiC_file,
     else:
         edges.to_csv(filter_HiC_file, sep=',', header=False, index=False)
         return 0
+
+
+
 
 
 
@@ -299,6 +340,8 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         else:
             utg_rescue_file = utg_file
 
+        utg_RE_len = read_REs(utg_rescue_file)
+
 
         # Process files with ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=args.thread_num) as executor:
@@ -319,7 +362,6 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         cut_value = filter_edges_by_density(chr_num, links_file, utg_rescue_file, filter_edge_file, logger=logger, step=0.5)
 
         filtered_links_file = f"{args.output_prefix}.chr{chr_num}.links.nor.filterAllele.csv"
-
         command = (
             f"awk -F '[, \\t]' 'NR==FNR{{lines[$1\",\"$2];next}}!($1\",\"$2 in lines)' "
             f"{partig_file} {filter_edge_file} > {filtered_links_file}"
@@ -330,24 +372,30 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
         # # The knee is used to filter HiC signals
         best_knee = find_best_knee(filtered_links_file, f"{args.output_prefix}.chr{chr_num}.knees")
-        cut_value_step = 1
+        cut_value_step  = 1
 
         if best_knee < 5:
             cut_value_max = 5
+        elif best_knee > 10:
+            cut_value_max = 10
         else:
             cut_value_max = best_knee
 
 
         cluster_output = f"{args.output_prefix}.chr{chr_num}.cluster.txt"
-
+        # 计算 uncollapse 的长度和
         avg_uncollapse_num = get_avg_uncollapse_num(utg_rescue_file, args.collapse_num_file, args.hap_number)
-        logger.info(f"chr_num:{chr_num}\tbest_knee:{best_knee}")
+        logger.info(f"Chr{chr_num}: best_knee:{best_knee}")
 
+        # 记录每个满足要求的 cluster，在遍历至best_knee时则找最优的clusters
         # tuple ： (check_cluster_dict, max_group_allele_value）
         satisfy_clusters_list = list()
         check_cluster_dict = defaultdict(list)
 
         while cut_value < cut_value_max:
+            
+            # save uncollapse clusters
+            uncollapse_clusters_dict = defaultdict(dict)
 
             cut_links_file = f"{args.output_prefix}.chr{chr_num}.links.nor.filterAllele.c{float(cut_value)}.csv"
             command = (
@@ -357,44 +405,75 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
             execute_command(command, f"Failed to filter hic links for {cut_links_file}",logger)
 
             try:
-                # # Run louvain_nei.py
+                # Run louvain_nei.py
                 louvain_nei_result = louvain_nei(args.collapse_num_file, utg_rescue_file, cut_links_file, partig_file)
                 if not louvain_nei_result:
                     logger.error(f"Chr{chr_num}: Local clustering -> louvain_nei run error, try to running Direct clustering...")
                     raise Exception("Louvain_nei failed")
-                check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, float(1), "check", utg_rescue_file, no_expand_partig_file, int(args.hap_number))
-
-                optimal_r = multiple_adjust_r_and_cluster(
+                check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, 1.0, "check", utg_rescue_file, no_expand_partig_file, int(args.hap_number))
+                
+                optimal_r_set = multiple_adjust_r_and_cluster(
                     initial_r=1.0,
                     min_r=0.01,
                     max_r=3,
-                    step=0.03,
+                    step=0.05,
                     cluster_output=cluster_output,
                     csv_file="louvain_nei.csv", 
                     utg_file=utg_rescue_file,
                     partig_file=partig_file,
-                    hap_number=args.hap_number, logger=logger
+                    hap_number=args.hap_number, args=args, chr_num=chr_num, logger=logger
                 )
-                if optimal_r:
-                    check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, float(optimal_r), "check", utg_rescue_file, no_expand_partig_file, int(args.hap_number))
-                else:
-                    raise ValueError("Optimal r not found for Louvain clustering.")
-                
-                # Check the number of clusters
-                num_clusters = len(check_cluster_dict)
-                if num_clusters != args.hap_number:
-                    raise
-                else:
-                    satisfy_clusters_list.append((check_cluster_dict, max_group_allele_value))
 
-                if max_group_allele_value > 1000000:
-                    logger.info(f"Chr{chr_num}: Local clustering -> uncollapse clusters max_group_allele_value: {max_group_allele_value}, discard... ")
-                    raise
-                else:
-                    logger.info(f"Chr{chr_num}: Local clustering -> uncollapse clusters max_group_allele_value: {max_group_allele_value}, try to reassgin collaspe utg... ")
+                for optimal_r in optimal_r_set:
+                    cluster_numbr_eq = False
+
+                    if optimal_r is None or optimal_r == 0:
+                        continue
+
+                    for i in range(1):
+                        check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, float(optimal_r), "check", utg_rescue_file, no_expand_partig_file, int(args.hap_number))
+                    
+                        num_clusters = len(check_cluster_dict)
+                        logger.info(f"Chr{chr_num}: Local clustering -> check the number of clusters: {num_clusters}, target:{args.hap_number} ")
+                    
+                        if num_clusters == args.hap_number:
+                            cluster_numbr_eq = True
+                            break
+
+                    if not cluster_numbr_eq:
+                        continue
+                    else:
+                        satisfy_clusters_list.append((check_cluster_dict, max_group_allele_value))
+
+
+                    if int(max_group_allele_value) > 1000000:
+                        logger.info(f"Chr{chr_num}: Local clustering -> uncollapse clusters max_group_allele_value: {max_group_allele_value}, discard... ")
+                        continue
+                    else:   
+                        logger.info(f"Chr{chr_num}: Local clustering -> uncollapse clusters max_group_allele_value: {max_group_allele_value}, try to reassgin collaspe utg... ")
+                        find_best_isolated, isolated_threshold = True, 0
+                        min_variance_idx, min_allele_length, cluster_length_list = reassign(args.collapse_num_file, utg_rescue_file, filtered_links_file, check_cluster_dict , args.RE_file, partig_file, args.output_prefix, True, no_expand_partig_file, chr_num)
+
+                        # Allow for the longest possible utg error allocation
+                        if int(min_allele_length) > 1000000 :
+                        # if int(min_allele_length) > 1000000 + max([pair[1] for pair in utg_RE_len.values()]):
+                            logger.info(f"Chr{chr_num}: Local clustering -> reassign clusters max_group_allele_value: {min_allele_length}, discard...")
+                            continue
+                        length_check = check_cluster_length(cluster_length_list, args.hap_number)
+
+                        if not check_cluster_length(cluster_length_list, args.hap_number):
+                            logger.info(f"Chr{chr_num}: Local clustering -> reassign clusters lengths: {','.join([ str(value) for value in cluster_length_list])}, discard...")
+                            continue
+                        else:
+                            logger.info(f"Chr{chr_num}: Local clustering -> reassign clusters lengths: {','.join([ str(value) for value in cluster_length_list])}, saved...")
+                            uncollapse_clusters_dict[optimal_r] = check_cluster_dict 
+
+                if uncollapse_clusters_dict:
                     break
+                else:
+                    raise Exception("Local clustering over...")    
 
-            except:
+            except Exception as e:
 
                 chr_num_collapse_num_file = f"{args.output_prefix}.chr{chr_num}.utgs.uncollapse.txt"
                 command = (
@@ -420,46 +499,71 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
                 # Adjust r and run multilevel_cluster.py
                 try:
-                    check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, 1, "check", utg_rescue_file, no_expand_partig_file, args.hap_number)
-                    optimal_r = multiple_adjust_r_and_cluster(
+                    check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, 1.0, "check", utg_rescue_file, no_expand_partig_file, int(args.hap_number))
+                    optimal_r_set = multiple_adjust_r_and_cluster(
                         initial_r=1.0,
                         min_r=0.01,
                         max_r=3,
-                        step=0.03,
+                        step=0.05,
                         cluster_output=cluster_output,
                         csv_file=chr_num_uncollapse_hic_file, 
                         utg_file=utg_rescue_file,
                         partig_file=partig_file,
-                        hap_number=args.hap_number, logger=logger
+                        hap_number=args.hap_number, args=args, chr_num=chr_num, logger=logger
                     )
-                    if optimal_r:
-                        check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, optimal_r, "check", utg_rescue_file, no_expand_partig_file, args.hap_number)
-                    else:
-                        raise ValueError("Optimal r not found for Louvain clustering.")
 
+                    for optimal_r in optimal_r_set:
+                        cluster_numbr_eq = False
 
-                    # Check the number of clusters
-                    num_clusters = len(check_cluster_dict)
+                        if optimal_r is None or optimal_r == 0:
+                            continue
 
-                    if num_clusters != args.hap_number:
-                        raise
-                    else:
-                        satisfy_clusters_list.append((check_cluster_dict, max_group_allele_value))
+                        for i in range(1):
+                            check_cluster_dict, max_group_allele_value = multilevel_cluster(chr_num_uncollapse_hic_cut_file, cluster_output, float(optimal_r), "check", utg_rescue_file, no_expand_partig_file, int(args.hap_number))
 
-                    # if max_group_allele_value > min([avg_uncollapse_num/20, 1000000]):
-                    if max_group_allele_value > 1000000:
-                        logger.info(f"Chr{chr_num}: Direct clustering -> uncollapse clusters max_group_allele_value: {max_group_allele_value}, discard... ")
-                        raise
-                    else:
-                        logger.info(f"Chr{chr_num}: Direct clustering -> uncollapse clusters max_group_allele_value: {max_group_allele_value}, try to reassgin collaspe utg... ")
+                            num_clusters = len(check_cluster_dict)
+                            logger.info(f"Chr{chr_num}: Direct clustering -> check the number of clusters: {num_clusters}, target:{args.hap_number} ")
+                        
+                            if num_clusters == args.hap_number:
+                                cluster_numbr_eq = True
+                                break
+
+                        if not cluster_numbr_eq:
+                            continue
+                        else:
+                            satisfy_clusters_list.append((check_cluster_dict, max_group_allele_value))
+
+                        if int(max_group_allele_value) > 1000000:
+                            logger.info(f"Chr{chr_num}: Direct clustering -> uncollapse clusters max_group_allele_value: {max_group_allele_value}, discard... ")
+                            continue
+                        else:
+                            logger.info(f"Chr{chr_num}: Direct clustering -> uncollapse clusters max_group_allele_value: {max_group_allele_value}, try to reassgin collaspe utg... ")
+                            min_variance_idx, min_allele_length, cluster_length_list = reassign(args.collapse_num_file, utg_rescue_file, filtered_links_file, check_cluster_dict , args.RE_file, partig_file, args.output_prefix, True, no_expand_partig_file, chr_num)
+                            # Allow for the longest possible utg error allocation
+                            if int(min_allele_length) > 2000000 :
+                            # if int(min_allele_length) > 1000000 + max([pair[1] for pair in utg_RE_len.values()]):
+                                logger.info(f"Chr{chr_num}: Direct clustering -> reassign clusters max_group_allele_value: {min_allele_length}, discard...")
+                                continue
+                            length_check = check_cluster_length(cluster_length_list, args.hap_number)
+
+                            if not check_cluster_length(cluster_length_list, args.hap_number):
+                                logger.info(f"Chr{chr_num}: Direct clustering -> reassign clusters lengths: {','.join([ str(value) for value in cluster_length_list])}, discard...")
+                                continue
+                            else:
+                                logger.info(f"Chr{chr_num}: Direct clustering -> reassign clusters lengths: {','.join([ str(value) for value in cluster_length_list])}, saved...")
+                                uncollapse_clusters_dict[optimal_r] = check_cluster_dict 
+
+                    if uncollapse_clusters_dict:
                         break
+                    else:
+                        raise  Exception("Direct clustering over...")
                 except:
                     cut_value += cut_value_step
                     continue
 
         # 未得到满足的聚类结果
         if cut_value >= cut_value_max:
-            if satisfy_clusters_list:   
+            if satisfy_clusters_list and not uncollapse_clusters_dict:   
                 sorted_satisfy_clusters_list = sorted(satisfy_clusters_list, key=lambda x: x[1])
                 logger.info(f"Chr:{chr_num}: the detection is not met, take the result with the smallest detection value ({sorted_satisfy_clusters_list[0][1]}) as the clustering result.")
                 final_clusters = sorted_satisfy_clusters_list[0][0]
@@ -469,13 +573,6 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                         file.write(f"group{idx+1}\t{len(final_clusters[group])}\t{' '.join(final_clusters[group])}\n")
 
                     
-        # Check the number of clusters
-        with open(cluster_output, 'r') as f:
-            clusters = set(line.split(',')[0].strip() for line in f if line.strip())
-        num_clusters = len(clusters)
-        if num_clusters != args.hap_number:
-            logger.error(f"Chr:{chr_num} clustering error!")
-            return False
 
 
         if args.correct:
@@ -490,13 +587,32 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         else:
             cluster_file = cluster_output
 
-        # Run louvain_reassign_allele.py
-        find_best_isolated, isolated_threshold = True, 0
-        min_variance_idx = louvain_reassign_allele(args.collapse_num_file, utg_rescue_file, filtered_links_file, cluster_file , args.RE_file, partig_file, args.output_prefix, find_best_isolated, no_expand_partig_file, isolated_threshold)
-        logger.info(f"Chr{chr_num}: louvain_reassign_allele find best isolated : {min_variance_idx}")
+
+        reassign_allele_dict = defaultdict()
+
+        if uncollapse_clusters_dict:
+            for r, cluster_dict in uncollapse_clusters_dict.items():
+                min_variance_idx, min_allele_length, cluster_length_list = reassign(args.collapse_num_file, utg_rescue_file, filtered_links_file, cluster_dict , args.RE_file, partig_file, args.output_prefix, True, no_expand_partig_file, chr_num)
+                reassign_allele_dict[r] = min_allele_length
+            
+            sorted_reassign_allele_dict = sorted(reassign_allele_dict.items(), key=lambda x: x[1])
+            min_r_cluster = sorted_reassign_allele_dict[0]
+
+            print(f"min_r_cluster -> {min_r_cluster}")
+
+            min_variance_idx, min_allele_length, cluster_length_list = reassign(args.collapse_num_file, utg_rescue_file, filtered_links_file, uncollapse_clusters_dict[min_r_cluster[0]] , args.RE_file, partig_file, args.output_prefix, True, no_expand_partig_file, chr_num)
+
+        else:
+            if satisfy_clusters_list:
+                min_variance_idx, min_allele_length, cluster_length_list = reassign(args.collapse_num_file, utg_rescue_file, filtered_links_file, final_clusters , args.RE_file, partig_file, args.output_prefix, True, no_expand_partig_file, chr_num)
+            else:
+                return f"Failed to process chromosome {chr_num}: No clusters"
+
+
+
 
         for i in range(int(args.reassign_number)-1):
-            min_variance_idx = louvain_reassign_allele(args.collapse_num_file, utg_rescue_file, filtered_links_file, f"{args.output_prefix}.reassign.cluster.txt", args.RE_file, partig_file, args.output_prefix, find_best_isolated, no_expand_partig_file, isolated_threshold)
+            min_variance_idx, min_allele_length,  cluster_length_list = louvain_reassign_allele(args.collapse_num_file, utg_rescue_file, filtered_links_file, f"{args.output_prefix}.reassign.cluster.txt", args.RE_file, partig_file, args.output_prefix, True, no_expand_partig_file, isolated_threshold)
 
         
         return f"Successfully processed chromosome {chr_num}"
@@ -591,47 +707,6 @@ def main():
         # Log results
         for result in results:
             logger.info(result)
-
-    # Step 4: Merge .reassign.cluster.txt files with modified first column format
-    merged_output = f"{args.output_prefix}.hap.cluster.txt"
-    missing_files = []
-    merged_content = []
-
-    for chr_num in range(1, args.chr_number + 1):
-        reassign_file = os.path.join(pwd, f"chr{chr_num}", f"{args.output_prefix}.reassign.cluster.txt")
-        if not os.path.exists(reassign_file):
-            missing_files.append(reassign_file)
-            continue
-        
-        try:
-            with open(reassign_file, 'r') as f:
-                lines = f.readlines()
-                modified_lines = []
-                for line in lines:
-                    if line.strip(): 
-                        parts = line.strip().split('\t') if '\t' in line else line.strip().split(',')
-                        if len(parts) < 1:
-                            logger.warning(f"Invalid line format in {reassign_file}: {line.strip()}")
-                            continue
-
-                        group_num = parts[0].replace('group', '') if parts[0].startswith('group') else parts[0]
-                        parts[0] = f"Chr{chr_num}g{group_num}"
-                        modified_line = '\t'.join(parts) if '\t' in line else ','.join(parts)
-                        modified_lines.append(modified_line)
-
-                merged_content.extend(modified_lines)
-        except Exception as e:
-            logger.error(f"Failed to process {reassign_file}: {e}")
-            missing_files.append(reassign_file)
-
-    if missing_files:
-        logger.error(f"Missing or failed reassign.cluster.txt files: {missing_files}")
-        raise FileNotFoundError(f"Missing or failed haplotypes phaseing files: {missing_files}")
-
-    # Write merged content to output file
-    with open(merged_output, 'w') as f_out:
-        f_out.write('\n'.join(merged_content) + '\n')
-    logger.info(f"Successfully merged haplotypes phaseing files into {merged_output}")
 
 
 

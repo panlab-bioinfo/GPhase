@@ -17,6 +17,16 @@ def read_fai(fai_file):
 
     return fai_dict, fai_reverse_dict
 
+def read_REs(REFile):
+    ctg_RE_len = defaultdict(tuple)
+    with open(REFile, 'r') as fp:
+        for line in  fp:
+            if line[0] == "#":
+                continue
+            line = line.strip().split()
+            ctg_RE_len[line[0]] = (int(line[1]), int(line[2]))
+    return ctg_RE_len
+
 def add_graph_allele(digraph_file):
 
     graph_allele_dict = defaultdict(tuple)
@@ -42,9 +52,11 @@ def add_graph_allele(digraph_file):
                 graph_allele_dict[tuple(sorted([utg1, utg2]))] = 1
                 # print(f"{utg1}\t{utg2}")
 
-    return graph_allele_dict
+    return graph_allele_dict, G
 
-def read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, graph_allele_dict):
+
+
+def read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, graph_allele_dict, G, ctg_RE_len):
     
     partig_re = defaultdict()
 
@@ -59,10 +71,19 @@ def read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, graph_alle
                 if tuple(sorted([contig1, contig2])) in graph_allele_dict:
                     continue
 
+                # if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1) or ctg_RE_len[contig1][1] < 10000 or ctg_RE_len[contig2][1] < 10000:
+                if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1):
+                    continue
+
                 output_f.write(f"{contig1},{contig2},{line[7]}\n")
 
     with open(output_file, 'a') as output_f2:
         for (utg1, utg2) in graph_allele_dict:
+
+            # if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1) or ctg_RE_len[contig1][1] < 10000 or ctg_RE_len[contig2][1] < 10000:
+            if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1):
+                continue
+
             sim = 1 
             output_f2.write(f"{utg1},{utg2},{sim}\n")
 
@@ -70,6 +91,7 @@ def read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, graph_alle
 def main():
     parser = argparse.ArgumentParser(description="trans partig file", formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-fai', '--fai', required=True, help='fai for asm.fa')
+    parser.add_argument('-r', '--RE_file', required=True, help='length for contig')
     parser.add_argument('-p', '--partig_file', required=True, help='partig file')
     parser.add_argument('-d', '--digraph', required=True, help='digraph file')
     parser.add_argument('-o', '--output', required=True, help='output file')
@@ -79,10 +101,12 @@ def main():
     partig_file = args.partig_file
     output_file = args.output
     digraph_file = args.digraph
+    RE_file = args.RE_file
 
     fai_dict, fai_reverse_dict = read_fai(fai_file)
-    graph_allele_dict = add_graph_allele(digraph_file)
-    read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, graph_allele_dict)
+    ctg_RE_len = read_REs(RE_file)
+    graph_allele_dict, G = add_graph_allele(digraph_file)
+    read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, graph_allele_dict, G, ctg_RE_len)
 
 if __name__ == "__main__":
     main()

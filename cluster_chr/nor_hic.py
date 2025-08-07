@@ -70,9 +70,11 @@ def normalize_links(utg_utg_link_dict, ctg_RE_len_dict, output_file):
             # r1 = float(ctg_RE_len_dict[pair[0]][0])
             # r2 = float(ctg_RE_len_dict[pair[1]][0])
 
-
-            r1 = float(ctg_RE_len_dict[pair[0]][0] / ctg_RE_len_dict[pair[0]][1]) 
-            r2 = float(ctg_RE_len_dict[pair[1]][0] / ctg_RE_len_dict[pair[1]][1])
+            if pair[0] in ctg_RE_len_dict and pair[1] in ctg_RE_len_dict:
+                r1 = float(ctg_RE_len_dict[pair[0]][0] / ctg_RE_len_dict[pair[0]][1]) 
+                r2 = float(ctg_RE_len_dict[pair[1]][0] / ctg_RE_len_dict[pair[1]][1])
+            else:
+                continue
             
 
             # r1 = float(ctg_RE_len_dict[pair[0]][0] * ctg_RE_len_dict[pair[0]][1]) 
@@ -97,7 +99,7 @@ def main():
 
     utg_utg_link_dict = read_noNorFile(csv_file)
     ctg_RE_len_dict = read_REs(res_file)
-    normalize_links_v2(utg_utg_link_dict, ctg_RE_len_dict, output_file)
+    normalize_links(utg_utg_link_dict, ctg_RE_len_dict, output_file)
 
 
 

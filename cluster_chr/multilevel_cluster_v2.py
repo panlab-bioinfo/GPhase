@@ -27,6 +27,7 @@ def read_REs(REFile):
 def Louvain_cluster(g, id_to_node, resolution):
 
     nk.setSeed(42, True)
+    nk.setNumberOfThreads(1)
     partitioner = nk.community.PLM(g, refine=True, gamma=float(resolution))
     partitioner.run()
     partition = partitioner.getPartition()
@@ -82,7 +83,7 @@ def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=No
             chr_len_dict[idx] = sum_length
 
         # threshold = ctg_len_All / int(n_chr) / 3
-        threshold = sum(chr_len_dict.values()) / int(n_chr) / 2
+        threshold = sum(chr_len_dict.values()) / int(n_chr) / 3
         filtered_chr_list = [key for key, value in chr_len_dict.items() if value > threshold]
 
         group = 0

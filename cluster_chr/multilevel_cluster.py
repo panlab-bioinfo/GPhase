@@ -30,7 +30,7 @@ def read_REs(REFile):
     return ctg_RE_len
 
 
-def Multilevel_cluster(csv_file, output_file, resolution, check, RE_file, Allele_cluster, n_chr):
+def Multilevel_cluster(csv_file, output_file, resolution, check=False, RE_file=None, Allele_cluster=None, n_chr=None):
 
     if RE_file:
         ctg_RE_len = read_REs(RE_file)

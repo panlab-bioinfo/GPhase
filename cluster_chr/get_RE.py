@@ -26,6 +26,12 @@ def write_output_to_file(results, output_prefix):
         for seq_id, count, seq_length in results:
             f.write(f"{seq_id}\t{count}\t{seq_length}\n")
 
+def Get_RE(fasta_file, output_prefix, enzyme_site="GATC"):
+
+    results = count_restriction_sites(fasta_file, enzyme_site)
+    write_output_to_file(results, output_prefix)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Gets the RE file form fasta.")
     parser.add_argument("-f", "--fasta", required=True, help="fasta file.")
@@ -41,10 +47,7 @@ def main():
     output_prefix = args.output_prefix
 
 
-    results = count_restriction_sites(fasta_file, enzyme_site)
-
-
-    write_output_to_file(results, output_prefix)
+    Get_RE(fasta_file, output_prefix, enzyme_site="GATC")
 
 if __name__ == "__main__":
     main()

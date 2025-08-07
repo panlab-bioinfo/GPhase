@@ -5,13 +5,21 @@ import glob
 import logging
 import os
 import subprocess
+import shutil
 import sys
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from collections import defaultdict
 from pathlib import Path
 from typing import List, Tuple, Optional, Union
+from trans_pairs import Trans_pairs
 from get_subgraph_scaffold import Get_subgraph_scaffold
 from get_data_HapHiC_sort import Get_data_HapHiC_sort
+from rescue_base_graph import Rescue_base_graph
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'cluster_chr')))
+from get_RE import Get_RE
+
 
 def setup_logging(log_file: str = "scaffold.log") -> logging.Logger:
     """Configure logging to both file and console."""
@@ -41,6 +49,7 @@ def parse_arguments() -> argparse.Namespace:
     base_group  = parser.add_argument_group('>>> Parameters for basic data')
     base_group.add_argument("-f", "--fa_file", metavar='\b', required=True,help="Fasta file")
     base_group.add_argument("-r", "--RE_file", metavar='\b', required=True,help="Path to RE file")
+    base_group.add_argument("-e", "--enzyme_site", metavar='\b', default="GATC",help="Restriction enzyme file.")
 
     cluster_group  = parser.add_argument_group('>>> Parameters of the file for the haplotype clustering results')
     cluster_group.add_argument("-CHP", "--cluster_hap_path",metavar='\b', required=True, help="Path to cluster hap directory")
@@ -51,7 +60,6 @@ def parse_arguments() -> argparse.Namespace:
     graph_group.add_argument("-d", "--digraph_file", metavar='\b', required=True,help="Directed graph resulting from GFA conversion")
 
     hic_group  = parser.add_argument_group('>>> Parameters for HiC data alignment')
-    hic_group.add_argument("--map_file_type",metavar='\b', default="pa5", choices=['bam', 'pa5'], type=str.lower,help="HiC mapping file type")
     hic_group.add_argument("-m", "--map_file", metavar='\b', required=True,help="HiC mapping file")
     hic_group.add_argument("-l", "--HiC_file", metavar='\b', required=True,help="HiC links file")
 
@@ -71,20 +79,96 @@ def parse_arguments() -> argparse.Namespace:
 
     haphic_group  = parser.add_argument_group('>>> Parameters for HapHiC sort')
     haphic_group .add_argument("--min_len", metavar='\b',type=int, default=100, help="minimum scaffold length(kb), default: 100")
-    haphic_group .add_argument("--mutprob", metavar='\b', type=float, default=0.6, help="mutation probability in the genetic algorithm, default: 0.6")
-    haphic_group .add_argument("--ngen", metavar='\b', type=int, default=20000, help="number of generations for convergence, default: 20000")
-    haphic_group .add_argument("--npop", metavar='\b', type=int, default=200, help="mopulation size, default: 200")
+    haphic_group .add_argument("--mutprob", metavar='\b', type=float, default=0.3, help="mutation probability in the genetic algorithm, default: 0.3")
+    haphic_group .add_argument("--ngen", metavar='\b', type=int, default=5000, help="number of generations for convergence, default: 5000")
+    haphic_group .add_argument("--npop", metavar='\b', type=int, default=100, help="mopulation size, default: 100")
     haphic_group .add_argument("--processes", metavar='\b', type=int, default=32, help="processes for fast sorting and ALLHiC optimization, default: 32")
 
     
     return parser.parse_args()
 
+def trans_agp(agp_file, original_agp, output_file):
+
+    scaffold_map = defaultdict(list)
+
+    with open(agp_file) as f:
+        for line in f:
+            if line.startswith("#") or line.strip() == "":
+                continue
+            fields = line.strip().split('\t')
+            scaffold = fields[0]
+            if len(fields) >= 9 and "scaffold" in fields[5]:
+                target = fields[5]
+                ori = fields[8]
+                scaffold_map[scaffold].append((ori, target))
+
+    with open(output_file, "w") as out:
+        for i, (scaffold, pairs) in enumerate(scaffold_map.items(), 1):
+            if not pairs:
+                continue
+
+            ori, target = pairs[0]
+
+            if len(pairs) == 1:
+                with open(original_agp) as orig_f:
+                    for line in orig_f:
+                        if line.startswith("#") or line.strip() == "":
+                            out.write(line)
+                            continue
+                        fields = line.strip().split('\t')
+                        if fields[0] == target:
+                            fields[0] = scaffold
+                            out.write('\t'.join(fields) + "\n")
+            else:
+
+                join_string = ",".join([ori + tgt for ori, tgt in pairs]) + "\t" + scaffold
+
+                with open("joins.txt", "w") as jf:
+                    jf.write(join_string)
+
+                cmd = ["agptools", "join", "joins.txt", original_agp, "-n100"]
+                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+                for line in result.stdout.splitlines():
+                    if scaffold in line:
+                        out.write(line + "\n")
+
+                os.remove("joins.txt")
+                        
+
+def split_pairs(hap_num, chr_num, map_file, logger):
+
+    tmp_file = f"tmp_{hap_num}.txt"
+    cut_command = f"cut -f1 group{hap_num}.txt > {tmp_file}"
+    if not run_command([cut_command], shell=True, logger=logger):
+        return False
+
+    awk_cmd = f"""awk 'NR==FNR{{lines[$1];next}}
+    {{
+        if($2!=before_utg){{
+            before_utg=$2;
+            before_utg_in_set=($2 in lines);
+        }}
+        if(before_utg_in_set){{
+            if(before_utg_in_set && ($4 in lines)){{
+                print $1"\\t"$2"\\t"$3"\\t"$4"\\t"$5"\\t"$6;
+            }}
+        }}
+    }}' {tmp_file} {map_file} > chr{chr_num}g{hap_num}.pairs"""
+    if not run_command([awk_cmd], shell=True, logger=logger):
+        return False
+
+    cleanup_command = f"rm {tmp_file}"
+    if not run_command([cleanup_command], shell=True, logger=logger):
+        return False
+
+
 def run_command(cmd: List[str], logger, cwd: Optional[str] = None, shell: bool = False, stdout=None) -> bool:
     """Execute a shell command."""
     try:
-        logger.info(f"Running command: {cmd}")
+        # logger.info(f"Running command: {cmd}")
         subprocess.run(cmd, cwd=cwd, shell=shell, check=True)
-        logger.info(f"Running command successfully: {cmd}")
+        # logger.info(f"Running command successfully: {cmd}")
         return True
     except subprocess.CalledProcessError as e:
         logger.error(f"Command failed: {' '.join(cmd)}")
@@ -118,6 +202,15 @@ def process_one_Contig(file_path):
         else:
             os.symlink(file_path, file_name)  
             return None
+
+def sort_file(input_file):
+
+    with open(input_file, 'r') as f:
+        lines = f.readlines()
+
+    lines.sort()
+    with open(input_file, 'w') as f:
+        f.writelines(lines)
 
 
 def process_chromosome(pwd: str, chr_num: int, args: argparse.Namespace,logger) -> bool:
@@ -203,72 +296,56 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
         if not run_command(["samtools", "faidx", f"chr{chr_num}g{hap_num}.fa"], logger=logger):
             return False
 
-        if args.map_file_type == "pa5":
+        # split pairs
+        split_pairs(hap_num, chr_num, args.map_file, logger)
 
-            tmp_file = f"tmp_{hap_num}.txt"
-            cut_command = f"cut -f1 group{hap_num}.txt > {tmp_file}"
-            if not run_command([cut_command], shell=True,logger=logger):
-                return False
+        # Run YAHS
+        if not run_command([
+            "yahs",
+            f"chr{chr_num}g{hap_num}.fa",
+            f"chr{chr_num}g{hap_num}.pairs",
+            "-a", "subgraph_sort.agp",
+            "-o", "yahs_iter_1",
+            "--file-type", "pa5",  "-q0"
+        ], logger=logger):
+            return False
 
-            awk_cmd = f"""awk 'NR==FNR{{lines[$1];next}}{{if(NF < 8 && $2 in lines){{print $0;next}}if($2 in lines && $4 in lines){{print $1"\\t"$2"\\t"$3"\\t"$4"\\t"$5}}}}' {tmp_file} {args.map_file} > chr{chr_num}g{hap_num}.pairs"""
-            if not run_command([awk_cmd], shell=True, logger=logger):
-                return False
+        # trans pairs
+        Trans_pairs("yahs_iter_1_scaffolds_final.agp", f"chr{chr_num}g{hap_num}.pairs", "yahs_iter_2.pairs") 
 
-            cleanup_command = f"rm {tmp_file}"
-            if not run_command([cleanup_command], shell=True, logger=logger):
-                return False
+        # Create fasta index
+        if not run_command(["samtools", "faidx", f"yahs_iter_1_scaffolds_final.fa"], logger=logger):
+            return False
 
-            # Run YAHS
-            contig_ec = "--no-contig-ec" if args.no_contig_ec else ""
-            scaffold_ec = "--no-scaffold-ec" if args.no_scaffold_ec else ""
-            if not run_command([
-                "yahs",
-                f"chr{chr_num}g{hap_num}.fa",
-                f"chr{chr_num}g{hap_num}.pairs",
-                "-a", "subgraph_sort.agp",
-                "-o", "subgraph_yahs",
-                "--file-type", "pa5", f"{contig_ec}", f"{scaffold_ec}", "-q0"
-            ], logger=logger):
-                return False
+        # Run YAHS_iter_2
+        if not run_command([
+            "yahs",
+            "yahs_iter_1_scaffolds_final.fa",
+            "yahs_iter_2.pairs",
+            "-o", "yahs_iter_2",
+            "--file-type", "pa5", "--no-contig-ec", "--no-scaffold-ec", "-q0"
+        ], logger=logger):
+            return False
 
+        Get_RE("yahs_iter_2_scaffolds_final.fa", "yahs_iter_2", f"{args.enzyme_site}")
+        
         # Update scaffold names
         for file_pattern, sed_cmd in [
-            ("subgraph_yahs_scaffolds_final.agp", f"s/^/chr{chr_num}g{hap_num}_/g"),
-            ("subgraph_yahs_scaffolds_final.fa", f"s/>/>chr{chr_num}g{hap_num}_/g"),
-            ("subgraph_sort.agp", f"s/^/chr{chr_num}g{hap_num}_/g"),
+            ("yahs_iter_2_scaffolds_final.agp", f"s/^/chr{chr_num}g{hap_num}_/g"),
+            ("yahs_iter_2_scaffolds_final.fa", f"s/>/>chr{chr_num}g{hap_num}_/g"),
         ]:
             if not run_command(["sed", "-i", sed_cmd, file_pattern], logger=logger):
                 return False
 
-        # Set up scaffold_HapHiC_sort directory
-        scaffold_dir = os.path.join(hap_dir, "scaffold_HapHiC_sort")
-        os.makedirs(scaffold_dir, exist_ok=True)
-        os.chdir(scaffold_dir)
+        # trans agp
+        trans_agp("yahs_iter_2_scaffolds_final.agp", "yahs_iter_1_scaffolds_final.agp", "yahs_iter_2_scaffolds_final_trans.agp")
 
-        # Create links in scaffold directory
-        links_list = [f"chr{chr_num}g{hap_num}/subgraph_yahs.bin", \
-                    f"chr{chr_num}g{hap_num}/chr{chr_num}g{hap_num}.fa", \
-                    f"chr{chr_num}g{hap_num}/subgraph_yahs_scaffolds_final.agp", \
-                    f"chr{chr_num}g{hap_num}/subgraph_sort.agp", \
-                    args.RE_file]
-
-        if args.map_file_type == "bam":
-            links_list.append(f"chr{chr_num}g{hap_num}/chr{chr_num}g{hap_num}.bam")
-        elif args.map_file_type == "pa5":
-            links_list.append(f"chr{chr_num}g{hap_num}/chr{chr_num}g{hap_num}.pairs")
-
-        for src in links_list:
-            try:
-                os.symlink(os.path.join(pwd, f"chr{chr_num}", src), os.path.basename(src))
-            except FileExistsError:
-                pass
 
         # Run get_data_HapHiC_sort.py
-        if args.map_file_type == "pa5":
-            flag = Get_data_HapHiC_sort(f"chr{chr_num}g{hap_num}.pairs", "pa5",  "subgraph_yahs_scaffolds_final.agp", args.RE_file, f"{args.output_prefix}.chr{chr_num}g{hap_num}", args.min_len)
-            if not flag:
-                logger.error(f"Error : Chr{chr_num}g{hap_num} get data for HapHiC -> {str(e)}")
-                return False 
+        flag = Get_data_HapHiC_sort(f"yahs_iter_2.pairs",  "yahs_iter_2_scaffolds_final.agp", "yahs_iter_2.RE_counts.txt", f"{args.output_prefix}.chr{chr_num}g{hap_num}", args.min_len)
+        if not flag:
+            logger.error(f"Error : Chr{chr_num}g{hap_num} get data for HapHiC -> {str(e)}")
+            return False 
 
 
         logger.info(f"Haplotype {hap_num} of chromosome {chr_num} processing completed.")
@@ -277,7 +354,8 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
         logger.error(f"Error processing chr{chr_num}g{hap_num}: {str(e)}")
         return False
 
-def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
+def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
+
     """Perform final merging steps."""
     logger.info(f"Starting final merge steps...")
     script_path = os.path.abspath(sys.path[0])
@@ -290,7 +368,7 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
         os.chdir(os.path.join(haphic_dir, "split_clms"))
 
         # Link CLM files
-        clm_files = glob.glob(os.path.join(pwd, "chr*/chr*/scaffold_HapHiC_sort", f"{args.output_prefix}.*chr*g*.clm"))
+        clm_files = glob.glob(os.path.join(pwd, "chr*/chr*/", f"{args.output_prefix}.*chr*g*.clm"))
         for clm_file in clm_files:
             try:
                 os.symlink(clm_file, os.path.basename(clm_file))
@@ -299,7 +377,7 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
 
         # Link RE files
         os.chdir(os.path.join(haphic_dir, "groups_REs"))
-        re_files = glob.glob(os.path.join(pwd, "chr*/chr*/scaffold_HapHiC_sort/", f"{args.output_prefix}.chr*g*scaffold*txt"))
+        re_files = glob.glob(os.path.join(pwd, "chr*/chr*/", f"{args.output_prefix}.chr*g*scaffold*txt"))
         for re_file in re_files:
             try:
                 re = process_one_Contig(re_file)
@@ -310,22 +388,22 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
 
         os.chdir(haphic_dir)
 
-        # Merge AGP files
-        with open(f"{args.output_prefix}.merge.agp", 'w') as outfile:
-            for agp_file in glob.glob(os.path.join(pwd, "chr*/chr*/scaffold_HapHiC_sort/subgraph_yahs_scaffolds_final.agp")):
-                with open(agp_file) as infile:
-                    outfile.write(infile.read())
-
 
         # Merge HT files
         with open(f"{args.output_prefix}.merge.HT.pkl", 'wb') as outfile:
-            for ht_file in glob.glob(os.path.join(pwd, "chr*/chr*/scaffold_HapHiC_sort/*HT*")):
+            for ht_file in glob.glob(os.path.join(pwd, "chr*/chr*/*HT*")):
                 with open(ht_file, 'rb') as infile:
                     outfile.write(infile.read())
 
         # Merge scaffold files
         with open(f"{args.output_prefix}.merge.fa", 'w') as outfile:
-            for scaffold_file in glob.glob(os.path.join(pwd, "chr*/chr*/subgraph_yahs_scaffolds_final.fa")):
+            for scaffold_file in glob.glob(os.path.join(pwd, "chr*/chr*/yahs_iter_2_scaffolds_final.fa")):
+                with open(scaffold_file) as infile:
+                    outfile.write(infile.read())
+
+        # Merge trans agp for get final agp
+        with open(f"{args.output_prefix}.merge.agp", 'w') as outfile:
+            for scaffold_file in glob.glob(os.path.join(pwd, "chr*/chr*/yahs_iter_2_scaffolds_final_trans.agp")):
                 with open(scaffold_file) as infile:
                     outfile.write(infile.read())
 
@@ -367,37 +445,37 @@ def perform_final_merge(pwd: str, args: argparse.Namespace,logger) -> bool:
             return False
         logger.info("HapHiC build completed.")
 
-        # get final agp (using agptools)
-        os.chdir(haphic_dir)
-        os.makedirs(os.path.join(haphic_dir, "final_agp"), exist_ok=True)
-        os.chdir(os.path.join(haphic_dir, "final_agp"))
 
-        for i in range(1, int(args.chr_number) + 1):
-            for j in range(1, int(args.hap_number) + 1):
-                # Step 1: Extract rows from scaffolds.agp
-                subprocess.run(f"grep chr{i}g{j} ../scaffolds.agp > chr{i}g{j}.agp", shell=True)
+        try:
+            # get final agp
+            trans_agp("scaffolds.agp", f"{args.output_prefix}.merge.agp", "../gphase_final.agp")
 
-                # Step 2: Process and convert the data from .agp file into .joins.txt
-                with open(f"chr{i}g{j}.agp", 'r') as infile, open(f"chr{i}g{j}.joins.txt", 'w') as outfile:
+            # rescue and connect utg base graph
+            os.chdir(os.path.join(haphic_dir, "../"))
+            Rescue_base_graph(args.digraph_file, "gphase_final.agp", args.gfa_file, args.RE_file, args.fa_file)
+            logger.info("GPhase rescue completed.")
 
-                    first_scaffold = True
-                    for line in infile:
-                        cols = line.strip().split()
+            # sort file
+            sort_file("gphase_final.agp")
+            sort_file("gphase_final_rescue.agp")
 
-                        if first_scaffold:
-                            first_scaffold = False
-                        elif cols[8] == "+" or cols[8] == "-":
-                            outfile.write(",")
-                           
-                        if cols[8] == "+":
-                            outfile.write(f"{cols[5]}")
-                        elif cols[8] == "-":
-                            outfile.write(f"-{cols[5]}")
+            # get rescue fasta
+            haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
+            cmd = [f"{haphic_utils_dir}/agp_to_fasta", "gphase_final_rescue.agp", f"{args.fa_file}"]
 
-                # Step 4: Join using agptools
-                subprocess.run(f"agptools join chr{i}g{j}.joins.txt <(grep 'chr{i}g{j}' ../{args.output_prefix}.merge.agp) -n 100 -e proximity_ligation | "
-                            f"awk -v i={i} -v j={j} 'BEGIN{{OFS=\"\\t\"}}{{$1=\"Chr\"i\"g\"j; print $0}}' >> {args.output_prefix}.final.agp", shell=True)
+            with open("gphase_final_rescue.fasta", "w") as outfile:
+                if subprocess.run(cmd, stdout=outfile).returncode != 0:
+                    return False
+
+            # rename scaffolds.sort.fa
+            src_file = os.path.join(haphic_dir, "scaffolds.sort.fa")
+            dst_file = "gphase_final.fasta"
+            shutil.copy(src_file, dst_file)
         
+        except:
+            logger.info("Final conversion error.")
+            return False
+
         return True
     except Exception as e:
         logger.error(f"Error during final merge: {str(e)}")
@@ -438,9 +516,9 @@ def main():
                 sys.exit(1)
 
     # Final merge
-    logger.info("Performing final merge steps...")
-    if not perform_final_merge(pwd, args,logger):
-        logger.error("Error in final merge steps")
+    logger.info("haphic sort and final rescue...")
+    if not haphic_sort(pwd, args,logger):
+        logger.error("Error in haphic sort and final rescue")
         sys.exit(1)
     
     logger.info("Program completed successfully.")

@@ -69,7 +69,7 @@ def multilevel_cluster(csv_file, output_file, resolution=1, check=None, RE_file=
 
     if check:
         # 检查有效聚类簇数目
-        # 1:阈值设置为平均聚类簇长度的 1/10
+        # 1:阈值设置为平均聚类簇长度的 1/3
         # 2: 簇中平均contigs长度小于平均contig长度中位数的1/7 （防止聚类到核糖体）
         
         ctg_RE_len = read_REs(RE_file)
