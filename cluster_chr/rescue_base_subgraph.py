@@ -112,8 +112,6 @@ def get_chr_cluster(subgraph_unCluster_ctgs_dict, ctg_subgraph_unCluster_dict, r
 
     for group, dict_ in subgraph_unClusterRm_hicGroup_dict.items():
         sorted_dict_ = dict(sorted(dict_.items(), key=lambda item: item[1], reverse=True))
-        if group == 166 or group == "166":
-            print(sorted_dict_)
 
         if not sorted_dict_:
             continue

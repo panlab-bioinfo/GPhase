@@ -249,10 +249,7 @@ samtools faidx ${fa_file}
 awk 'BEGIN{print "## pairs format v1.0.0\n##columns: readID chrom1 pos1 chrom2 pos2 mapQ"}{print "##chromsize: "$1" "$2}' ${fa_file}.fai > map.chromap.pairs
 samtools view -@ 8 "${map_file}" | awk -v scaffold_q="${scaffold_q}" '{if($7=="=")$7=$3;if($5>=scaffold_q)print $1"\t"$3"\t"$4"\t"$7"\t"$8"\t"$5}' >> map.chromap.pairs
 
-# cat <( grep '^#' map.chromap.pairs ) <( grep '^#' -v map.chromap.pairs | sort --parallel=32  -k2,2 -k4,4 ) >map.chromap.sort.pairs
-# # Generate the links file
-# awk -v cluster_q="$cluster_q" '{if(substr($1,1,1) != "#" && $2 != $4 && $6 >= cluster_q){print $2,$4}}' map.chromap.sort.pairs | \
-#         uniq -c | awk '{print $2","$3","$1}' > ${output_prefix}.chromap.links.csv
+
 
 # get hic links from pairs
 run_step "python  ${SCRIPT_DIR}/../cluster_chr/get_links.py -i map.chromap.pairs -o ${output_prefix} -q ${cluster_q}"
