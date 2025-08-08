@@ -265,7 +265,7 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
 
         # Run get_data_HapHiC_sort.py
         if args.map_file_type == "pa5":
-            flag = Get_data_HapHiC_sort(f"chr{chr_num}g{hap_num}.pairs", "pa5",  "subgraph_yahs_scaffolds_final.agp", args.RE_file, f"{args.output_prefix}.chr{chr_num}g{hap_num}", args.min_len)
+            flag = Get_data_HapHiC_sort(f"chr{chr_num}g{hap_num}.pairs",  "subgraph_yahs_scaffolds_final.agp", args.RE_file, f"{args.output_prefix}.chr{chr_num}g{hap_num}", args.min_len)
             if not flag:
                 logger.error(f"Error : Chr{chr_num}g{hap_num} get data for HapHiC -> {str(e)}")
                 return False 

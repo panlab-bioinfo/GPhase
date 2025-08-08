@@ -314,7 +314,7 @@ ln -s "../cluster_chr/group_ctgs_All.txt"
 ln -s "../cluster_chr/${output_prefix}.digraph.csv"
 ln -s "../preprocessing/map.chromap.pairs"
 
-run_step "python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m map.chromap.pairs -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}"
+run_step "python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap_v2.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m map.chromap.pairs -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}"
 
 # Step 5: Final Output
 # LOG_INFO ${log_file} "run" "Created output directory: gphase_final"

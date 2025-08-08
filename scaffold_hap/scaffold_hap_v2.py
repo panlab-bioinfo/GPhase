@@ -342,10 +342,20 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
 
 
         # Run get_data_HapHiC_sort.py
-        flag = Get_data_HapHiC_sort(f"yahs_iter_2.pairs",  "yahs_iter_2_scaffolds_final.agp", "yahs_iter_2.RE_counts.txt", f"{args.output_prefix}.chr{chr_num}g{hap_num}", args.min_len)
-        if not flag:
-            logger.error(f"Error : Chr{chr_num}g{hap_num} get data for HapHiC -> {str(e)}")
-            return False 
+        try:
+            flag = Get_data_HapHiC_sort(
+                "yahs_iter_2.pairs",
+                "yahs_iter_2_scaffolds_final.agp",
+                "yahs_iter_2.RE_counts.txt",
+                f"{args.output_prefix}.chr{chr_num}g{hap_num}",
+                args.min_len
+            )
+            if not flag:
+                logger.error(f"Error: Chr{chr_num}g{hap_num} get data for HapHiC")
+                return False
+        except Exception as e:
+            logger.error(f"Error: Chr{chr_num}g{hap_num} get data for HapHiC -> {str(e)}")
+            return False
 
 
         logger.info(f"Haplotype {hap_num} of chromosome {chr_num} processing completed.")

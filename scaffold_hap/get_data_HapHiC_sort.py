@@ -149,7 +149,7 @@ def Get_data_HapHiC_sort(map_file, agp_file, RE_file, output_prefix, min_len=0):
 
         return True
     except:
-        False
+        return False
 
 
 
