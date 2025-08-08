@@ -10,6 +10,7 @@ import pandas as pd
 import sys
 from multilevel_cluster_v2 import Multilevel_cluster
 from argcomplete.completers import FilesCompleter
+from pipeline_allele import Pipeline_allele
 
 def setup_logging(log_file: str = "cluster_chr.log") -> logging.Logger:
     """Configure logging to both file and console."""
@@ -100,7 +101,7 @@ def run_partig(fa_file, partig_k, partig_w, partig_c, partig_m, output_prefix,lo
 def convert_partig_output(fa_file, partig_k, partig_w, partig_c, partig_m, output_prefix,RE_file, logger):
     script_path = os.path.abspath(sys.path[0])
     flag = run_command([
-        "python", os.path.join(script_path, "trans.partig.py"),
+        "python", os.path.join(script_path, "trans_partig.py"),
         "-fai", f"{fa_file}.fai",
         "-p", f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt",
         "-o", f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.csv",
@@ -111,19 +112,13 @@ def convert_partig_output(fa_file, partig_k, partig_w, partig_c, partig_m, outpu
         return True
     return False 
 
-def run_pipeline_allele(split_gfa_file, HiC_file, RE_file, partig_file, output_prefix,logger):
-    script_path = os.path.abspath(sys.path[0])
-    flag = run_command([
-        "python", os.path.join(script_path, "pipeline.allele.py"),
-        "-g", split_gfa_file,
-        "-l", HiC_file,
-        "-r", RE_file,
-        "-a", partig_file,
-        "-n", output_prefix
-    ], "Running pipeline.allele.py", logger)
-    if flag:
-        return True
-    return False 
+def run_pipeline_allele(split_gfa_file, HiC_file, RE_file, partig_file, output_prefix, n_chr,logger):
+
+    try:
+        Pipeline_allele(split_gfa_file, HiC_file, RE_file, partig_file, output_prefix, n_chr)
+    except:
+        return False 
+    return True
 
 def run_trans_cluster(output_prefix, logger):
     script_path = os.path.abspath(sys.path[0])
@@ -140,12 +135,12 @@ def run_trans_cluster(output_prefix, logger):
 def run_pipeline_chr(output_prefix, HiC_file, logger):
     script_path = os.path.abspath(sys.path[0])
     flag = run_command([
-        "python", os.path.join(script_path,"pipeline.chr.py"),
+        "python", os.path.join(script_path,"pipeline_chr.py"),
         "-c", f"{output_prefix}.allele.cluster.expand.txt",
         "-l", HiC_file,
         "-s", "group_ctgs_save.txt",
         "-n", output_prefix
-    ], "Running pipeline.chr.py", logger)
+    ], "Running pipeline_chr.py", logger)
     if flag:
         return True
     return False 
@@ -193,7 +188,7 @@ def run_multilevel_cluster(output_prefix, chr_number, logger, max_attempts=50):
         if attempt < 5:
             iter_num = 1
         elif attempt >= 5:
-            iter_num = 5
+            iter_num = 1
 
         for i in range(iter_num):
 
@@ -311,22 +306,21 @@ def main():
         logger.error("Split GFA Error: An error occurred while splitting the GFA.")
         return
 
-    split_gfa_file = f"{args.output_prefix}.rmTip.split.gfa"
 
-    partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.csv"
-
+    # # # Step 1: Run partig
+    partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.txt"
+    trans_partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.csv"
     if not os.path.isfile(partig_file):
-
         if not run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix,logger):
             logger.error("Run partig Error: An error occurred while running Partig.")
             return
-
+    if not os.path.isfile(trans_partig_file):
         if not convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix, args.RE_file,logger):
-            logger.error("Conversion partig Error: in Partig output to CSV.")
+            logger.error("Conversion partig Error: An error occurred while conversing Partig output to CSV.")
             return
 
-
-    if not run_pipeline_allele(split_gfa_file, args.HiC_file, args.RE_file, partig_file, args.output_prefix, logger):
+    split_gfa_file = f"{args.output_prefix}.rmTip.split.gfa"
+    if not run_pipeline_allele(split_gfa_file, args.HiC_file, args.RE_file, trans_partig_file, args.output_prefix, args.chr_number,logger):
         logger.error("Run allele_cluster Error: An error occurred while running allele_cluster.")
         return
 

@@ -43,19 +43,6 @@ def read_RE(REFile):
             ctg_RE_dict[line[0]] = (line[1], line[2])
     return ctg_RE_dict
 
-
-# def read_l(l):
-#     hic_nei_dict = defaultdict(set)
-#     hic_links_dict = defaultdict()
-#     with open(l, 'r') as file:
-#         for line in file:
-#             if line.startswith("utg") or line.startswith("utig") :
-#                 line = line.strip().split(',')
-#                 hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
-#                 hic_nei_dict[line[0]].add(line[1])
-#                 hic_nei_dict[line[1]].add(line[0])
-#     return hic_links_dict, hic_nei_dict
-
 def read_l(l):
     hic_nei_dict = defaultdict(set)
     hic_links_dict = {}
@@ -68,7 +55,6 @@ def read_l(l):
             if row[0].startswith(('utg', 'utig')):
                 a, b, w = row[0], row[1], float(row[2])
 
-                # 用 tuple 排序缓存减少运算
                 key = (a, b) if a < b else (b, a)
 
                 hic_links_dict[key] = w
@@ -84,6 +70,7 @@ def read_allele(allele_file):
             line = line.strip().split(',')
             if line[0].startswith("u") and line[1].startswith("u"):
                 allele_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
+
     return allele_dict
 
 def read_c(c):
@@ -178,8 +165,7 @@ def cluster(group_ctg_dict, ctg_group_dict, hic_links_dict, allele_dict):
         group_links_dict[ tuple(sorted([ctg_group_dict[ctg1], ctg_group_dict[ctg2]]))] += value if value > 0 else 0
 
     for (ctg1, ctg2) in allele_dict:
-        group_allele_dict[ tuple(sorted([ctg_group_dict[ctg1], ctg_group_dict[ctg2]]))] += \
-                                                        allele_dict[tuple(sorted([ctg1,ctg2]))]
+        group_allele_dict[ tuple(sorted([ctg_group_dict[ctg1], ctg_group_dict[ctg2]]))] += float(allele_dict[tuple(sorted([ctg1,ctg2]))])
         
 
 
@@ -195,18 +181,18 @@ def cluster(group_ctg_dict, ctg_group_dict, hic_links_dict, allele_dict):
     
     with open('group.allele.csv', 'w') as file:
         file.write("source,target,links\n")
-
         for ctg1, ctg2 in group_allele_dict:
             if  ctg1 != ctg2 and ctg1 in group_ctg_dict and ctg2 in group_ctg_dict:
                 file.write(f"{ctg1},{ctg2},{group_allele_dict[tuple(sorted([ctg1, ctg2]))]}\n")
+    
 
-def expand_cluster(csv_file, group_ctg_dict, output_prefix):
+def expand_cluster(csv_file, group_ctg_dict, output_prefix, n_chr):
 
     cluster_file = f"{output_prefix}.allele.cluster.txt"
     with open(csv_file, 'r') as f:
         row_count = sum(1 for _ in f) - 1 
 
-    if row_count > len(group_ctg_dict):
+    if row_count > n_chr:
         Multilevel_cluster(csv_file, cluster_file, 1, False, None, None, None)
         cluster_dict, utg_group_dict = read_c(cluster_file)
     else:
@@ -228,6 +214,21 @@ def expand_cluster(csv_file, group_ctg_dict, output_prefix):
         for group in cluster_dict:
             file.write(f"{group}\t{len(cluster_dict[group])}\t{' '.join(cluster_dict[group])}\n")
 
+
+def Pipeline_allele(split_gfa_file, HiC_file, RE_file, partig_file, output_prefix, n_chr):
+
+    graph, utgs_list = read_gfa(split_gfa_file)
+    ctg_RE_dict = read_RE(RE_file)
+    hic_links_dict, hic_nei_dict = read_l(HiC_file)
+    allele_dict = read_allele(partig_file)
+
+    group_ctg_dict, ctg_group_dict = trans_net(utgs_list, graph, ctg_RE_dict)
+    cluster(group_ctg_dict, ctg_group_dict, hic_links_dict, allele_dict)
+
+    csv_file = 'group.allele.csv'
+    expand_cluster(csv_file, group_ctg_dict,output_prefix, n_chr)
+
+
     
 
 
@@ -242,6 +243,8 @@ if __name__ == '__main__':
                         help='<filepath>REs and length for utgs')
     parser.add_argument('-a', '--allele', required=True,
                         help='<filepath>allele utgs pair for chromosome')
+    parser.add_argument('--n_chr', required=True,
+                        help='<int>Desired number of clusters corresponding to chromosomes.')
     parser.add_argument('-n', '--name', required=True,
                         help='<str> output prefix')
 
@@ -254,15 +257,6 @@ if __name__ == '__main__':
     l = args.links
     allele_file = args.allele
     output_prefix = args.name
+    n_chr = args.n_chr
 
-
-    graph, utgs_list = read_gfa(gfa_filePath)
-    ctg_RE_dict = read_RE(REFile)
-    hic_links_dict, hic_nei_dict = read_l(l)
-    allele_dict = read_allele(allele_file)
-
-    group_ctg_dict, ctg_group_dict = trans_net(utgs_list, graph, ctg_RE_dict)
-    cluster(group_ctg_dict, ctg_group_dict, hic_links_dict, allele_dict)
-
-    csv_file = 'group.allele.csv'
-    expand_cluster(csv_file, group_ctg_dict,output_prefix)
+    Pipeline_allele(gfa_filePath, l, REFile, allele_file, output_prefix, n_chr)
