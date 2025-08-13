@@ -61,7 +61,7 @@ def read_l(l):
             if not (line.startswith("utg") or line.startswith("utig")):
                 continue
             line = line.rstrip('\n')
-            # 手动找逗号分割，避免 split() 慢
+
             idx1 = line.find(',')
             idx2 = line.find(',', idx1 + 1)
             node1 = line[:idx1]
@@ -118,7 +118,7 @@ def allele_sort(unreassign_groups_hic):
 def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, cluster_dict, utg_group_dict, ctg_RE_len, allele_dict, ctg_allele_dict, no_expand_allele_dict, isolated_threshold, output_prefix, write_flag=False):
 
     log_file = open("reassign_collapse.log", 'a')
-    reassign_utg_list = [ utg for utg in correct_collapse_num_dict if (correct_collapse_num_dict[utg] > 1 or correct_collapse_num_dict[utg] == -1)and utg in utgs_list]
+    reassign_utg_list = [ utg for utg in correct_collapse_num_dict if (correct_collapse_num_dict[utg] > 1 or correct_collapse_num_dict[utg] == -1) and utg in utgs_list]
 
     # 计算collapse utg 对每个cluster的hic信号总数和allele的片段总长
     collapse_utg_group_links_dict = defaultdict(lambda: defaultdict(float))
@@ -173,17 +173,18 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
             unreassign_groups_allele_sorted = dict(sorted(unreassign_groups_allele.items(), \
                                             key=allele_sort(unreassign_groups_hic)))
 
-            # print(f"{collapse_utg}\t{unreassign_groups_hic_sorted}\n{unreassign_groups_allele}\t{unreassign_groups_allele_sorted}")
+
 
             
             max_hic_group = list(unreassign_groups_hic_sorted)[0]
             min_allele_group = list(unreassign_groups_allele_sorted)[0]
             min_allele_group, max_allele_group = list(unreassign_groups_allele_sorted)[0], list(unreassign_groups_allele_sorted)[n_hap - len(reassign_list) -1]
 
+            # 可能会导致collapse utg copy数目不足
             if unreassign_groups_hic_sorted[max_hic_group] == 0 and unreassign_groups_allele_sorted[max_allele_group] ==0:
                 continue
 
-            # 记录 可以分配的 group
+            # 可以分配的 group
             hic_list = list(unreassign_groups_hic_sorted.keys())
             allele_list = list(unreassign_groups_allele_sorted.values())
 

@@ -23,7 +23,7 @@ usage() {
     echo "|  --scaffold_q       <scaffold_q>             : Filter mapQ value when using HiC in the scaffolding step, default: 0"
     echo "|"
     echo "|>>> clustering chromosomes Parameters:"
-    echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 2"
+    echo "|  --split_gfa_n      <split_gfa_n>            : Number of common neighbors when splitting GFA, default: 5"
     echo "|  --chr_pm           <partig_chr_pm>          : Similarity of partig when clustering chr, default: 0.9"
     echo "|"
     echo "|>>> clustering haplotypes Parameters:"
@@ -59,7 +59,7 @@ output_prefix=""
 enzyme_site="GATC"
 cluster_q=1
 scaffold_q=0
-split_gfa_n="2"
+split_gfa_n="5"
 chr_pm="0.95"
 hap_pm="0.60"
 thread="12"

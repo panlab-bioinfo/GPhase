@@ -25,8 +25,7 @@ def setup_logging(log_file: str = "scaffold.log") -> logging.Logger:
     """Configure logging to both file and console."""
     logger = logging.getLogger('genome_scaffolding')
     logger.setLevel(logging.INFO)
-    
-    # File handler
+
     fh = logging.FileHandler(log_file)
     fh.setLevel(logging.INFO)
     
@@ -466,16 +465,15 @@ def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
             logger.info("GPhase rescue completed.")
 
             # sort file
-            sort_file("gphase_final.agp")
-            sort_file("gphase_final_rescue.agp")
+            # sort_file("gphase_final.agp")
+            # sort_file("gphase_final_rescue.agp")
 
-            # get rescue fasta
-            haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
-            cmd = [f"{haphic_utils_dir}/agp_to_fasta", "gphase_final_rescue.agp", f"{args.fa_file}"]
-
-            with open("gphase_final_rescue.fasta", "w") as outfile:
-                if subprocess.run(cmd, stdout=outfile).returncode != 0:
-                    return False
+            # # get rescue fasta
+            # haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
+            # cmd = [f"{haphic_utils_dir}/agp_to_fasta", "gphase_final_rescue.agp", f"{args.fa_file}"]
+            # with open("gphase_final_rescue.fasta", "w") as outfile:
+            #     if subprocess.run(cmd, stdout=outfile).returncode != 0:
+            #         return False
 
             # rename scaffolds.sort.fa
             src_file = os.path.join(haphic_dir, "scaffolds.sort.fa")

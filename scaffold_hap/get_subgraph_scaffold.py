@@ -646,12 +646,6 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--REFile', required=True,
                         help='<filepath>Length and REs of contig or unitig')
 
-    # group_file = "group4.txt"
-    # subgraph_file = "group_ctgs_All.txt"
-    # gfa_filePath = "waxapple.asm.bp.p_utg.gfa"
-    # subgraph_links_file = "subgraph_digraph.csv"
-    # l = "group4.links.csv"
-    # REFile = "alignment.counts_GATC.txt"
 
     args = parser.parse_args()
     group_file = args.group_file
@@ -662,25 +656,3 @@ if __name__ == '__main__':
     hic_link_file = args.hic_link
 
     Get_subgraph_scaffold(digraph_file, REFile, hic_link_file, group_file, subgraph_file, gfa_filePath)
-
-    
-
-
-    # digraph_dict = read_digraph(digraph_file)
-    # ctg_RE_dict = read_RE(REFile)
-    # hic_links_dict, hic_nei_dict = read_l(hic_link_file)
-
-    # ctgs_list = read_group(group_file)
-
-    # subgraph_ctgs_dict, ctg_subgraph_dict = read_subgraph(subgraph_file)
-    # filter_subgraph_ctgs_dict, filter_ctg_subgraph_dict = filter_subgraph(subgraph_ctgs_dict, ctg_subgraph_dict, ctgs_list)
-
-    # subgraph_connect_dict = get_subgraph_link(digraph_dict, subgraph_ctgs_dict, ctg_subgraph_dict)
-
-    # topo_order_list = connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict)
-    # graphs_dict, global_digraph = get_filter_subgraph_digraph(filter_subgraph_ctgs_dict, filter_ctg_subgraph_dict, gfa_filePath, topo_order_list, digraph_dict)
-    # filter_subgraph_sort_dir_dict, filter_subgraph_sort_dict = get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict, global_digraph)
-
-    # get_AGP(filter_subgraph_sort_dir_dict, ctg_RE_dict)
-
-
