@@ -1,9 +1,9 @@
-GPhase: A phasing assembly tool using assembly graphs and Hi-C data
+# GPhase: A phasing assembly tool using assembly graph and Hi-C data
 
-
+GPhase is a powerful tool for typing genome assemblies using assembly graphs and Hi-C data. 
 ---
 # Installation
-
+To install GPhase, follow these steps:
 ```
 git clone https://github.com/panlab-bioinfo/GPhase.git
 cd GPhase
@@ -14,8 +14,7 @@ conda activate gphase
 ```
 
 # Aligning Hi-C data to assembly
-#### tips: When the default MAPQ parameters of chromap do not work well, you can appropriately lower the MAPQ-threshold parameter value to obtain more Hi-C alignment data.
-
+To align Hi-C reads to the genome assembly, use chromap or other alignment tools, such as bwa. When using chromap, if the default MAPQ parameters do not produce satisfactory results, you can lower the --MAPQ-threshold value to include more Hi-C alignment information. When using other alignment software, you need to sort the bam file.
 ```
 chromap -i -r asm.fa -o index
 chromap --preset hic -x index -r asm.fa -q 0 \
@@ -25,32 +24,24 @@ samtools view -@ 64 -bh -o map.chromap.bam map.chromap.sam
 ```
 
 # Estimating of the number of contig collapses based on HiC data and popCNV
-By default, popCNV_pipeline.sh will use the file ending with fastaq.gz in the directory as HiFi data. [popCNV](https://github.com/sc-zhang/popCNV)
-
-1. `asm.fa` : your genome assembly file in FASTA format (Unitigs).
-2. `p` : The prefix for the output files.
-3. `t` : The number of threads.
+The popCNV_pipeline.sh script estimates the copy number of collapsed contigs collapse based on HiFi data or NGS data using the popCNV software. The file used by popCNV for GPhase input is `collapse_num.txt` : popcnv/06.genes.round.cn. For details, see [popCNV](https://github.com/sc-zhang/popCNV)
 ```
 /path/to/GPhase/pipeline/popCNV_pipeline.sh \
 -f asm.fa \
+-r reads.fq.gz \
 -p output_prefix \
 -t 32
 ```
-`collapse_num.txt` : popcnv/06.genes.round.cn
-
 
 
 # Running the GPhase scaffolding pipeline
-| Scaffolding Pipeline : subGraph_scaffold + YaHs [YaHS](https://github.com/c-zhou/yahs) + HapHiC [HapHiC](https://github.com/zengxiaofei/HapHiC)
-
-1. `asm.fa` :  your genome assembly file in FASTA format (Unitigs).
-2. `p_utg.gfa` : the GFA file representing the assembly graph.
-3. `collapse_num.txt` : the file that number information for collapse unitigs (popCNV output file: popcnv/06.genes.round.cn).
-4. `map.chromap.bam` : the mapping file used to map the Hi-C reads.
-5. `n_chr` : the number of chromosomes.
-6. `n_hap` : the number of haplotypes.
-7. `p` : The prefix for the output files.
-
+1. `asm.fa` :  Genome assembly file in FASTA format (unitigs).
+2. `p_utg.gfa` : Assembly graph file in GFA format.
+3. `collapse_num.txt` : File with contig collapse information (from popCNV: popcnv/06.genes.round.cn).
+4. `map.chromap.bam` : BAM file with mapped Hi-C reads.
+5. `n_chr` : Number of chromosomes.
+6. `n_hap` : Number of haplotypes.
+7. `p` : Prefix for output files.
 ```
 /path/to/GPhase/gphase pipeline\
  -f asm.fa \
@@ -63,10 +54,8 @@ By default, popCNV_pipeline.sh will use the file ending with fastaq.gz in the di
 ```
 
 # Output file
-- path: gphase_output/gphase_final
-- file:   
-    1. `*.scaffolds.fasta` : final genome assembly fasta file
-    2.  `*.final.agp` : final genome assembly agp file
-
-
-
+- gphase_final.agp : final assembly result agp file
+- gphase_final.fasta : final assembly result fasta file
+- gphase_final_rescue.agp : agp file of the final assembly result after rescue
+- gphase_final_rescue.fasta : fasta file of the final assembly result after rescue
+- gphase_final_contig.fasta : contig-level assembly result

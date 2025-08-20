@@ -204,12 +204,33 @@ def process_one_Contig(file_path):
 
 def sort_file(input_file):
 
-    with open(input_file, 'r') as f:
-        lines = f.readlines()
+    lines_to_sort = []
+    header_lines = []
 
-    lines.sort()
+    # 读取文件并区分注释行
+    with open(input_file, 'r') as f:
+        for line in f:
+            if line.startswith('#'):
+                header_lines.append(line)
+            else:
+                parts = line.strip().split('\t')
+                if len(parts) >= 2:
+                    scaffold = parts[0]
+                    start = int(parts[1])
+                    lines_to_sort.append((scaffold, start, line))
+                else:
+                    # 不符合格式的直接保留
+                    lines_to_sort.append(("", 0, line))
+
+    # 按 scaffold 和 start 排序
+    lines_to_sort.sort(key=lambda x: (x[0], x[1]))
+
+    # 写回文件
     with open(input_file, 'w') as f:
-        f.writelines(lines)
+        for hl in header_lines:
+            f.write(hl)
+        for _, _, line in lines_to_sort:
+            f.write(line)
 
 
 def process_chromosome(pwd: str, chr_num: int, args: argparse.Namespace,logger) -> bool:
@@ -465,15 +486,15 @@ def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
             logger.info("GPhase rescue completed.")
 
             # sort file
-            # sort_file("gphase_final.agp")
-            # sort_file("gphase_final_rescue.agp")
+            sort_file("gphase_final.agp")
+            sort_file("gphase_final_rescue.agp")
 
             # # get rescue fasta
-            # haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
-            # cmd = [f"{haphic_utils_dir}/agp_to_fasta", "gphase_final_rescue.agp", f"{args.fa_file}"]
-            # with open("gphase_final_rescue.fasta", "w") as outfile:
-            #     if subprocess.run(cmd, stdout=outfile).returncode != 0:
-            #         return False
+            haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
+            cmd = [f"{haphic_utils_dir}/agp_to_fasta", "gphase_final_rescue.agp", f"{args.fa_file}"]
+            with open("gphase_final_rescue.fasta", "w") as outfile:
+                if subprocess.run(cmd, stdout=outfile).returncode != 0:
+                    return False
 
             # rename scaffolds.sort.fa
             src_file = os.path.join(haphic_dir, "scaffolds.sort.fa")

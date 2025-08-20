@@ -101,14 +101,6 @@ def find_other_group(hic_links_dict, cluster_modify_dict, min_utg):
 
     return links_sorted_dict
 
-    
-
-            
-
-
-
-
-
 def run_cor_cluster(collapse_num_dict, hic_links_dict, cluster_dict, utg_group_dict, allele_key_dict, utgs_list, n_hap):
 
     cluster_modify_dict = copy.deepcopy(cluster_dict)
@@ -121,7 +113,7 @@ def run_cor_cluster(collapse_num_dict, hic_links_dict, cluster_dict, utg_group_d
     cluster_copy_dict = copy.deepcopy(cluster_modify_dict)
 
     
-    for group_ in list(cluster_modify_dict.keys()):  # 使用副本迭代
+    for group_ in list(cluster_modify_dict.keys()):  
         Allele_utg_pair = set(tuple(sorted([utg1, utg2]))
                             for utg1 in cluster_modify_dict[group_]
                             for utg2 in cluster_modify_dict[group_]
@@ -170,14 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('-n_hap', '--n_hap', required=True,
                         help='<filepath> hap number')
             
-    # argcomplete.autocomplete(parser)
     args = parser.parse_args()
-
-    # collapse_num_file = "06.genes.round.cn"
-    # chr_file = "chr1g1.txt"
-    # l = "test.allhic.csv"
-    # allele_file =  "chr1.allele.csv"
-    # c = "test.cluster.txt"
 
     collapse_num_dict = read_collapse_num(args.collapse_num)
     utgs_list = read_chr_utgs(args.chr_file)

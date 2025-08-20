@@ -246,15 +246,15 @@ fi
 
 # Generate the pairs from bam
 samtools faidx ${fa_file}
-awk 'BEGIN{print "## pairs format v1.0.0\n##columns: readID chrom1 pos1 chrom2 pos2 mapQ"}{print "##chromsize: "$1" "$2}' ${fa_file}.fai > map.chromap.pairs
-samtools view -@ 8 "${map_file}" | awk -v scaffold_q="${scaffold_q}" '{if($7=="=")$7=$3;if($5>=scaffold_q)print $1"\t"$3"\t"$4"\t"$7"\t"$8"\t"$5}' >> map.chromap.pairs
+awk 'BEGIN{print "## pairs format v1.0.0\n##columns: readID chrom1 pos1 chrom2 pos2 mapQ"}{print "##chromsize: "$1" "$2}' ${fa_file}.fai > map.pairs
+samtools view -@ 8 "${map_file}" | awk -v scaffold_q="${scaffold_q}" '{if($7=="=")$7=$3;if($5>=scaffold_q)print $1"\t"$3"\t"$4"\t"$7"\t"$8"\t"$5}' >> map.pairs
 
 
 
 # get hic links from pairs
-run_step "python  ${SCRIPT_DIR}/../cluster_chr/get_links.py -i map.chromap.pairs -o ${output_prefix} -q ${cluster_q}"
+run_step "python  ${SCRIPT_DIR}/../cluster_chr/get_links.py -i map.pairs -o ${output_prefix} -q ${cluster_q}"
 
-run_step "python  ${SCRIPT_DIR}/../cluster_chr/nor_hic.py -f ${output_prefix}.chromap.links.csv -r ${output_prefix}.RE_counts.txt -o ${output_prefix}.chromap.links.nor.csv"
+run_step "python  ${SCRIPT_DIR}/../cluster_chr/nor_hic.py -f ${output_prefix}.map.links.csv -r ${output_prefix}.RE_counts.txt -o ${output_prefix}.map.links.nor.csv"
 
 if [ $? -ne 0 ]; then
     LOG_INFO ${log_file} "err" "Error: nor_hic.py failed."
@@ -262,7 +262,7 @@ if [ $? -ne 0 ]; then
 fi
 
 RE_file=${output_prefix}.RE_counts.txt
-hic_links=${output_prefix}.chromap.links.nor.csv
+hic_links=${output_prefix}.map.links.nor.csv
 
 # Step 2: Cluster chromosomes
 LOG_INFO ${log_file} "run" "Created output directory: cluster_chr"
@@ -270,7 +270,7 @@ cd ../ && mkdir -p cluster_chr && cd cluster_chr
 ln -s "../../${fa_file}"
 ln -s "../../${gfa}"
 ln -s "../preprocessing/${output_prefix}.RE_counts.txt"
-ln -s "../preprocessing/${output_prefix}.chromap.links.nor.csv"
+ln -s "../preprocessing/${output_prefix}.map.links.nor.csv"
 
 
 run_step "python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -g ${gfa}  -pm ${chr_pm} --split_gfa_n ${split_gfa_n}"
@@ -309,9 +309,9 @@ ln -s "../cluster_chr/${hic_links}"
 ln -s "../cluster_chr/${gfa}"
 ln -s "../cluster_chr/group_ctgs_All.txt"
 ln -s "../cluster_chr/${output_prefix}.digraph.csv"
-ln -s "../preprocessing/map.chromap.pairs"
+ln -s "../preprocessing/map.map.pairs"
 
-run_step "python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap_v2.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m map.chromap.pairs -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}"
+run_step "python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap_v2.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m map.pairs -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}"
 
 # Step 5: Final Output
 # LOG_INFO ${log_file} "run" "Created output directory: gphase_final"

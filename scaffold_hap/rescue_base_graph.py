@@ -1,127 +1,82 @@
-import networkx as nx
 import argparse
-import copy as cp
 import pandas as pd
 from collections import defaultdict
 from Bio import SeqIO
 from Bio.Seq import Seq
+import igraph as ig
 
 
-
-
-def has_single_shortest_path(G, source, target, weight=None, shortest_len_T=10):
-
-    try:
-        shortest_length = nx.shortest_path_length(G, source, target, weight=weight)
-
-        if shortest_length > shortest_len_T:
-            return False
-
-        path_count = [0]  
-
-        def dfs(current, target, length_so_far, visited):
-            if path_count[0] > 1:  
-                return
-            if current == target:
-                if length_so_far == shortest_length:  
-                    path_count[0] += 1
-                return
-            if length_so_far > shortest_length:  
-                return
-
-
-            for neighbor in G.successors(current):
-                if neighbor not in visited:
-                    edge_weight = 1 if weight is None else G[current][neighbor][weight]
-                    new_length = length_so_far + edge_weight
-                    visited.add(neighbor)
-                    dfs(neighbor, target, new_length, visited)
-                    visited.remove(neighbor)
-
-        dfs(source, target, 0, {source})
-        return path_count[0] == 1
-
-    except nx.NetworkXNoPath:
-        return False
 
 def read_RE(REFile):
-    ctg_RE_dict = defaultdict(tuple)
+    """读取RE文件，返回 {ctg: (RE1, RE2)}"""
+    ctg_RE_dict = {}
     with open(REFile, 'r') as fp:
-        for line in  fp:
-            if line[0] == "#":
+        for line in fp:
+            if line.startswith("#"):
                 continue
-            line = line.strip().split()
-            ctg_RE_dict[line[0]] = (int(line[1]), int(line[2]))
+            parts = line.strip().split()
+            if len(parts) >= 3:
+                ctg_RE_dict[parts[0]] = (int(parts[1]), int(parts[2]))
     return ctg_RE_dict
 
 def read_gfa(file_path):
-    G = nx.DiGraph()
-    
+    """读取GFA文件，返回 dict，记录 forward/reverse list"""
+    gfa_graph = defaultdict(lambda: {"forward_list": [], "reverse_list": [], "edges": {}})
+    utgs_set = set()
     with open(file_path, 'r') as f:
         for line in f:
-            line = line.strip()
             if not line or line.startswith('#'):
-                continue  
-
-            fields = line.split('\t')
-            record_type = fields[0]
-
-            if record_type == 'S':
-                node_id = fields[1]
-                G.add_node(
-                    node_id,
-                    forward_list=[],
-                    reverse_list=[]
+                continue
+            fields = line.strip().split('\t')
+            if fields[0] == 'S':
+                _ = gfa_graph[fields[1]] 
+                utgs_set.add(fields[1])
+            elif fields[0] == 'L':
+                from_node, from_orient, to_node, to_orient, overlap = (
+                    fields[1], fields[2], fields[3], fields[4], fields[5][:-1]
                 )
-
-            elif record_type == 'L':
-                from_node = fields[1]
-                from_orient = fields[2]
-                to_node = fields[3]
-                to_orient = fields[4]
-                overlap = fields[5][:-1]
-                G.add_edge(
-                    from_node,
-                    to_node,
-                    from_orient=from_orient,
-                    to_orient=to_orient,
-                    overlap=overlap
-                )
-                pair = (to_node, to_orient)
                 if from_orient == '+':
-                    G.nodes[from_node]['forward_list'].append(pair)
-                elif from_orient == '-':
-                    G.nodes[from_node]['reverse_list'].append(pair)
-    return G
+                    gfa_graph[from_node]['forward_list'].append((to_node, to_orient))
+                else:
+                    gfa_graph[from_node]['reverse_list'].append((to_node, to_orient))
 
-def read_graph(edge_file):
-    G = nx.DiGraph()
+                overlap_length = int(''.join(filter(str.isdigit, overlap)))
+
+                gfa_graph[from_node]['edges'][(to_node, to_orient)] = overlap_length
+
+    return gfa_graph, utgs_set
+
+def read_graph_igraph(edge_file):
+    """读取边文件并构建 igraph Graph"""
+    edges = []
+    nodes = set()
     with open(edge_file, 'r') as f:
         for line in f:
-            if line.startswith('#'):
+            if not line or line.startswith('#'):
                 continue
             parts = line.strip().split(',')
             if len(parts) >= 2:
-                utgA, utgB = parts[0], parts[1]
-                G.add_edge(utgA, utgB)
-    
-    G_reverse = nx.DiGraph.reverse(G, copy=True)
-    return G, G_reverse
-
+                u, v = parts[0], parts[1]
+                edges.append((u, v))
+                nodes.add(u)
+                nodes.add(v)
+    node_list = sorted(nodes)
+    name_to_idx = {name: idx for idx, name in enumerate(node_list)}
+    edges_idx = [(name_to_idx[u], name_to_idx[v]) for u, v in edges]
+    g = ig.Graph(edges=edges_idx, directed=True)
+    g.vs["name"] = node_list
+    return g, name_to_idx
 
 def read_agp(agp_file):
+    """读取AGP，返回 {scaffold: [(utg, dir), ...]}"""
     scaffolds = defaultdict(list)
     with open(agp_file, 'r') as f:
         for line in f:
             if line.startswith('#'):
                 continue
             parts = line.strip().split('\t')
-            if len(parts) < 6 or parts[4] != 'W':
-                continue
-            scaffold_id = parts[0]
-            utg_id = parts[5]
-            direction = parts[8]
-            scaffolds[scaffold_id].append((utg_id, direction))
+            if len(parts) >= 9 and parts[4] == 'W':
+                scaffolds[parts[0]].append((parts[5], parts[8]))
     return scaffolds
 
 def read_agp_pd(agp_file):
@@ -130,88 +85,62 @@ def read_agp_pd(agp_file):
         sep='\t',
         header=None,
         comment='#',
-        names=['scaffold', 'start', 'end', 'part_num', 'type', 
+        names=['scaffold', 'start', 'end', 'part_num', 'type',
                'object', 'object_beg', 'object_end', 'orientation']
     )
 
 
+def has_single_shortest_path_igraph(g, name_to_idx, source, target, shortest_len_T=10):
+    src_idx = name_to_idx.get(source)
+    tgt_idx = name_to_idx.get(target)
+    if src_idx is None or tgt_idx is None:
+        return False
+    dist = g.shortest_paths_dijkstra(src_idx, tgt_idx)[0][0]
+    if dist == float("inf") or dist > shortest_len_T:
+        return False
+    paths = g.get_all_shortest_paths(src_idx, tgt_idx)
+    return len(paths) == 1
+
+
 def rescue(edge_file, agp_file, gfa_file, REFile):
+    utg_rescue_dict = {}
 
-    utg_rescue_dict = defaultdict(list)
-
-    G, G_reverse = read_graph(edge_file)
+    g, name_to_idx = read_graph_igraph(edge_file)
     scaffolds = read_agp(agp_file)
-    gfa_graph = read_gfa(gfa_file)
+    gfa_graph, utgs_set = read_gfa(gfa_file)
     ctg_RE_dict = read_RE(REFile)
-    find_path_graph = cp.deepcopy(G)
-
-
-    used_utgs = set() 
-    utg_rescue_dict = defaultdict(list)
 
     for scaffold_id, utgs in scaffolds.items():
-
         for i in range(len(utgs) - 1):
-            (utg1,dir1), (utg2, dir2) = utgs[i], utgs[i + 1]
-
-            if utg1 in used_utgs or utg2 in used_utgs:
+            (utg1, dir1), (utg2, dir2) = utgs[i], utgs[i + 1]
+            if utg1 not in name_to_idx or utg2 not in name_to_idx:
                 continue
 
-            if utg1 in list(G.nodes()) and utg2 in list(G.nodes()):
+            if has_single_shortest_path_igraph(g, name_to_idx, utg1, utg2):
+                try:
+                    vpaths = g.get_shortest_paths(name_to_idx[utg1], to=name_to_idx[utg2], output="vpath")[0]
+                    path_names = [g.vs[idx]["name"] for idx in vpaths]
 
-                if dir1 == "+":
-                    successors = list(G.successors(utg1))
-                    utg_forward_set = set(pair[0] for pair in gfa_graph.nodes()[utg1]['forward_list'])
-                    if set(successors) & utg_forward_set:
-                        find_path_graph = cp.deepcopy(G)
-                    else:
-                        find_path_graph = cp.deepcopy(G_reverse)
+                    path_utg_dir_list = [(utg1, dir1)]
+                    before_utg, before_dir = utg1, dir1
+                    for _utg in path_names[1:]:
+                        if _utg == utg2:
+                            path_utg_dir_list.append((utg2, dir2))
+                        else:
+                            if any(x[0] == _utg for x in gfa_graph[before_utg]['forward_list']):
+                                before_dir = "+"
+                            elif any(x[0] == _utg for x in gfa_graph[before_utg]['reverse_list']):
+                                before_dir = "-"
+                            path_utg_dir_list.append((_utg, before_dir))
+                            before_utg = _utg
 
-                else:
-                    successors = list(G.successors(utg1))
-                    utg_reverse_set = set(pair[0] for pair in gfa_graph.nodes()[utg1]['reverse_list'])
-                    if set(successors) & utg_reverse_set:
-                        find_path_graph = cp.deepcopy(G_reverse)
-                    else:
-                        find_path_graph = cp.deepcopy(G)
-
-
-                # if only one path
-                if has_single_shortest_path(find_path_graph, source=utg1, target=utg2, weight=None):
-
-                    try:
-                        path = nx.shortest_path(find_path_graph, source=utg1, target=utg2)
-                        path_utg_dir_list = [tuple([utg1, dir1])]
-                        before_utg, before_dir = utg1, dir1
-
-                        if any(utg in used_utgs for utg in path[1:-1]):
-                            continue
-
-                        for _utg in path[1:]:
-                            if _utg not in ctg_RE_dict:
-                                break
-                            if _utg == utg2:
-                                pair = (utg2, dir2)
-                            else:
-                                try:
-                                    utg_forward_set = set(pair[0] for pair in gfa_graph.nodes()[before_utg]['forward_list'])
-                                    utg_reverse_set = set(pair[0] for pair in gfa_graph.nodes()[before_utg]['reverse_list'])
-                                    if gfa_graph.has_edge(before_utg, _utg):
-                                        before_dir = gfa_graph.edges[before_utg, _utg]['to_orient']
-                                    pair = (_utg, before_dir)
-                                    before_utg = _utg
-                                except:
-                                    continue
-                            path_utg_dir_list.append(pair)
-
-                        if path_utg_dir_list:     
-                            utg_rescue_dict[(utg1, utg2)] = path_utg_dir_list
-                    except:
-                        print("error...")
-
+                    utg_rescue_dict[(utg1, utg2)] = path_utg_dir_list
+                except Exception:
+                    continue
     return utg_rescue_dict
 
-def update_agp_with_insert_lists(agp_df, insert_dict, ctg_RE_dict):
+
+def update_agp_with_insert_lists(agp_df, insert_dict, ctg_RE_dict, utgs_set):
     updated_rows = []
     grouped = agp_df.groupby("scaffold", sort=False)
 
@@ -250,6 +179,8 @@ def update_agp_with_insert_lists(agp_df, insert_dict, ctg_RE_dict):
 
                     for idx, _utg in enumerate(insert_path):
 
+                        if _utg not in utgs_set:
+                            continue
                         insert_begin = int(row["start"]) + bp_set_off
 
                         new_group.append({
@@ -257,7 +188,7 @@ def update_agp_with_insert_lists(agp_df, insert_dict, ctg_RE_dict):
                             "start": insert_begin,
                             "end": insert_begin + ctg_RE_dict[_utg[0]][1],
                             "part_num": int(row['part_num']) + idx_set_off,
-                            "type": 'W', 
+                            "type": 'W',
                             "object": _utg[0],
                             "object_beg": 1,
                             "object_end": ctg_RE_dict[_utg[0]][1],
@@ -271,7 +202,7 @@ def update_agp_with_insert_lists(agp_df, insert_dict, ctg_RE_dict):
                             "start": insert_begin + ctg_RE_dict[_utg[0]][1] + 1,
                             "end": insert_begin + ctg_RE_dict[_utg[0]][1] + 100,
                             "part_num": int(row['part_num']) + idx_set_off,
-                            "type": 'U', 
+                            "type": 'U',
                             "object": 100,
                             "object_beg": 'scaffold',
                             "object_end": 'yes',
@@ -291,17 +222,16 @@ def update_agp_with_insert_lists(agp_df, insert_dict, ctg_RE_dict):
                     continue
 
             elif row['type'] in ['U', 'N']:
-
                 new_group.append({
                     "scaffold": scaffold,
                     "start": int(row['start']) + bp_set_off,
                     "end": int(row['end']) + bp_set_off,
                     "part_num": int(row['part_num']) + idx_set_off,
                     "type": row['type'],
-                    "object": row['object'], 
-                    "object_beg": row['object_beg'], 
-                    "object_end": row['object_end'],  
-                    "orientation": row['orientation'] 
+                    "object": row['object'],
+                    "object_beg": row['object_beg'],
+                    "object_end": row['object_end'],
+                    "orientation": row['orientation']
                 })
                 i += 1
                 continue
@@ -312,30 +242,24 @@ def update_agp_with_insert_lists(agp_df, insert_dict, ctg_RE_dict):
 
     updated_df = pd.DataFrame(updated_rows, columns=agp_df.columns)
     updated_df.to_csv("gphase_final_rescue.agp", sep='\t', index=False, header=False)
-    
     return updated_df
 
 
-def scaffold_sequences_from_agp(updated_df, G, fasta_file):
-
+def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
     def reverse_complement(seq):
         return str(Seq(seq).reverse_complement())
 
-    utg_seq_dict = {}
-    for record in SeqIO.parse(fasta_file, "fasta"):
-        utg_seq_dict[record.id] = str(record.seq)
-
+    utg_seq_dict = {rec.id: str(rec.seq) for rec in SeqIO.parse(fasta_file, "fasta")}
     scaffold_seq_dict = {}
     grouped = updated_df.groupby("scaffold", sort=False)
 
     for scaffold, group in grouped:
         group = group.reset_index(drop=True)
         i = 0
-
         while i < len(group):
             row_current = group.iloc[i]
             if row_current['type'] != 'W':
-                i += 1 
+                i += 1
                 continue
 
             utg_id = row_current['object']
@@ -350,37 +274,47 @@ def scaffold_sequences_from_agp(updated_df, G, fasta_file):
             while j < len(group):
                 row_next = group.iloc[j]
                 if row_next['type'] != 'W':
-                    j += 1 
+                    j += 1
                     continue
 
                 next_utg_id = row_next['object']
                 next_orientation = row_next['orientation']
                 connected = False
-
                 if orientation == '+':
-                    if (next_utg_id, next_orientation) in G.nodes[utg_id]['forward_list']:
+                    if (next_utg_id, next_orientation) in gfa_graph[utg_id]['forward_list']:
                         connected = True
+                        overlap_length = gfa_graph[utg_id]['edges'].get((next_utg_id, next_orientation), 0)
                 elif orientation == '-':
-                    if (next_utg_id, next_orientation) in G.nodes[utg_id]['reverse_list']:
+                    if (next_utg_id, next_orientation) in gfa_graph[utg_id]['reverse_list']:
                         connected = True
+                        overlap_length = gfa_graph[utg_id]['edges'].get((next_utg_id, next_orientation), 0)
 
-                if connected and G.has_edge(utg_id, next_utg_id):
-                    overlap_len = int(G.edges[utg_id, next_utg_id]['overlap'])
+                if connected:
                     next_seq = utg_seq_dict[next_utg_id]
+                    # 使用 updated_df 第七列和第八列裁剪实际序列
+                    try:
+                        start_pos = int(row_next.iloc[6])  
+                        end_pos = int(row_next.iloc[7])   
+                        if start_pos < 1 or end_pos < start_pos or end_pos > len(next_seq):
+                            raise ValueError(f"error: start_pos={start_pos}, end_pos={end_pos} for {next_utg_id}")
+                        actual_length = end_pos - start_pos + 1
+                        next_seq = next_seq[start_pos-1:end_pos]  
+                    except (ValueError, IndexError) as e:
+                        actual_length = len(next_seq)
+
+                    # 根据方向转换
                     if next_orientation == '-':
                         next_seq = reverse_complement(next_seq)
 
-                    # 验证overlap区域
-                    if len(current_seq) >= overlap_len and len(next_seq) >= overlap_len:
-                        current_tail = current_seq[-overlap_len:]
-                        next_head = next_seq[:overlap_len]
-                        if current_tail == next_head:
-                            current_seq = current_seq[:-overlap_len] + next_seq
-                        else:
-                            current_seq = current_seq[:-overlap_len] + next_seq
-                    else:
-                        current_seq = current_seq[:-overlap_len] + next_seq
+                    overlap_length = gfa_graph[utg_id]['edges'].get((next_utg_id, next_orientation), 0)
 
+                    if overlap_length > 0:
+                        if overlap_length >= len(next_seq):
+                            overlap_length = 0
+                        else:
+                            next_seq = next_seq[overlap_length:] 
+
+                    current_seq += next_seq
                     current_components.append(f"{next_utg_id}_{next_orientation}")
                     utg_id = next_utg_id
                     orientation = next_orientation
@@ -394,12 +328,13 @@ def scaffold_sequences_from_agp(updated_df, G, fasta_file):
 
             i = j if j > i else i + 1
 
+    # 添加未在 AGP 的 contig
     agp_utg_ids = set(updated_df[updated_df['type'] == 'W']['object'])
     for utg_id in utg_seq_dict:
         if utg_id not in agp_utg_ids:
-            scaffold_name = f"{utg_id}_+"
-            scaffold_seq_dict[scaffold_name] = utg_seq_dict[utg_id]
+            scaffold_seq_dict[f"{utg_id}_+"] = utg_seq_dict[utg_id]
 
+    # 输出 fasta
     with open("gphase_final_contig.fasta", 'w') as f:
         for scaffold_name, seq in scaffold_seq_dict.items():
             f.write(f">{scaffold_name}\n")
@@ -410,52 +345,27 @@ def scaffold_sequences_from_agp(updated_df, G, fasta_file):
 
 
 def Rescue_base_graph(edge_file, agp_file, gfa_file, REFile, fa_file):
-    G = read_gfa(gfa_file)
+    gfa_graph, utgs_set = read_gfa(gfa_file)
     ctg_RE_dict = read_RE(REFile)
     utg_rescue_dict = rescue(edge_file, agp_file, gfa_file, REFile)
-    
     agp_df = read_agp_pd(agp_file)
-
-    updated_df = update_agp_with_insert_lists(agp_df, utg_rescue_dict, ctg_RE_dict)
-
-    scaffold_sequences_from_agp(updated_df, G, fa_file)
-
-
-
-
-
+    updated_df = update_agp_with_insert_lists(agp_df, utg_rescue_dict, ctg_RE_dict, utgs_set)
+    scaffold_sequences_from_agp(updated_df, gfa_graph, fa_file)
 
 
 if __name__ == '__main__':
-    # edge_file = 'waxapple.digraph.csv' 
-    # agp_file = 'gphase_final.agp'  
-    # gfa_file = "waxapple.ho.asm.bp.p_utg.gfa"
-    # REFile = "waxapple.RE_counts.txt"
-    # fa_file = "waxapple.ho.asm.bp.p_utg.gfa.fa"
-
     parser = argparse.ArgumentParser(description='Rescue scaffolds and generate sequences based on AGP and GFA files.')
     parser.add_argument('-e', '--edge_file', required=True, help='Input edge file')
     parser.add_argument('-a', '--agp_file', required=True, help='Input AGP file')
     parser.add_argument('-g', '--gfa_file', required=True, help='Input GFA file')
     parser.add_argument('-r', '--re_file', required=True, help='Input RE counts file')
     parser.add_argument('-f', '--fasta_file', required=True, help='Input fasta file of unitigs')
-
     args = parser.parse_args()
 
-    edge_file = args.edge_file
-    agp_file = args.agp_file
-    gfa_file = args.gfa_file
-    REFile = args.re_file
-    fa_file = args.fasta_file
-
-    G = read_gfa(gfa_file)
-    ctg_RE_dict = read_RE(REFile)
-    utg_rescue_dict = rescue(edge_file, agp_file, gfa_file, REFile)
-
-
-
-    agp_df = read_agp_pd(agp_file)
-
-    updated_df = update_agp_with_insert_lists(agp_df, utg_rescue_dict, ctg_RE_dict)
-
-    scaffold_sequences_from_agp(updated_df, G, fa_file)
+    Rescue_base_graph(
+        args.edge_file,
+        args.agp_file,
+        args.gfa_file,
+        args.re_file,
+        args.fasta_file
+    )
