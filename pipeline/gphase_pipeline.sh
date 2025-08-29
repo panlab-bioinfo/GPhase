@@ -309,7 +309,7 @@ ln -s "../cluster_chr/${hic_links}"
 ln -s "../cluster_chr/${gfa}"
 ln -s "../cluster_chr/group_ctgs_All.txt"
 ln -s "../cluster_chr/${output_prefix}.digraph.csv"
-ln -s "../preprocessing/map.map.pairs"
+ln -s "../preprocessing/map.pairs"
 
 run_step "python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap_v2.py  -f ${fa_file} -r ${RE_file} -l ${hic_links} -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g ${gfa} -d ${output_prefix}.digraph.csv -m map.pairs -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}"
 

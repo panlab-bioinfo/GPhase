@@ -265,6 +265,15 @@ def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
             utg_id = row_current['object']
             orientation = row_current['orientation']
             seq = utg_seq_dict[utg_id]
+
+            start_pos = int(row_current.iloc[6])  
+            end_pos = int(row_current.iloc[7])   
+
+            if start_pos < 1 or end_pos < start_pos or end_pos > len(seq):
+                raise ValueError(f"error: start_pos={start_pos}, end_pos={end_pos} for {utg_id}")
+            actual_length = end_pos - start_pos + 1
+            seq = seq[start_pos-1:end_pos]  
+            
             if orientation == '-':
                 seq = reverse_complement(seq)
             current_seq = seq

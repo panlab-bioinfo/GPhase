@@ -16,7 +16,7 @@ def process_chromap_pairs(input_file, output_prefix, cluster_q):
 
     counts = filtered.groupby([1, 3], sort=False).size().reset_index(name='count')
 
-    output_file = f"{output_prefix}.chromap.links.csv"
+    output_file = f"{output_prefix}.map.links.csv"
     counts.to_csv(output_file, index=False, header=False)
 
 if __name__ == "__main__":
