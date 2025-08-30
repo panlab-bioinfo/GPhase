@@ -278,7 +278,7 @@ def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
             if orientation == '-':
                 seq = reverse_complement(seq)
             current_seq = seq
-            current_components = [f"{utg_id}_{orientation}"]
+            current_components = [f"{utg_id}:{start_pos}:{end_pos}_{orientation}"]
 
             j = i + 1
             while j < len(group):
@@ -325,7 +325,7 @@ def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
                             next_seq = next_seq[overlap_length:] 
 
                     current_seq += next_seq
-                    current_components.append(f"{next_utg_id}_{next_orientation}")
+                    current_components.append(f"{next_utg_id}:{start_pos}:{end_pos}_{next_orientation}")
                     utg_id = next_utg_id
                     orientation = next_orientation
                     j += 1
@@ -342,7 +342,12 @@ def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
     agp_utg_ids = set(updated_df[updated_df['type'] == 'W']['object'])
     for utg_id in utg_seq_dict:
         if utg_id not in agp_utg_ids:
-            scaffold_seq_dict[f"{utg_id}_+"] = utg_seq_dict[utg_id]
+            row = updated_df[updated_df['object'] == utg_id]
+            if not row.empty:
+                start = row['component_beg'].iloc[0]
+                end = row['component_end'].iloc[0]
+
+                scaffold_seq_dict[f"{utg_id}:{start}:{end}_+"] = utg_seq_dict[utg_id]
 
     # 输出 fasta
     with open("gphase_final_contig.fasta", 'w') as f,  open("gphase_final_ctg2utg.txt", 'w') as f2:
@@ -366,11 +371,14 @@ def utg_to_ctg_agp(updated_df, ctg2utg_file, fasta_file, output_agp="gphase_fina
 
     utg_to_ctg_list = defaultdict(list)  
     pair_pat = re.compile(r"(utg\d+[a-z]?)_([+-])")
+    
     with open(ctg2utg_file) as f:
         for line in f:
             ctg, utgs_str = line.strip().split("\t")
             pairs = pair_pat.findall(utgs_str)
-            for utg_id, orient in pairs:
+            _ = utgs_str.split("_")
+            pairs = [p for p in _ if p not in ["+", "-"]]
+            for utg_id in pairs:
                 utg_to_ctg_list[utg_id].append(ctg)
 
     utg_counter = defaultdict(int)
@@ -391,7 +399,12 @@ def utg_to_ctg_agp(updated_df, ctg2utg_file, fasta_file, output_agp="gphase_fina
                 continue 
 
             utg = row['object']
+            start = row['object_beg']
+            end = row['object_end']
+
+            utg += f":{start}:{end}"
             idx = utg_counter[utg]
+
             if idx >= len(utg_to_ctg_list[utg]):
                 idx = len(utg_to_ctg_list[utg]) - 1
             ctg = utg_to_ctg_list[utg][idx]
@@ -403,9 +416,15 @@ def utg_to_ctg_agp(updated_df, ctg2utg_file, fasta_file, output_agp="gphase_fina
                 nxt_row = group.iloc[j]
                 if nxt_row['type'] == 'W':
                     nxt_utg = nxt_row['object']
+                    start = nxt_row['object_beg']
+                    end = nxt_row['object_end']
+
+                    nxt_utg += f":{start}:{end}"
+
                     nxt_idx = utg_counter[nxt_utg]
                     if nxt_idx >= len(utg_to_ctg_list[nxt_utg]):
                         nxt_idx = len(utg_to_ctg_list[nxt_utg]) - 1
+
                     nxt_ctg = utg_to_ctg_list[nxt_utg][nxt_idx]
                     if nxt_ctg != ctg:
                         break
