@@ -488,11 +488,12 @@ def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
             # sort file
             sort_file("gphase_final.agp")
             sort_file("gphase_final_rescue.agp")
+            sort_file("gphase_final_contig.agp")
 
-            # # get rescue fasta
+            # get rescue fasta
             haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
-            cmd = [f"{haphic_utils_dir}/agp_to_fasta", "gphase_final_rescue.agp", f"{args.fa_file}"]
-            with open("gphase_final_rescue.fasta", "w") as outfile:
+            cmd = [f"{haphic_utils_dir}/agp_to_fasta", "gphase_final_contig.agp", "gphase_final_contig.fasta"]
+            with open("gphase_final_contig_scaffold.fasta", "w") as outfile:
                 if subprocess.run(cmd, stdout=outfile).returncode != 0:
                     return False
 

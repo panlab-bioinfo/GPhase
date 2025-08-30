@@ -54,8 +54,10 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
 ```
 
 # Output file
-- gphase_final.agp : final assembly result agp file
-- gphase_final.fasta : final assembly result fasta file
-- gphase_final_rescue.agp : agp file of the final assembly result after rescue
-- gphase_final_rescue.fasta : fasta file of the final assembly result after rescue
-- gphase_final_contig.fasta : contig-level assembly result
+- `gphase_final.agp` : unitig level assembly result agp file
+- `gphase_final.fasta` : unitig level assembly result fasta file
+- `gphase_final_rescue.agp` :  unitig level assembly result agp file after rescue
+- `gphase_final_ctg2utg.txt` : correspondence between unitig and contig
+- `gphase_final_contig.fasta` : Contig-level fasta sequence
+- `gphase_final_contig.agp` : contig level assembly result agp file
+- `gphase_final_contig_scaffold.fasta` : contig level assembly result fasta file

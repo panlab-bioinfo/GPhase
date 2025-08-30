@@ -4,6 +4,7 @@ from collections import defaultdict
 from Bio import SeqIO
 from Bio.Seq import Seq
 import igraph as ig
+import re
 
 
 
@@ -344,13 +345,114 @@ def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
             scaffold_seq_dict[f"{utg_id}_+"] = utg_seq_dict[utg_id]
 
     # 输出 fasta
-    with open("gphase_final_contig.fasta", 'w') as f:
-        for scaffold_name, seq in scaffold_seq_dict.items():
-            f.write(f">{scaffold_name}\n")
+    with open("gphase_final_contig.fasta", 'w') as f,  open("gphase_final_ctg2utg.txt", 'w') as f2:
+        for idx, (scaffold_name, seq) in enumerate(scaffold_seq_dict.items(), 1):
+
+            ctg_ID = f"ctg{idx:0>6}l"
+            utgs_list = scaffold_name.replace("+", "_").replace("-", "_").split("_")
+
+            f2.write(f"{ctg_ID}\t{scaffold_name}\n")
+
+            f.write(f">{ctg_ID}\n")
             for i in range(0, len(seq), 80):
                 f.write(seq[i:i+80] + '\n')
 
     return scaffold_seq_dict
+
+
+def utg_to_ctg_agp(updated_df, ctg2utg_file, fasta_file, output_agp="gphase_final_contig.agp", gap_len=100):
+
+    ctg_len = {rec.id: len(rec.seq) for rec in SeqIO.parse(fasta_file, "fasta")}
+
+    utg_to_ctg_list = defaultdict(list)  
+    pair_pat = re.compile(r"(utg\d+[a-z]?)_([+-])")
+    with open(ctg2utg_file) as f:
+        for line in f:
+            ctg, utgs_str = line.strip().split("\t")
+            pairs = pair_pat.findall(utgs_str)
+            for utg_id, orient in pairs:
+                utg_to_ctg_list[utg_id].append(ctg)
+
+    utg_counter = defaultdict(int)
+    agp_lines = []
+
+    for scaffold, group in updated_df.groupby("scaffold", sort=False):
+        group = group.reset_index(drop=True)
+        part_number = 1
+        current_pos = 1
+        i = 0
+        prev_ctg = None
+
+        while i < len(group):
+            row = group.iloc[i]
+
+            if row['type'] != 'W':
+                i += 1
+                continue 
+
+            utg = row['object']
+            idx = utg_counter[utg]
+            if idx >= len(utg_to_ctg_list[utg]):
+                idx = len(utg_to_ctg_list[utg]) - 1
+            ctg = utg_to_ctg_list[utg][idx]
+            utg_counter[utg] += 1
+
+
+            j = i + 1
+            while j < len(group):
+                nxt_row = group.iloc[j]
+                if nxt_row['type'] == 'W':
+                    nxt_utg = nxt_row['object']
+                    nxt_idx = utg_counter[nxt_utg]
+                    if nxt_idx >= len(utg_to_ctg_list[nxt_utg]):
+                        nxt_idx = len(utg_to_ctg_list[nxt_utg]) - 1
+                    nxt_ctg = utg_to_ctg_list[nxt_utg][nxt_idx]
+                    if nxt_ctg != ctg:
+                        break
+                    utg_counter[nxt_utg] += 1
+                j += 1
+
+            if prev_ctg is not None and prev_ctg != ctg:
+                agp_lines.append([
+                    scaffold,
+                    current_pos,
+                    current_pos + gap_len - 1,
+                    part_number,
+                    "U",
+                    gap_len,
+                    "scaffold",
+                    "yes",
+                    "proximity_ligation"
+                ])
+                current_pos += gap_len
+                part_number += 1
+
+
+            length = ctg_len.get(ctg)
+            if length is None:
+                raise KeyError(f"CTG '{ctg}' 未在 fasta 文件中找到！")
+            agp_lines.append([
+                scaffold,
+                current_pos,
+                current_pos + length - 1,
+                part_number,
+                "W",
+                ctg,
+                1,
+                length,
+                "+"
+            ])
+            current_pos += length
+            part_number += 1
+
+            prev_ctg = ctg
+            i = j
+
+    with open(output_agp, "w") as f:
+        for line in agp_lines:
+            f.write("\t".join(map(str, line)) + "\n")
+
+    return output_agp
 
 
 def Rescue_base_graph(edge_file, agp_file, gfa_file, REFile, fa_file):
@@ -359,7 +461,11 @@ def Rescue_base_graph(edge_file, agp_file, gfa_file, REFile, fa_file):
     utg_rescue_dict = rescue(edge_file, agp_file, gfa_file, REFile)
     agp_df = read_agp_pd(agp_file)
     updated_df = update_agp_with_insert_lists(agp_df, utg_rescue_dict, ctg_RE_dict, utgs_set)
-    scaffold_sequences_from_agp(updated_df, gfa_graph, fa_file)
+    scaffold_seq_dict = scaffold_sequences_from_agp(updated_df, gfa_graph, fa_file)
+
+    utg_to_ctg_agp(updated_df, "gphase_final_ctg2utg.txt", "gphase_final_contig.fasta", output_agp="gphase_final_contig.agp")
+
+
 
 
 if __name__ == '__main__':
