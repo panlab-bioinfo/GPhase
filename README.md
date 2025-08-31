@@ -1,6 +1,6 @@
-# GPhase: A phasing assembly tool using assembly graph and Hi-C data
+# GPhase: A Phasing Assembly Tool Leveraging an Assembly Graph and Hi-C Data
 
-GPhase is a powerful tool for typing genome assemblies using assembly graphs and Hi-C data. 
+GPhase leverages an assembly graph and Hi-C data to facilitate genome assembly phasing, automatically resolves and assigns collapsed sequences, and fills assembly gaps based on the graph structure.
 ---
 # Installation
 To install GPhase, follow these steps:
