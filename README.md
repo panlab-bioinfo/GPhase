@@ -23,7 +23,7 @@ chromap --preset hic -x index -r asm.fa -q 0 \
 samtools view -@ 64 -bh -o map.chromap.bam map.chromap.sam
 ```
 
-# Estimating of the number of contig collapses based on HiC data and popCNV
+# Estimating of the number of contig collapses based on HiFi data and popCNV
 The popCNV_pipeline.sh script estimates the copy number of collapsed contigs collapse based on HiFi data or NGS data using the popCNV software. The file used by popCNV for GPhase input is `collapse_num.txt` : popcnv/06.genes.round.cn. For details, see [popCNV](https://github.com/sc-zhang/popCNV)
 ```
 /path/to/GPhase/pipeline/popCNV_pipeline.sh \
