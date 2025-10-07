@@ -61,3 +61,19 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
 - `gphase_final_contig.fasta` : Contig-level fasta sequence
 - `gphase_final_contig.agp` : contig level assembly result agp file
 - `gphase_final_contig_scaffold.fasta` : contig level assembly result fasta file
+
+# Test dataset
+To help you quickly verify the functionality of the software, we provide a small test dataset. This dataset contains simulated input data that demonstrates the core functionality of the software. You can download it from this link https://pan.quark.cn/s/1253ac3c6bf3
+
+Use the following command to run the test dataset
+```
+tar -zxvf test_dataset.tar.gz
+bash run_gphase.sh
+```
+# Contact
+This software is developed by Professor Wei-Hua Pan's team at the Shenzhen Institute of Genome Research, Chinese Academy of Agricultural Sciences. 
+
+If you have any questions or concerns while using the software, please submit an issue in the repository or contact us through the following methods:
+### Email:
+#### Prof. Pan: panweihua@caas.cn
+#### Du Wenjie: duwenjie1024@163.com
