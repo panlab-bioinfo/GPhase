@@ -283,7 +283,7 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
 
 
         topo_order = list(nx.topological_sort(subgraph_digraph))
-        # print(f"topo_order:{topo_order}")
+        #print(f"topo_order:{topo_order}")
 
         # check : 相邻两点是否只存在一条路径, 如果没有路径或者存在多条路径则打断,并且无同源节点
         for i in range(len(topo_order)-1):
@@ -323,7 +323,7 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
                         if subgraph in topo_order_list_cp[idx1]:
                             topo_order_list_cp[idx1].remove(subgraph)
     
-    # print(f"Final : {topo_order_list_cp}")
+    #print(f"Final : {topo_order_list_cp}")
     return topo_order_list_cp
 
 
@@ -491,8 +491,8 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
             successors = list(digraph.successors(ctgs_sort[i]))
             predecessors = list(digraph.predecessors(ctgs_sort[i+1]))
 
-            if len(successors) > 1 or len(predecessors) > 1:
-                break_points_set.add(i+1)
+            #if len(successors) > 1 or len(predecessors) > 1:
+            #    break_points_set.add(i+1)
 
 
         except:
