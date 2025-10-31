@@ -63,7 +63,7 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
 - `gphase_final_contig_scaffold.fasta` : contig level assembly result fasta file
 
 # Test dataset
-To help you quickly verify the functionality of the software, we provide a small test dataset. This dataset contains simulated input data that demonstrates the core functionality of the software. You can download it from this link https://pan.quark.cn/s/1253ac3c6bf3
+To help you quickly verify the functionality of the software, we provide a small test dataset. This dataset contains input data that demonstrates the core functionality of the software. You can download it from this link https://drive.google.com/drive/folders/1M_ZlSHBTDwtCHGrUI6uMCVutfIweECaY?usp=sharing
 
 Use the following command to run the test dataset
 ```
