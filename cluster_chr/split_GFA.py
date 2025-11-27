@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from collections import defaultdict, deque
 import csv
 import networkx as nx
@@ -40,7 +42,6 @@ def check_end_point(digraph, utg):
 def split_GFA(gfa_filePath, digraph, nei_level:2, output_prefix):
 
     # unsafety_set = set(utg for utg in digraph.nodes() if utg not in safety_set)
-    # print(unsafety_set)
     predecessors_rmEdges_set = set()
     successors_rmEdges_set = set()
     split_utg_set = set()
@@ -100,10 +101,6 @@ def split_GFA(gfa_filePath, digraph, nei_level:2, output_prefix):
 
 
 if __name__ == '__main__':
-
-    # gfa_filePath = "tetra.asm.bp.p_utg.noseq.gfa"
-
-
     parser = argparse.ArgumentParser(description="split gfa", formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-g', '--gfa_file', required=True, help='gfa file')
     parser.add_argument('-n', '--n', required=False,default=2, type=int, help='Nth-order neighbor')

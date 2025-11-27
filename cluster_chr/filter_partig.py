@@ -1,15 +1,11 @@
+#!/usr/bin/env python3
+
 from collections import defaultdict, deque
 import csv
 import networkx as nx
 import pandas as pd
 import argparse
 
-
-#--------------------------------------#
-# 过滤 等位contig对
-# 非同一子图：两个contig长度大于N80
-# 同一子图：相同前驱和相同后继
-#--------------------------------------#
 
 def read_digraph(digraph_file):
 
@@ -30,7 +26,6 @@ def read_gfa(gfa_filePath):
                 utgs_list.append(line[1])
                 graph.add_node(line[1], length = len(line[2]), seq = line[2], coverage = int(line[4][5:]), visit_count = 1, out=set(), enter=set(), type=None)
             elif(line[0] == "L"): # no self loop
-                # gfa.add_edge(line[1],line[3])
                 graph.add_edge(line[1],line[3],strand1=line[2], strand2=line[4], match=int(line[5][:-1]))
                 if line[2] == '+' :
                     graph.nodes[line[1]]['out'].add(line[3]) 
@@ -200,11 +195,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--partig_file', required=True,
                         help='<filepath>partig file')
 
-    # digraph_file = "c88.split.digraph.csv"
-    # gfa_filePath = "c88.bp.p_utg.noseq.gfa"
-    # REFile = "c88.counts_RE.txt"
     subgraph_file = "group_ctgs_All.txt"
-    # allele_file = "c88.partig.csv"
 
     args = parser.parse_args()
     digraph_file = args.digraph_file

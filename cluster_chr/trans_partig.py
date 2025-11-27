@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from collections import defaultdict
 import pandas as pd
 import networkx as nx
@@ -65,10 +67,9 @@ def nor_partig(weight, ctg1_len, ctg2_len, method="no"):
     elif method == "len-penalty":
         L_mean = (ctg1_len + ctg2_len) / 2
         length_ratio = min([ctg1_len, ctg2_len]) / max([ctg1_len, ctg2_len])
-        beta = 0.1     # 惩罚长度差异的强度
-        gamma = 500000  # 短序列惩罚强度
+        beta = 0.1    
+        gamma = 500000 
         penalty = (1 - length_ratio) * beta
-        # length_weight = L_mean / (L_mean + gamma)
         sim = weight * (1-penalty) * L_mean
     else:
         sim = 0

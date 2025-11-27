@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from collections import defaultdict, Counter
 import csv
 import networkx as nx
@@ -65,7 +67,6 @@ def trans_cluster(cluster_dict, subgraph_ctgs_dict, ctg_subgraph_dict, output_pr
             file.write(f"{group}\t{len(ctg_cluster[group])}\t{' '.join(ctg_cluster[group])}\n")
 
 
-            
 
 if __name__ == '__main__':
 

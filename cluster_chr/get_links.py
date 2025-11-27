@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+
 import pandas as pd
 import argparse
 
@@ -9,10 +12,11 @@ def process_chromap_pairs(input_file, output_prefix, cluster_q):
         comment='#',
         header=None,
         usecols=[1, 3, 5],  
-        dtype={1: str, 3: str, 5: float}  
+        dtype={1: str, 3: str, 5: str}  
     )
 
-    filtered = df[(df[1] != df[3]) & (df[5] >= cluster_q)]
+    df[5] = pd.to_numeric(df[5], errors='coerce')
+    filtered = df[(df[1] != df[3]) & ((df[5] >= cluster_q) | (df[5].isna()))]
 
     counts = filtered.groupby([1, 3], sort=False).size().reset_index(name='count')
 

@@ -1,7 +1,4 @@
-#-----------------------------#
-# 根据allele contig 先聚类，再根据hic信息层次聚类
-# 对subgraph 的过滤：所有节点长度均小于N80
-#-----------------------------#
+#!/usr/bin/env python3
 
 from collections import defaultdict,Counter
 from multilevel_cluster_v2 import Multilevel_cluster
