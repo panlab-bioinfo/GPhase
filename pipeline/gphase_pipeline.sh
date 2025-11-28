@@ -142,6 +142,7 @@ fa_file=""
 gfa=""
 collapse_num_file=""
 map_file=""
+output_prefix="gphase"
 n_chr=""
 n_hap=""
 output_prefix=""
@@ -286,7 +287,7 @@ elif [[ "$map_basename" =~ \.bam$ ]]; then
     run_step "samtools view -@ ${thread} \"$bam_link\" | awk -v q=\"${scaffold_q}\" '(\$5+0 >= q && \$7!=\"=\"){print \$1\"\t\"\$3\"\t\"\$4\"\t\"\$7\"\t\"\$8\"\t\"\$5}' >> \"$tmp_pairs\"" "BAM to pairs conversion"
     mv "$tmp_pairs" map.pairs
 else
-    die "Unsupported map file extension for: $map_basename. Must be .pairs, .pairs.gz, .pair, or .bam"
+    die "Unsupported map file extension for: $map_basename. Must be .pairs or .bam"
 fi
 
 check_file_exists_and_nonempty "map.pairs" "generated map.pairs"
@@ -295,7 +296,8 @@ check_file_exists_and_nonempty "map.pairs" "generated map.pairs"
 run_step "python ${SCRIPT_DIR}/../cluster_chr/get_links.py -i map.pairs -o ${output_prefix} -q ${cluster_q}" "get_links.py"
 links_csv="${output_prefix}.map.links.csv"
 
-if [[ $(wc -l "${links_csv}" | cut -f1) -eq 1 ]]; then
+lines=$(wc -l "${links_csv}" | awk '{print $1}')
+if [[ "${lines}" -eq 1 ]]; then
     die "Error: The link file ${links_csv} must contain exactly 1 data line."
 fi
 
