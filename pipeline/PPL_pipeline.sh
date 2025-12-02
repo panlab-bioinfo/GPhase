@@ -20,7 +20,7 @@ LOG_INFO() {
 usage() {
     echo "|"
     echo "|Run the PPL software using the fasta file and the fastq.gz file"
-    echo "|Usage: $0 -g <genome.fa> -f <reads.fq> [options]"
+    echo "|Usage: $0 -j ./PPL-0.1.1.jar -g <genome.fa> -f <reads.fq> [options]"
     echo "|"
     echo "| Required:"
     echo "|  -j <jar_path>       PPL jar file (required)"
@@ -35,7 +35,7 @@ usage() {
     echo "|  -h                  Show help and exit"
     echo "|"
     echo "|Example:"
-    echo "|  bash $0 -f asm.fa -r reads.fq.gz -p PPL -t 32 -q 1"
+    echo "|  bash $0 -j ./PPL-0.1.1.jar -f asm.fa -r reads.fq.gz -p PPL -t 32 -q 1"
     exit 1
 }
 

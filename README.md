@@ -25,7 +25,7 @@ chromap --preset hic -x index -r asm.fa -q 0 \
 ```
 To process Pore-C data, you can use [PPL Toolbox](https://github.com/versarchey/PPL-Toolbox). GPhase provides a script to run PPL Toolbox. You can quickly run it to get the final pairs file `map.PPL.pairs` and input it into GPhase.
 ```
-/path/to/GPhase/pipeline/PPL_pipeline.sh -j /path/to/PPL-Toolbox-jar \
+/path/to/GPhase/pipeline/PPL_pipeline.sh -j /path/to/PPL-Toolbox.jar \
 -f asm.fa \
 -r reads.fq.gz \
 -p PPL
