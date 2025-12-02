@@ -41,13 +41,15 @@ def get_RE(RE_file, scaffold_ctgs_dict, scaffold_length_dict, output_prefix, min
 
             if contig in ctg_RE_dict:
                 scaffold_RE_dict[scaffold] += ((pair[3]-pair[2]+1) / ctg_RE_dict[contig][1]) * ctg_RE_dict[contig][0]
+
     
+    long_scaffolds = [scaffold for scaffold in scaffold_length_dict if scaffold_length_dict[scaffold] > min_len*1000]
+    min_len = 0 if not len(long_scaffolds) else min_len
     with open(f"{output_prefix}.scaffold.txt", 'w') as file:
         file.write("#Contig\tRECounts\tLength\n")
         for scaffold, value in scaffold_RE_dict.items():
-            if scaffold_length_dict[scaffold] > min_len*1000:
+            if scaffold_length_dict[scaffold] > min_len*1000 :
                 file.write(f"{scaffold}\t{int(value)}\t{scaffold_length_dict[scaffold]}\n")
-
 
     return scaffold_RE_dict
 
@@ -56,8 +58,6 @@ def read_map_file(map_file, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_leng
 
     scaffold_HT_dict = defaultdict(int)
     scaffold_clm_dict = defaultdict(lambda: defaultdict(list))
-
-
     with open(map_file, "r") as file:
 
         for line in file:
@@ -135,9 +135,7 @@ def read_map_file(map_file, scaffold_ctgs_dict, ctg_scaffold_dict, scaffold_leng
                     scaffold_2_dir = "-"
 
                 idx_list = [ str(idx) for idx in list(scaffold_clm_dict[(scaffold_1, scaffold_2)][i])]
-
                 file.write(f"{scaffold_1}{scaffold_1_dir} {scaffold_2}{scaffold_2_dir}\t{len(idx_list)}\t{' '.join(idx_list)}\n")
-
 
     return scaffold_HT_dict, scaffold_clm_dict
 

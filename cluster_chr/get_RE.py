@@ -12,8 +12,8 @@ def count_restriction_sites(fasta_file, enzyme_site):
     enzyme_site = enzyme_site.lower()
 
     for record in SeqIO.parse(fasta_file, "fasta"):
-        sequence = str(record.seq).lower()   
-        count = int(sequence.count(enzyme_site)) + 1     
+        sequence = str(record.seq).lower()
+        count = int(sequence.count(enzyme_site)) + 1
         seq_length = len(sequence)
         result.append((record.id, count, seq_length))
 

@@ -237,30 +237,29 @@ def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, ch
     if not all(check_file_exists_and_not_empty(f, logger) for f in [input_hic_file, input_RE_counts]):
         return False
         
-    current_r = 1.0
+    r = 1.0
     r_start = r_min
     r_end = r_max
     
-    for i in range(max_iter):
+    # for i in range(max_iter):
+    while r_start <= r <= r_end:
+
         if r_end - r_start < tolerance:
             logger.warning(f"r adjustment range is too small ({r_end - r_start:.4f} < {tolerance}). Stopping search.")
             break
-            
-        r = (r_start + r_end) / 2
         
-        logger.info(f"Attempt {i+1}/{max_iter}: Trying r={r:.4f} (range: [{r_start:.4f}, {r_end:.4f}])")
+        logger.info(f"Trying r={r:.4f} (range: [{r_start:.4f}, {r_end:.4f}])")
         
         try:
             cluster_count = Multilevel_cluster(
                 input_hic_file,
                 chr_cluster_output,
-                str(r),
+                int(r),
                 True,
                 input_RE_counts,
                 allele_cluster,
                 int(chr_number)
             )
-            
             if cluster_count is None:
                 logger.error("Multilevel_cluster returned None, check inner component errors.")
                 return False
@@ -273,9 +272,11 @@ def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, ch
             elif cluster_count > chr_number:
                 logger.info(f"Cluster count {cluster_count} > target {chr_number}. Decreasing r (r_end = {r:.4f}).")
                 r_end = r
+                r = (r_start + r_end) / 2
             else: # cluster_count < chr_number
                 logger.info(f"Cluster count {cluster_count} < target {chr_number}. Increasing r (r_start = {r:.4f}).")
                 r_start = r
+                r = (r_start + r_end) / 2
                 
         except Exception as e:
             logger.error(f"Error running Multilevel_cluster with r={r:.4f}: {e}")
@@ -405,17 +406,15 @@ def run_spectral_clustering_fallback(input_hic_file: str, groups_file: str, fina
     
     try:
         try:
-            nodes_df = pd.read_csv(input_hic_file, sep=',', header=0)
-            all_nodes = list(pd.concat([nodes_df.iloc[:, 0], nodes_df.iloc[:, 1]]).unique())
-            num_nodes = len(all_nodes)
-            logger.info(f"Loaded {num_nodes} contigs from {input_hic_file}.")
-        except Exception as e:
-            logger.error(f"Failed to load nodes from {input_hic_file}: {e}")
-            return False
-
-        try:
             edges_df = pd.read_csv(input_hic_file, sep=',', header=0)
             edges_df.columns = ['source', 'target', 'links']
+            try:
+                all_nodes = list(pd.concat([edges_df.iloc[:, 0], edges_df.iloc[:, 1]]).unique())
+                num_nodes = len(all_nodes)
+                logger.info(f"Loaded {num_nodes} contigs from {input_hic_file}.")
+            except Exception as e:
+                logger.error(f"Failed to load nodes from {input_hic_file}: {e}")
+                return False
             
             G = nx.from_pandas_edgelist(
                 edges_df,

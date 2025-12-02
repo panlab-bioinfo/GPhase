@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+
 from collections import defaultdict
 import numpy as np
 import pandas as pd
@@ -11,16 +14,7 @@ import argparse
 def find_best_knee(csv_file, output_prefix):
 
     try:
-        with open(csv_file, 'r') as file:
-            first_line = file.readline()
-            has_header = 1 if first_line == "source,target,links\n" else 0
-            
-        if has_header:
-            data = pd.read_csv(csv_file, sep=",")
-        else:
-            data = pd.read_csv(csv_file, sep=",", header=None)
-            data.columns = ["source", "target", "links"]
-
+        data = pd.read_csv(csv_file, sep=",", header=0)
     except Exception as e:
         print(f"Error reading the CSV file: {e}")
         return None

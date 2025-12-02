@@ -6,19 +6,11 @@ import argparse
 def read_agp(agp_file):
     try:
 
-        agp = pd.read_csv(agp_file, sep='\t', comment='#', header=None,
-                                  names=['scaffold', 'start', 'end', 'part_num', 'type', 
-                                         'component_id', 'component_start', 'component_end', 'orientation'])
-
+        agp = pd.read_csv(agp_file, sep='\t', comment='#', header=None,names=['scaffold', 'start', 'end', 'part_num', 'type', 'component_id', 'component_start', 'component_end', 'orientation'])
         if agp.columns[0] != 'scaffold':
-            agp.columns = ['scaffold', 'start', 'end', 'part_num', 'type', 
-                           'component_id', 'component_start', 'component_end', 'orientation']
-        
-
+            agp.columns = ['scaffold', 'start', 'end', 'part_num', 'type', 'component_id', 'component_start', 'component_end', 'orientation']
         for col in ['start', 'end', 'component_start', 'component_end']:
             agp[col] = pd.to_numeric(agp[col], errors='coerce')
-        
-
         agp = agp.dropna(subset=['start', 'end', 'component_start', 'component_end'])
 
         return agp
@@ -86,19 +78,16 @@ def convert_pairs(pairs_file, contig_map, scaffold_lengths, output_file):
             if contig1 in contig_map:
                 map1 = contig_map[contig1]
                 scaffold1 = map1['scaffold']
-                scaffold_pos1 = map1['scaffold_start'] + (pos1 - 1 if map1['orientation'] == '+' 
-                                                        else map1['length'] - pos1)
+                scaffold_pos1 = map1['scaffold_start'] + (pos1 - 1 if map1['orientation'] == '+' else map1['length'] - pos1)
             else:
                 continue 
 
             if contig2 in contig_map:
                 map2 = contig_map[contig2]
                 scaffold2 = map2['scaffold']
-                scaffold_pos2 = map2['scaffold_start'] + (pos2 - 1 if map2['orientation'] == '+' 
-                                                        else map2['length'] - pos2)
+                scaffold_pos2 = map2['scaffold_start'] + (pos2 - 1 if map2['orientation'] == '+' else map2['length'] - pos2)
             else:
                 continue  
-
 
             new_fields = [read_id, scaffold1, str(int(scaffold_pos1)), scaffold2, str(int(scaffold_pos2)), mapq] 
             f_out.write('\t'.join(new_fields) + '\n')

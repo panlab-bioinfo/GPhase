@@ -177,11 +177,10 @@ def read_collapse_num(collapse_num_file):
     with open(collapse_num_file, 'r') as file:
         for line in file:
             line = line.strip().split()
-            if line[0].startswith("utg") or line[0].startswith("utig") :
-                try:
-                    collapse_num_dict[line[0]] = int(line[1])
-                except:
-                    collapse_num_dict[line[0]] = 1
+            try:
+                collapse_num_dict[line[0]] = int(line[1])
+            except:
+                collapse_num_dict[line[0]] = 1
     return collapse_num_dict
 
 def get_avg_uncollapse_num(REFile, collapse_num_file, hap_number):

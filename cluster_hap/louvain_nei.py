@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from multilevel_cluster import multilevel_cluster
 from collections import defaultdict
 import matplotlib.pyplot as plt
@@ -12,19 +14,16 @@ import os
 import sys
 
 
-
-
 def read_collapse_num(collapse_num_file):
 
     collapse_num_dict = defaultdict(int)
     with open(collapse_num_file, 'r') as file:
         for line in file:
             line = line.strip().split()
-            if line[0].startswith("utg") or line[0].startswith("utig") :
-                try:
-                    collapse_num_dict[line[0]] = int(line[1])
-                except:
-                    collapse_num_dict[line[0]] = 1
+            try:
+                collapse_num_dict[line[0]] = int(line[1])
+            except:
+                collapse_num_dict[line[0]] = 1
     return collapse_num_dict
 
 def read_chr_utgs(chr_file):
@@ -32,8 +31,7 @@ def read_chr_utgs(chr_file):
     with open(chr_file, 'r') as file:
         for line in file:
             line = line.strip().split()
-            if line[0].startswith("utg") or line[0].startswith("utig"):
-                utgs_list.append(line[0])
+            utgs_list.append(line[0])
     return utgs_list
 
 
@@ -49,25 +47,17 @@ def read_c(c):
                     utg_group_dict[utg].append(line[0])
     return cluster_dict, utg_group_dict
 
-
 def read_l(l):
     hic_nei_dict = defaultdict(set)
-    hic_links_dict = dict()
+    hic_links_dict = defaultdict()
     with open(l, 'r') as file:
         for line in file:
-            if not (line.startswith("utg") or line.startswith("utig")):
+            line = line.strip().split(',')
+            if line[0] == "source":
                 continue
-            line = line.rstrip('\n')
-            idx1 = line.find(',')
-            idx2 = line.find(',', idx1 + 1)
-            node1 = line[:idx1]
-            node2 = line[idx1 + 1:idx2]
-            weight = float(line[idx2 + 1:])
-            
-            key = tuple(sorted((node1, node2)))
-            hic_links_dict[key] = weight
-            hic_nei_dict[node1].add(node2)
-            hic_nei_dict[node2].add(node1)
+            hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
+            hic_nei_dict[line[0]].add(line[1])
+            hic_nei_dict[line[1]].add(line[0])
     return hic_links_dict, hic_nei_dict
 
 def read_allele(allele_file):
@@ -76,10 +66,9 @@ def read_allele(allele_file):
     allele_key_dict = defaultdict(int)
     with open(allele_file, 'r') as file:
         for line in file:
-            if line.startswith("utg") or line.startswith("utig"):
-                line = line.strip().split(',')
-                allele_utg_dict[line[0]].add(line[1])
-                allele_key_dict[tuple(sorted([line[0], line[1]]))] = 1
+            line = line.strip().split(',')
+            allele_utg_dict[line[0]].add(line[1])
+            allele_key_dict[tuple(sorted([line[0], line[1]]))] = 1
     return allele_utg_dict, allele_key_dict
 
 def cal_hic_links(hic_links_dict, utg, utgs_list):
@@ -228,7 +217,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--collapse_num', required=True,
                         help='<filepath> collapse num for utgs')
     parser.add_argument('-chr', '--chromosome', required=True,
-                        help='<filepath>all utg for chrompsome')
+                        help='<filepath>all utg for chromesome')
     parser.add_argument('-l', '--links', required=True,
                         help='<filepath>hic links for utgs')
     parser.add_argument('-a', '--allele', required=True,

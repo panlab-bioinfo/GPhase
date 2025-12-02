@@ -71,7 +71,7 @@ def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=No
 
     if check:
         filtered_chr_list = list()
-        chr_len_dict = defaultdict(int)
+        chr_len_max, chr_len_dict = 0, defaultdict(int)
         chr_cluster_dict = defaultdict(set)
         for idx, group in communities.items():
             sum_length = 0
@@ -81,10 +81,13 @@ def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=No
                     if utg in ctg_RE_len:
                         sum_length += ctg_RE_len[utg][1]
             chr_len_dict[idx] = sum_length
+            chr_len_max = sum_length if sum_length > chr_len_max else chr_len_max
+
 
         # threshold = ctg_len_All / int(n_chr) / 3
-        threshold = sum(chr_len_dict.values()) / int(n_chr) / 3
-        filtered_chr_list = [key for key, value in chr_len_dict.items() if value > threshold]
+        threshold_1 = sum(chr_len_dict.values()) / int(n_chr) / 3
+        threshold_2 = chr_len_max / 10
+        filtered_chr_list = [key for key, value in chr_len_dict.items() if value > max(threshold_1, threshold_2)]
 
         group = 0
         with open(output_file, 'w') as file:

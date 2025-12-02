@@ -13,9 +13,8 @@ def read_group(group_file):
     ctgs_set = set()
     with open(group_file, 'r') as file:
         for line in file:
-            if line.startswith('u'):
-                line = line.strip().split()
-                ctgs_set.add(line[0])
+            line = line.strip().split()
+            ctgs_set.add(line[0])
 
     return list(ctgs_set)
 
@@ -30,13 +29,11 @@ def read_digraph(digraph_file):
 
     digraph = nx.DiGraph()
 
-    # 添加边和权重
     for (node1, node2) in digraph_dict.keys():
         digraph.add_edge(node1, node2)
     
     return digraph, digraph_dict
 
-# 读取子图
 def read_subgraph(subgraph_file):
 
     subgraph_ctgs_dict = defaultdict(list)
@@ -63,7 +60,6 @@ def read_RE(RE_file):
             ctg_RE_dict[line[0]] = (line[1], line[2])
     return ctg_RE_dict
 
-# 全部子图之间的连接
 def get_subgraph_link(digraph_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
 
     subgraph_connect_dict = defaultdict()
@@ -77,7 +73,6 @@ def get_subgraph_link(digraph_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
 
     digraph = nx.DiGraph()
 
-    # 添加边和权重
     for (node1, node2) in subgraph_connect_dict.keys():
         digraph.add_edge(node1, node2)
 
@@ -88,9 +83,7 @@ def break_cycles_keep_low_weight(G, weight_attr='weight'):
     G = G.copy()
     while True:
         try:
-            # 找到一个环，返回节点序列
             cycle = next(nx.simple_cycles(G))
-            # 在这个环中找出权重最大的边
             max_weight = float('-inf')
             edge_to_remove = None
             for i in range(len(cycle)):
@@ -100,7 +93,6 @@ def break_cycles_keep_low_weight(G, weight_attr='weight'):
                 if w > max_weight:
                     max_weight = w
                     edge_to_remove = (u, v)
-            # 删除这条权重最大的边
             if edge_to_remove:
                 G.remove_edge(*edge_to_remove)
         except StopIteration:
@@ -145,12 +137,9 @@ def iter_node_nth_successors(G, subgraph_digraph, ctgs_set, subgraph_ctgs_dict, 
 
     nx.write_edgelist(first_digraph, path='edges.csv', delimiter=',',data=True)
 
-    # 去除虚假边
-    # 检测两个点之间最短路径，去除三个以上节点
     first_digraph_cp = cp.deepcopy(first_digraph)
     for u, v in first_digraph_cp.edges():
         try:
-            # 找路径使用subgraph链接图
             subgraph1 = ctg_subgraph_dict.get(u, None)
             subgraph2 = ctg_subgraph_dict.get(v, None)
             if not subgraph1 or not subgraph2:
@@ -165,7 +154,6 @@ def iter_node_nth_successors(G, subgraph_digraph, ctgs_set, subgraph_ctgs_dict, 
         except:
             pass
 
-    # 去环
     first_digraph_DAG = break_cycles_keep_low_weight(first_digraph)
     nx.write_edgelist(first_digraph_DAG, path='edges_DAG.csv', delimiter=',',data=True)
 
@@ -184,7 +172,6 @@ def iter_node_nth_successors(G, subgraph_digraph, ctgs_set, subgraph_ctgs_dict, 
 
 def Nth_nei(G, reverse = False):
 
-    # N-th nei
     while True:
 
         if reverse:
@@ -210,14 +197,11 @@ def Nth_nei(G, reverse = False):
                 for branch_node in node_list:
                     node_nei_dict[branch_node] = get_nth_order_successors(G, branch_node, 5, return_by_level=False, reverse=True)
 
-            # 找 分支节点N阶邻居之间的交集
             intersect_list = node_nei_dict[node_list[0]]
             for branch_node, nei_1 in node_nei_dict.items():
                 intersect_list_cp = cp.deepcopy(intersect_list)
                 intersect_list = set(intersect_list_cp) & set(nei_1)
             
-            # 去除节点与分支节点之间的连接
-            # 若 分支中存在 tip节点 则只去除tip节点
             if len(node_list) == 2 and (len(node_nei_dict.get(node_list[0], [])) == 0 )  !=  (len(node_nei_dict.get(node_list[1], [])) == 0):
                 if len(node_nei_dict.get(node_list[0], [])) == 0:
                     if G.has_edge(node, node_list[0]):
@@ -236,7 +220,6 @@ def Nth_nei(G, reverse = False):
                     if G.has_edge(branch_node, node):
                         G.remove_edge(branch_node, node)
 
-            # 交集存在
             if intersect_list and not reverse:
                 for intersect_node in intersect_list:
                     predecessors = list(G.predecessors(intersect_node))
@@ -254,7 +237,6 @@ def Nth_nei(G, reverse = False):
 
 def simple_scaffold_Graph(G):
 
-    # 模式P1
     P1 = nx.DiGraph()
     P1.add_edges_from([
         (1, 2), (1, 4), (3, 4)
@@ -262,7 +244,6 @@ def simple_scaffold_Graph(G):
 
     matcher = isomorphism.DiGraphMatcher(G, P1)
     if matcher.subgraph_is_isomorphic():
-        print("找到P1同构子图")
         for subgraph_mapping in matcher.subgraph_isomorphisms_iter():
             start_nodes = [ node for node,num in subgraph_mapping.items() if num== 1]
             end_nodes = [ node for node,num in subgraph_mapping.items() if num== 4]
@@ -281,9 +262,7 @@ def simple_scaffold_Graph(G):
                 G.remove_edge(start_node, end_node)
             if G.has_edge(end_node, start_node):
                 G.remove_edge(end_node, start_node)
-            print("匹配P1子图映射：", subgraph_mapping)
-    else:
-        print("未找到P1同构子图")
+
 
     P2 = nx.DiGraph()
     P2.add_edges_from([
@@ -293,7 +272,6 @@ def simple_scaffold_Graph(G):
     while True:
         matcher = isomorphism.DiGraphMatcher(G, P2)
         if matcher.subgraph_is_isomorphic():
-            print("找到P2同构子图")
             for subgraph_mapping in matcher.subgraph_isomorphisms_iter():
                 node_1 = [ node for node,num in subgraph_mapping.items() if num== 1][0]
                 node_2 = [ node for node,num in subgraph_mapping.items() if num== 2][0]
@@ -309,9 +287,7 @@ def simple_scaffold_Graph(G):
                     G.remove_edge(node_3, node_4)
                 if nx.has_path(G, node_1, node_4):
                     G.add_edge(node_1, node_4)
-                print("匹配子图P2映射：", subgraph_mapping)
         else:
-            print("未找到同构子图")
             break
 
     return G
@@ -332,9 +308,6 @@ def get_linear_path(G, start_node):
 
 
 def orient(G, digraph, GFA_file):
-    # G: scaffold 图
-    # digraph ：全部的有向边
-    # global_digraph ： 边节点朝向的有向图
 
     scaffold_list = list()
     global_digraph = nx.DiGraph()
@@ -362,18 +335,13 @@ def orient(G, digraph, GFA_file):
 
     for idx, component in enumerate(nx.weakly_connected_components(G)):
 
-        # 获取每个连通分量的起始节点
         start_node_list = [ node for node in list(component) if len(list(G.predecessors(node))) == 0]
         if len(start_node_list) > 1:
-            print(f"连通分量{idx} 中起始节点个数大于1")
             return False
         elif start_node_list:
             start_node = start_node_list[0]
-            print(f"连通分量{idx}, start_node : {start_node}")
         else:
-            print(f"遍历连通分量{idx} ERROR...")
 
-        # 得到线性路径;
         line_path_list = get_linear_path(G, start_node)
         line_path_All_list, line_path_All_filtered_list= list(), list()
 
@@ -411,19 +379,6 @@ def get_AGP(scaffold_list, ctg_RE_dict):
 
 def Get_subgraph_scaffold_v2(gfa_file, RE_file, digraph_file, group_file, subgraph_file):
 
-    # gfa_file = "C88.h.asm.bp.p_utg.gfa"
-    # RE_file = "C88.RE_counts.txt"
-    # digraph_file = "C88.digraph.csv"
-    # group_file = "group2.txt"
-    # subgraph_file = "group_ctgs_All.txt"
-
-    # args = parser.parse_args()
-    # gfa_file = args.graph_file
-    # RE_file = args.RE_file
-    # digraph_file = args.digraph_file
-    # group_file = args.group_file
-    # subgraph_file = args.subgraph_file
-
     ctgs_set = read_group(group_file)
     ctg_RE_dict = read_RE(RE_file)
     digraph, digraph_dict = read_digraph(digraph_file)
@@ -437,7 +392,6 @@ def Get_subgraph_scaffold_v2(gfa_file, RE_file, digraph_file, group_file, subgra
     G1 = Nth_nei(reduce_DAG_clear, reverse = False)
     G2 = Nth_nei(G1, reverse = True)
 
-    # 去环
     G_DAG = break_cycles_keep_low_weight(G2)
     for u in G_DAG.nodes():
         for v in G_DAG.nodes():
@@ -465,11 +419,6 @@ if __name__ == '__main__':
                         help='<filepath>Length and REs of contig or unitig')
 
 
-    # gfa_file = "C88.h.asm.bp.p_utg.gfa"
-    # RE_file = "C88.RE_counts.txt"
-    # digraph_file = "C88.digraph.csv"
-    # group_file = "group2.txt"
-    # subgraph_file = "group_ctgs_All.txt"
 
     args = parser.parse_args()
     gfa_file = args.graph_file

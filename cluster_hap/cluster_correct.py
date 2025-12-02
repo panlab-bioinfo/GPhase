@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from matplotlib.colors import to_hex
 from collections import defaultdict
 import matplotlib.pyplot as plt
@@ -18,12 +20,10 @@ def read_collapse_num(collapse_num_file):
     with open(collapse_num_file, 'r') as file:
         for line in file:
             line = line.strip().split()
-            if line[0].startswith("utg") or line[0].startswith("utig") :
-                try:
-                    collapse_num_dict[line[0]] = int(line[1])
-                except:
-                    print(f"error : {line[0]}\t{line[1]}")
-                    collapse_num_dict[line[0]] = 1
+            try:
+                collapse_num_dict[line[0]] = int(line[1])
+            except:
+                collapse_num_dict[line[0]] = 1
     return collapse_num_dict
 
 def read_chr_utgs(chr_file):
@@ -31,8 +31,7 @@ def read_chr_utgs(chr_file):
     with open(chr_file, 'r') as file:
         for line in file:
             line = line.strip().split()
-            if line[0].startswith("utg") or line[0].startswith("utig"):
-                utgs_list.append(line[0])
+            utgs_list.append(line[0])
     return utgs_list
 
 
@@ -53,11 +52,12 @@ def read_l(l):
     hic_links_dict = defaultdict()
     with open(l, 'r') as file:
         for line in file:
-            if line.startswith("utg") or line.startswith("utig") :
-                line = line.strip().split(',')
-                hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
-                hic_nei_dict[line[0]].add(line[1])
-                hic_nei_dict[line[1]].add(line[0])
+            line = line.strip().split(',')
+            if line[0] == "source":
+                continue
+            hic_links_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
+            hic_nei_dict[line[0]].add(line[1])
+            hic_nei_dict[line[1]].add(line[0])
     return hic_links_dict, hic_nei_dict
 
 def read_allele(allele_file):
@@ -66,10 +66,9 @@ def read_allele(allele_file):
     allele_key_dict = defaultdict()
     with open(allele_file, 'r') as file:
         for line in file:
-            if line.startswith("utg") or line.startswith("utig"):
-                line = line.strip().split(',')
-                allele_utg_dict[line[0]].add(line[1])
-                allele_key_dict[tuple(sorted([line[0], line[1]]))] = 1
+            line = line.strip().split(',')
+            allele_utg_dict[line[0]].add(line[1])
+            allele_key_dict[tuple(sorted([line[0], line[1]]))] = 1
     return allele_utg_dict, allele_key_dict
 
 def cal_hic_links(hic_links_dict, utg, utgs_list):

@@ -1,15 +1,11 @@
+#!/usr/bin/env python3
+
 from collections import defaultdict, deque
 import csv
 import networkx as nx
 import pandas as pd
 import argparse
 
-
-#--------------------------------------#
-# 过滤 等位contig对
-# 非同一子图：两个contig长度大于N90
-# 同一子图：相同前驱和相同后继
-#--------------------------------------#
 
 def read_digraph(digraph_file):
 
@@ -45,13 +41,6 @@ def read_RE(REFile):
             line = line.strip().split()
             ctg_RE_dict[line[0]] = (int(line[1]), int(line[2]))
     return ctg_RE_dict
-
-
-
-
-
-
-
 
 def read_subgraph(subgraph_file):
 
@@ -110,7 +99,6 @@ def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ct
             successors_utg1 = set(digraph.successors(utg1))
             successors_utg2 = set(digraph.successors(utg2))
 
-            # 没有相同的前驱或者相同得后继节点
             if not (predecessors_utg1 & predecessors_utg2 ) and \
                 not (successors_utg1 & successors_utg2 ):
                 filted_dict[tuple(sorted([utg1, utg2]))] = value

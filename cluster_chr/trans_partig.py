@@ -53,7 +53,6 @@ def add_graph_allele(digraph_file):
             
             if len(utg1_predecessors & utg2_predecessors) == 1 and len(utg1_successors & utg2_successors) == 1:
                 graph_allele_dict[tuple(sorted([utg1, utg2]))] = 1
-                # print(f"{utg1}\t{utg2}")
 
     return graph_allele_dict
 

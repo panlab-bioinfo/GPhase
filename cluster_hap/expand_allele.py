@@ -1,13 +1,9 @@
+#!/usr/bin/env python3
+
 from collections import defaultdict, deque
 import csv
 import networkx as nx
 import argparse
-
-#--------------------------------------#
-# 过滤 等位contig对
-# 非同一子图：两个contig长度大于N80
-# 同一子图：相同前驱和相同后继
-#--------------------------------------#
 
 
 
@@ -26,10 +22,6 @@ def get_N80(len_list):
             
         return int(N80_length)
 
-
-
-
-
 def read_REs(REFile):
     ctg_RE_len = defaultdict(tuple)
     with open(REFile, 'r') as fp:
@@ -39,7 +31,6 @@ def read_REs(REFile):
             line = line.strip().split()
             ctg_RE_len[line[0]] = (int(line[1]), int(line[2]))
     return ctg_RE_len
-
 
 def read_subgraph(subgraph_file):
 
@@ -61,8 +52,7 @@ def read_allele(allele_file):
     with open(allele_file, 'r') as file:
         for line in file:
             line = line.strip().split(',')
-            if line[0].startswith("u") and line[1].startswith("u"):
-                allele_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
+            allele_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
     return allele_dict
 
 

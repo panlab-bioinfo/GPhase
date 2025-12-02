@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import igraph as ig
 import pandas as pd
 import numpy as np
@@ -25,8 +27,9 @@ def read_Allele(Allele_file):
     with open(Allele_file, 'r') as file:
         for line in file:
             line = line.strip().split(',')
-            if line[0].startswith("u") and line[1].startswith("u"):
-                allele_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
+            if line[0] == "source":
+                continue
+            allele_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
     return allele_dict
 
 def Louvain_cluster(g, id_to_node, resolution):
@@ -44,19 +47,17 @@ def Louvain_cluster(g, id_to_node, resolution):
 
 def multilevel_cluster(csv_file, output_file, resolution=1, check=None, RE_file=None, Allele_file=None, n_hap=None):
 
-    df = pd.read_csv(csv_file)
-    df['source'] = df['source'].astype(str)
-    df['target'] = df['target'].astype(str)
-    df['links'] = df['links'].astype(float)
+    df = pd.read_csv(csv_file, sep=',', header=0)
+    if list(df.columns)[0] != "source":
+        df = pd.read_csv(csv_file, sep=',')
+        df.columns = ['source', 'target', 'links']
 
-    # 建立节点映射
     g = nk.graph.Graph(weighted=True, directed=False)
     nodes = list(set(df['source']).union(set(df['target'])))
     node_to_id = {node: idx for idx, node in enumerate(nodes)}
     id_to_node = {idx: node for node, idx in node_to_id.items()}
     g.addNodes(len(nodes))
 
-    # 添加边（避免重复添加）
     for _, row in df.iterrows():
         u = node_to_id[row['source']]
         v = node_to_id[row['target']]
@@ -64,14 +65,9 @@ def multilevel_cluster(csv_file, output_file, resolution=1, check=None, RE_file=
         if not g.hasEdge(u, v):
             g.addEdge(u, v, weight)
 
-    # 社区划分
     communities = Louvain_cluster(g, id_to_node, resolution)
 
     if check:
-        # 检查有效聚类簇数目
-        # 1:阈值设置为平均聚类簇长度的 1/3
-        # 2: 簇中平均contigs长度小于平均contig长度中位数的1/7 （防止聚类到核糖体）
-        
         ctg_RE_len = read_REs(RE_file)
         allele_dict = read_Allele(Allele_file)
         cluster_dict = defaultdict(list)
@@ -84,13 +80,10 @@ def multilevel_cluster(csv_file, output_file, resolution=1, check=None, RE_file=
             utgs_len = sum([ int(ctg_RE_len[utg][1]) for utg in utgs])
             group_len_dict[idx] = utgs_len
             avg_contig_len[idx] = utgs_len/len(list(community))
-        
         avg_len = sum(group_len_dict.values()) / n_hap
-        # print(avg_len)
         median_avg_contig_len = statistics.median(avg_contig_len.values())
 
         save_group = [ k for k,v in group_len_dict.items() if v > float(avg_len)/5 and avg_contig_len[k] > median_avg_contig_len/7]
-
         with open(output_file, 'w') as file:
             flag = 0
             for idx, community in enumerate(communities.values()):
@@ -99,8 +92,6 @@ def multilevel_cluster(csv_file, output_file, resolution=1, check=None, RE_file=
                     utgs = list(community)
                     cluster_dict[flag] = utgs
                     file.write(f"group{flag}\t{len(utgs)}\t{' '.join(utgs)}\n")
-        
-        # 计算聚类簇中最大同源contigs长度
         group_allele_list = list()
         for group, ctgs in cluster_dict.items():
             allele_sum = 0
@@ -110,13 +101,8 @@ def multilevel_cluster(csv_file, output_file, resolution=1, check=None, RE_file=
                         if tuple(sorted([ctg_1, ctg_2])) in allele_dict:
                             allele_sum += min(ctg_RE_len[ctg_1][1], ctg_RE_len[ctg_2][1])
             group_allele_list.append(allele_sum)
-        # print(max(group_allele_list))
         
         return cluster_dict, max(group_allele_list)
-
-
-
-
     else:
         with open(output_file, 'w') as file:
             for idx, community in enumerate(communities.values()):

@@ -49,14 +49,14 @@ def read_l(l):
         for row in reader:
             if not row:
                 continue
-            if row[0].startswith(('utg', 'utig')):
-                a, b, w = row[0], row[1], float(row[2])
+            if row[0] == "source":
+                continue
+            a, b, w = row[0], row[1], float(row[2])
+            key = (a, b) if a < b else (b, a)
 
-                key = (a, b) if a < b else (b, a)
-
-                hic_links_dict[key] = w
-                hic_nei_dict[a].add(b)
-                hic_nei_dict[b].add(a)
+            hic_links_dict[key] = w
+            hic_nei_dict[a].add(b)
+            hic_nei_dict[b].add(a)
 
     return hic_links_dict, hic_nei_dict
 

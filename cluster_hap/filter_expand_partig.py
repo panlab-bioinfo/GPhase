@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from collections import defaultdict, deque
 import csv
 import networkx as nx
@@ -5,11 +7,6 @@ import pandas as pd
 import argparse
 
 
-#--------------------------------------#
-# 过滤 等位contig对
-# 非同一子图：两个contig长度大于N80
-# 同一子图：相同前驱和相同后继
-#--------------------------------------#
 
 def read_digraph(digraph_file):
 
@@ -67,15 +64,14 @@ def read_partig(partig_file):
     with open(partig_file, 'r') as file:
         for line in file:
             line = line.strip().split(',')
-            if line[0].startswith("u") and line[1].startswith("u"):
-                partig_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
+            partig_dict[tuple(sorted([line[0], line[1]]))] = float(line[2])
     return partig_dict
 
 
 def filter_allele(digraph, partig_dict,subgraph_ctgs_dict, ctg_subgraph_dict, ctg_RE_len):
 
     filted_dict = defaultdict()
-    len_list = [ float( ctg_RE_len[utg][1]) for utg in ctg_RE_len]
+    len_list = [ float(ctg_RE_len[utg][1]) for utg in ctg_RE_len]
     N80 = get_N80(len_list)
     for (utg1, utg2), value in partig_dict.items():
 
@@ -143,10 +139,9 @@ def expand_allele(digraph, save_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
                     for sub_utg2 in subgraph2:
                         expand_dict[tuple(sorted([sub_utg1, sub_utg2]))] = 1
 
-    # 根据图结构来识别同源contig
+    # Use graph to identify allele ctg.
     for utg in list(digraph.nodes()):
         predecessors_utg = set(digraph.predecessors(utg))
-        # 
         successors_utg = set(digraph.successors(utg))
 
         if len(predecessors_utg) > 1 or len(predecessors_utg) == 0 or len(successors_utg) > 1 or len(successors_utg) == 0:
@@ -216,13 +211,6 @@ if __name__ == '__main__':
                         help='<filepath> subgraph ctgs')
     parser.add_argument('-p', '--partig_file', required=True,
                         help='<filepath> partig file')
-
-
-
-    # digraph_file = "digraph.csv"
-    # REFile = "HiC.filtered.sort.counts_GATC.txt"
-    # subgraph_file = "group_ctgs_All.txt"
-    # partig_file = "rice4.partig.csv"
 
     args = parser.parse_args()
     digraph_file = args.digraph

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from collections import defaultdict
 import pandas as pd
 import networkx as nx
@@ -50,7 +52,6 @@ def add_graph_allele(digraph_file):
             
             if len(utg1_predecessors & utg2_predecessors) == 1 and len(utg1_successors & utg2_successors) == 1:
                 graph_allele_dict[tuple(sorted([utg1, utg2]))] = 1
-                # print(f"{utg1}\t{utg2}")
 
     return graph_allele_dict, G
 
@@ -70,7 +71,7 @@ def read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, graph_alle
                 contig2 = fai_dict[scontig2]
                 if tuple(sorted([contig1, contig2])) in graph_allele_dict:
                     continue
-
+                print(111)
                 # if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1) or ctg_RE_len[contig1][1] < 10000 or ctg_RE_len[contig2][1] < 10000:
                 if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1):
                     continue
