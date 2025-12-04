@@ -169,9 +169,9 @@ def adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output, csv_file
             # logger.info(f"Optimal r found: {r}")
             return r
         elif num_clusters > hap_number:
-            max_r = r - step
+            max_r = r
         else:
-            min_r = r + step
+            min_r = r
 
         r = (min_r + max_r) / 2
 
@@ -497,7 +497,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                     initial_r=1.0,
                     min_r=0.01,
                     max_r=3,
-                    step=0.03,
+                    step=0.01,
                     cluster_output=cluster_output,
                     csv_file="louvain_nei.csv", 
                     utg_file=utg_rescue_file,

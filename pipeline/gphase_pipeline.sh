@@ -266,7 +266,7 @@ check_file_exists_and_nonempty "${expected_RE}" "RE_counts output"
 
 # 2. Generate or link map.pairs
 map_basename=$(basename "$map_file")
-if [[ "$map_basename" =~ \.pairs(\.gz)?$ || "$map_basename" =~ \.pair$ ]]; then 
+if [[ "$map_basename" =~ \.pair$ ]]; then 
     if [ ! -e "map.pairs" ]; then
         ln -s "$map_file" map.pairs
         info "Linked: $map_file -> map.pairs"
@@ -274,8 +274,7 @@ if [[ "$map_basename" =~ \.pairs(\.gz)?$ || "$map_basename" =~ \.pair$ ]]; then
         info "skip link: map.pairs already exists"
     fi
 elif [[ "$map_basename" =~ \.bam$ ]]; then
-    bam_link="$(basename "$fa_file").bam"
-    safe_ln "$map_file" "$bam_link"
+    safe_ln "$map_file" "$map_file"
     check_file_exists_and_nonempty "$(basename "$fa_file")" "FASTA for samtools faidx"
     
     info "Indexing FASTA for samtools"
@@ -289,7 +288,7 @@ elif [[ "$map_basename" =~ \.bam$ ]]; then
         awk '{print "##chromsize: "$1" "$2}' "$(basename "$fa_file").fai"
     } > "$tmp_pairs"
     
-    run_step "samtools view -@ ${thread} \"$bam_link\" | awk -v q=\"${scaffold_q}\" '(\$5+0 >= q && \$7!=\"=\"){print \$1\"\t\"\$3\"\t\"\$4\"\t\"\$7\"\t\"\$8\"\t\"\$5}' >> \"$tmp_pairs\"" "BAM to pairs conversion"
+    run_step "samtools view -@ ${thread} \"$map_file\" | awk -v q=\"${scaffold_q}\" '(\$5+0 >= q && \$7!=\"=\"){print \$1\"\t\"\$3\"\t\"\$4\"\t\"\$7\"\t\"\$8\"\t\"\$5}' >> \"$tmp_pairs\"" "BAM to pairs conversion"
     mv "$tmp_pairs" map.pairs
 else
     die "Unsupported map file extension for: $map_basename. Must be .pairs or .bam"
@@ -356,8 +355,8 @@ cr_file="${cluster_chr_dir}/rescue.cluster.ctg.txt"
 run_step "python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file $(basename "$collapse_num_file") -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr_file} -pm ${hap_pm} --reassign_number ${reassign_number} ${rescue_flag} ${expand_flag}" "cluster_hap.py"
 
 for chr_id in $(seq 1 "$n_chr"); do
-    reassign_file="${output_prefix}.chr${chr_id}.reassign.cluster.txt"
-    check_file_exists_and_nonempty "$reassign_file" "reassign cluster file for chromosome ${chr_id}"
+    reassign_file="${output_prefix}.reassign.cluster.txt"
+    check_file_exists_and_nonempty "chr${chr_id}/$reassign_file" "reassign cluster file for chromosome ${chr_id}"
 done
 
 # ============================== Scaffold haplotypes ==============================

@@ -85,9 +85,9 @@ def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=No
 
 
         # threshold = ctg_len_All / int(n_chr) / 3
-        threshold_1 = sum(chr_len_dict.values()) / int(n_chr) / 3
+        # threshold_1 = sum(chr_len_dict.values()) / int(n_chr) / 3
         threshold_2 = chr_len_max / 10
-        filtered_chr_list = [key for key, value in chr_len_dict.items() if value > max(threshold_1, threshold_2)]
+        filtered_chr_list = [key for key, value in chr_len_dict.items() if value > max(threshold_2, threshold_2)]
 
         group = 0
         with open(output_file, 'w') as file:

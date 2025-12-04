@@ -608,7 +608,7 @@ def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
 
         # Rescue and connect utg base graph
         try:
-            Rescue_base_graph(args.digraph_file, final_agp, args.gfa_file, args.RE_file, args.fa_file)
+            Rescue_base_graph(args.digraph_file, f"HapHiC_sort/{final_agp}", args.gfa_file, args.RE_file, args.fa_file)
             # Check for rescue AGP files
             check_file_exists_and_not_empty(final_rescue_agp, logger, "Rescue_base_graph execution", min_size=100)
             check_file_exists_and_not_empty(final_contig_agp, logger, "Rescue_base_graph execution", min_size=100)
@@ -618,7 +618,7 @@ def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
             return False
 
         # Sort files
-        sort_file(final_agp)
+        sort_file(f"HapHiC_sort/{final_agp}")
         sort_file(final_rescue_agp)
         sort_file(final_contig_agp)
 

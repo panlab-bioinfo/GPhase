@@ -126,7 +126,7 @@ def split_gfa(gfa: str, split_gfa_n: int, split_gfa_iter: int, output_prefix: st
 
 def run_partig(fa_file: str, partig_k: int, partig_w: int, partig_c: int, partig_m: float, output_prefix: str, logger: logging.Logger) -> bool:
     """Run the Partig tool."""
-    output_file = f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt"
+    output_file = f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m:.2f}.txt"
     if check_file_exists_and_not_empty(output_file, logger):
         logger.info(f"Partig output already exists: {output_file}. Skipping Partig run.")
         return True
@@ -146,8 +146,8 @@ def run_partig(fa_file: str, partig_k: int, partig_w: int, partig_c: int, partig
 
 def convert_partig_output(fa_file: str, partig_k: int, partig_w: int, partig_c: int, partig_m: float, output_prefix: str, RE_file: str, logger: logging.Logger) -> bool:
     """Convert Partig output to CSV format."""
-    input_partig_file = f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.txt"
-    output_csv_file = f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m}.csv"
+    input_partig_file = f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m:.2f}.txt"
+    output_csv_file = f"{output_prefix}.partig.{partig_k}_{partig_w}_{partig_c}_{partig_m:.2f}.csv"
     
     if not check_file_exists_and_not_empty(input_partig_file, logger):
         return False
@@ -223,9 +223,9 @@ def run_pipeline_chr(output_prefix: str, HiC_file: str, logger: logging.Logger) 
         "-s", input_file_s,
         "-n", output_prefix
     ]
-    return run_command(command, "Running pipeline_chr.py (Hic clustering pre-processing)", logger)
+    return run_command(command, "Running pipeline_chr.py (HiC clustering pre-processing)", logger)
 
-def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, chr_number: int, logger: logging.Logger, r_min=0.01, r_max=5.0, tolerance=0.01, max_iter=50) -> bool:
+def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, chr_number: int, logger: logging.Logger, r_min=0.01, r_max=5.0, tolerance=0.001, max_iter=50) -> bool:
     """
     Run multilevel clustering with an optimized binary search for the ratio 'r'
     to achieve the desired cluster count.
@@ -254,7 +254,7 @@ def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, ch
             cluster_count = Multilevel_cluster(
                 input_hic_file,
                 chr_cluster_output,
-                int(r),
+                float(r),
                 True,
                 input_RE_counts,
                 allele_cluster,
@@ -513,8 +513,8 @@ def parse_arguments() -> argparse.Namespace:
         sys.exit(f"Error: Chromosome number (-n_chr) must be a positive integer.")
     if args.partig_k <= 0 or args.partig_w <= 0:
         sys.exit(f"Error: Partig k-mer/window size (-pk, -pw) must be positive.")
-    if not (0.0 <= args.partig_m <= 1.0):
-        sys.exit(f"Error: Partig k-mer similarity (-pm) must be between 0.0 and 1.0.")
+    if not (0.80 <= args.partig_m <= 1.0):
+        sys.exit(f"Error: Partig k-mer similarity (-pm) must be between 0.80 and 1.0.")
 
     return args
 
@@ -523,6 +523,7 @@ def main():
     pwd = os.getcwd()
     logger = setup_logging('cluster_chr.log')
     log_start(logger, "cluster_chr.py", "1.0.0", args)
+    successful_clustering = False
 
     # --- Step 0: Pre-processing and Initial GFA Split ---
     if not index_fasta(args.fa_file, logger):
@@ -533,79 +534,104 @@ def main():
         logger.error("Split GFA failed. Exiting.")
         return
 
-    # --- Step 1: Run Partig and Convert Output ---
-    partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.txt"
-    trans_partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{args.partig_m}.csv"
+    # --- Step 1: Running partig ---
+    min_partig_m = 0.8
+    if args.partig_m < min_partig_m:
+        logger.error("Your parameter (partig_m) is too small. Please select a value greater than or equal to 0.8 and less than or equal to 0.95.. Exiting.")
+        return
+
+    partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{min_partig_m:.2f}.txt"
+    trans_partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{min_partig_m:.2f}.csv"
     
     if not check_file_exists_and_not_empty(partig_file, logger):
-        if not run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix, logger):
+        if not run_partig(args.fa_file, args.partig_k, args.partig_w, args.partig_c, min_partig_m, args.output_prefix, logger):
             logger.error("Run partig failed. Exiting.")
             return
-
     if not check_file_exists_and_not_empty(trans_partig_file, logger):
-        if not convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, args.partig_m, args.output_prefix, args.RE_file, logger):
+        if not convert_partig_output(args.fa_file, args.partig_k, args.partig_w, args.partig_c, min_partig_m, args.output_prefix, args.RE_file, logger):
             logger.error("Conversion partig output failed. Exiting.")
             return
 
-    # --- Step 2: Allele Clustering Pipeline ---
-    split_gfa_file = f"{args.output_prefix}.rmTip.split.gfa"
-    if not run_pipeline_allele(split_gfa_file, args.HiC_file, args.RE_file, trans_partig_file, args.output_prefix, args.chr_number, logger):
-        logger.error("Run allele_cluster pipeline failed. Exiting.")
-        return
+    vals = [x / 100 for x in range(int(args.partig_m*100), 75, -5)]
 
-    # --- Step 3: Transform Allele Cluster Results ---
-    if not run_trans_cluster(args.output_prefix, logger):
-        logger.error("Transform cluster results failed. Exiting.")
-        return
+    for partig_m_iter in vals:
+        partig_m_iter = float(partig_m_iter)
+        logger.info(f"The current parameter partig_m is {partig_m_iter}...")
+        trans_partig_df = pd.read_csv(trans_partig_file)
+        filtered_trans_partig_df = trans_partig_df[trans_partig_df.iloc[:, 2] >= partig_m_iter]
 
-    # --- Step 4: Chromosome Clustering Pre-processing ---
-    if not run_pipeline_chr(args.output_prefix, args.HiC_file, logger):
-        logger.error("Run chromosome clustering pre-processing failed. Exiting.")
-        return
-    
-    # --- Step 5: Filter Allele HiC Data ---
-    filter_threshold = 30
-    allele_hic_file, filter_HiC_file = f"{args.output_prefix}.allele.hic.csv", f"{args.output_prefix}.allele.hic.filter.csv"
-    groups_file = "group_ctgs_save.txt"
-    
-    # Ensure the required HiC file for filtering exists after run_pipeline_chr
-    if not check_file_exists_and_not_empty(allele_hic_file, logger):
-         logger.error(f"Required HiC file for filtering not found: {allele_hic_file}. Exiting.")
-         return
+        trans_partig_file = f"{args.output_prefix}.partig.{args.partig_k}_{args.partig_w}_{args.partig_c}_{partig_m_iter:.2f}.csv"
+        filtered_trans_partig_df.to_csv(trans_partig_file, index=False)
 
-    # --- Step 6: Multilevel Chromosome Clustering ---
-    max_filter_attempts = 6 
-    successful_clustering = False
-    
-    for attempt in range(max_filter_attempts):
-        current_threshold = filter_threshold - (attempt * 5)
-        if current_threshold < 5: # Set a minimum practical threshold
-            logger.warning("Minimum filter threshold reached. Stopping threshold search.")
-            break
-            
-        logger.info(f"Attempt {attempt + 1}: Chromosome clustering uses the filter_threshold : {current_threshold}.")
-        filter_edges_by_density(
-            args.chr_number, 
-            allele_hic_file, 
-            groups_file, 
-            filter_HiC_file, 
-            logger, 
-            filter_threshold=current_threshold, 
-            step=0.5
-        )
+        # --- Step 2: Allele Clustering Pipeline ---
+        split_gfa_file = f"{args.output_prefix}.rmTip.split.gfa"
+        if not run_pipeline_allele(split_gfa_file, args.HiC_file, args.RE_file, trans_partig_file, args.output_prefix, args.chr_number, logger):
+            logger.error("Run allele_cluster pipeline failed. Exiting.")
+            return
+
+        # --- Step 3: Transform Allele Cluster Results ---
+        if not run_trans_cluster(args.output_prefix, logger):
+            logger.error("Transform cluster results failed. Exiting.")
+            return
+
+        # --- Step 4: Chromosome Clustering Pre-processing ---
+        if not run_pipeline_chr(args.output_prefix, args.HiC_file, logger):
+            logger.error("Run chromosome clustering pre-processing failed. Exiting.")
+            return
         
-        # Check if the filtered HiC file is valid before proceeding
-        if not check_file_exists_and_not_empty(filter_HiC_file, logger):
-            logger.info(f"Filtered HiC file is invalid: {filter_HiC_file}. Cannot proceed to clustering with this threshold.")
-            filter_HiC_file = allele_hic_file
-            continue
+        # --- Step 5: Filter Allele HiC Data ---
+        filter_threshold = 30
+        allele_hic_file, filter_HiC_file = f"{args.output_prefix}.allele.hic.csv", f"{args.output_prefix}.allele.hic.filter.csv"
+        groups_file = "group_ctgs_save.txt"
+        
+        # Ensure the required HiC file for filtering exists after run_pipeline_chr
+        if not check_file_exists_and_not_empty(allele_hic_file, logger):
+            logger.error(f"Required HiC file for filtering not found: {allele_hic_file}. Exiting.")
+            return
+
+        # --- Step 6: Multilevel Chromosome Clustering ---
+        max_filter_attempts = 6
+        successful_clustering = False
+        
+        for attempt in range(max_filter_attempts):
+            if attempt > 0:
+                input_hic_file = filter_HiC_file
+                output_hic_file = filter_HiC_file
+            else:
+                input_hic_file = allele_hic_file
+                output_hic_file = filter_HiC_file
+            current_threshold = filter_threshold - (attempt * 5)
+            if current_threshold < 5: # Set a minimum practical threshold
+                logger.warning("Minimum filter threshold reached. Stopping threshold search.")
+                break
+                
+            logger.info(f"Attempt {attempt + 1}: Chromosome clustering uses the filter_threshold : {current_threshold}.")
             
-        # Run optimized multilevel cluster
-        if run_multilevel_cluster_optimized(filter_HiC_file, args.output_prefix, int(args.chr_number), logger):
-            successful_clustering = True
+            filter_edges_by_density(
+                args.chr_number, 
+                input_hic_file, 
+                groups_file, 
+                output_hic_file, 
+                logger, 
+                filter_threshold=current_threshold, 
+                step=0.5
+            )
+            
+            # Check if the filtered HiC file is valid before proceeding
+            if not check_file_exists_and_not_empty(filter_HiC_file, logger):
+                logger.info(f"Filtered HiC file is invalid: {filter_HiC_file}. Cannot proceed to clustering with this threshold.")
+                filter_HiC_file = allele_hic_file
+                continue
+                
+            # Run optimized multilevel cluster
+            if run_multilevel_cluster_optimized(filter_HiC_file, args.output_prefix, int(args.chr_number), logger):
+                successful_clustering = True
+                break
+            else:
+                logger.warning(f"Run Chromosome multilevel_cluster failed with filter_threshold : {current_threshold}. Trying next threshold.")
+        
+        if successful_clustering:
             break
-        else:
-            logger.warning(f"Run Chromosome multilevel_cluster failed with filter_threshold : {current_threshold}. Trying next threshold.")
     
     final_cluster_file = f"{args.output_prefix}.chr.cluster.ctg.txt"
     if not successful_clustering:
