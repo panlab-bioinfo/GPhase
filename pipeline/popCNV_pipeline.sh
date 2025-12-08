@@ -3,17 +3,17 @@
 # Function for displaying usage
 usage() {
     echo "|"
-    echo "|Run the popcnv software using the fasta file and the fastq.gz file in the current directory"
+    echo "|The popcnv software was run to estimate the collapse number of unitigs based on unitigs fasta file and HiFi reads"
     echo "|    Usage: $0 -f <fa_file>  -r <reads1.fastq.gz [reads2.fastq.gz ...]> -p <output_prefix> -t <threads>"
     echo "|"
     echo "|Required Parameters:"
     echo "|  -f     <fa_file>                : The FASTA file containing the utg sequences."
-    echo "|  -r     <reads_files>            : One or more FASTQ(.gz) files (space-separated)."
+    echo "|  -r     <reads_files>            : One or more FASTQ(.gz) files."
     echo "|  -p     <output_prefix>          : The prefix for the output files."
     echo "|  -t     <threads>                : The number of threads (default: 32)."
     echo "|"
     echo "|Example:"
-    echo "|  bash $0 -f asm.fa -r read1.fq.gz read2.fq.gz -p output_prefix -t 32"
+    echo "|  bash $0 -f asm.fa -r hifi_read1.fq.gz hifi_read2.fq.gz -p output_prefix -t 32"
     exit 1
 }
 
@@ -24,7 +24,8 @@ output_prefix=""
 threads=""
 default_threads=32
 
-# getopt parsing
+reads_files=()
+
 TEMP=$(getopt -o f:r:p:t: -- "$@")
 if [ $? != 0 ]; then
     echo "Error: Invalid arguments."
@@ -54,6 +55,7 @@ while true; do
     esac
 done
 
+
 # Validate required arguments
 if [ -z "$fa_file" ] || [ -z "$output_prefix" ] || [ ${#reads_files[@]} -eq 0 ]; then
     echo "Error: Missing required arguments."
@@ -78,12 +80,16 @@ LOG_INFO() {
     echo "${time} <popCNV_pipeline> [${flag}] ${msg}" >> ${log_file}
 }
 
+
 # Directory setup
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 LOG_INFO ${log_file} "path" "Script dir : ${SCRIPT_DIR}"
 
 LOG_INFO ${log_file} "run" "samtools faidx ${fa_file}"
 samtools faidx ${fa_file}
+
+LOG_INFO ${log_file} "info" "input FASTA files: ${fa_file}"
+LOG_INFO ${log_file} "info" "input HiFi files: ${reads_files[@]}"
 
 # Mapping
 LOG_INFO ${log_file} "run" "Mapping HiFi data to ${fa_file} using minimap2"

@@ -16,7 +16,7 @@ from collections import defaultdict
 from find_knees import find_best_knee
 from multilevel_cluster_v2 import multilevel_cluster
 from louvain_reassign_allele import louvain_reassign_allele
-from louvain_nei import louvain_nei
+from louvain_nei_v2 import louvain_nei
 
 
 
