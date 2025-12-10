@@ -266,7 +266,7 @@ check_file_exists_and_nonempty "${expected_RE}" "RE_counts output"
 
 # 2. Generate or link map.pairs
 map_basename=$(basename "$map_file")
-if [[ "$map_basename" =~ \.pair$ ]]; then 
+if [[ "$map_basename" =~ \.pairs$ ]]; then 
     if [ ! -e "map.pairs" ]; then
         ln -s "$map_file" map.pairs
         info "Linked: $map_file -> map.pairs"

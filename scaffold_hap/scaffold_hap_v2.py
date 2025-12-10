@@ -8,6 +8,7 @@ import subprocess
 import shutil
 import sys
 import tempfile
+from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import defaultdict
 from pathlib import Path
@@ -621,6 +622,8 @@ def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
         sort_file(f"HapHiC_sort/{final_agp}")
         sort_file(final_rescue_agp)
         sort_file(final_contig_agp)
+
+        Path(f"HapHiC_sort/{final_agp}").rename(f"{final_agp}")
 
         # Get rescue fasta
         haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")

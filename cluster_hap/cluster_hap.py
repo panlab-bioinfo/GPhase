@@ -16,7 +16,7 @@ from collections import defaultdict
 from find_knees import find_best_knee
 from multilevel_cluster_v2 import multilevel_cluster
 from louvain_reassign_allele import louvain_reassign_allele
-from louvain_nei_v2 import louvain_nei
+from louvain_nei import louvain_nei
 
 
 
@@ -110,6 +110,7 @@ def execute_command(command, error_message,logger):
 # --- Check if file exists and is not empty ---
 def check_file_exists_and_not_empty(filepath: str, logger: logging.Logger, action_name: str) -> None:
     """Check if a file exists and is not empty. Raise an error if it fails."""
+    logger.info(action_name)
     if not os.path.exists(filepath):
         logger.error(f"File check failed for: {filepath}")
         raise FileNotFoundError(f"{action_name} failed: Required file not found: {filepath}")
@@ -167,12 +168,11 @@ def adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output, csv_file
 
         if num_clusters == hap_number:
             # logger.info(f"Optimal r found: {r}")
-            return r
+            return r 
         elif num_clusters > hap_number:
-            max_r = r
+            max_r = r - step
         else:
-            min_r = r
-
+            min_r = r + step
         r = (min_r + max_r) / 2
 
     return None
@@ -214,6 +214,7 @@ def get_avg_uncollapse_num(REFile, collapse_num_file, hap_number):
 
 
 def multiple_adjust_r_and_cluster(initial_r, min_r, max_r, step, cluster_output, csv_file, utg_file, partig_file, hap_number,logger):
+
 
     section_length = float((max_r - min_r) / 8)
 
@@ -508,7 +509,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                     check_cluster_dict, max_group_allele_value = multilevel_cluster("louvain_nei.csv", cluster_output, float(optimal_r), "check", utg_rescue_file, no_expand_partig_file, int(args.hap_number))
                 else:
                     raise ValueError("Optimal r not found for Louvain clustering.")
-                
+
                 # Check the number of clusters
                 num_clusters = len(check_cluster_dict)
                 if num_clusters != args.hap_number:

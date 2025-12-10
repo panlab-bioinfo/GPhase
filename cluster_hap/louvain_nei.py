@@ -20,6 +20,8 @@ def read_collapse_num(collapse_num_file):
     with open(collapse_num_file, 'r') as file:
         for line in file:
             line = line.strip().split()
+            if line[0][0] == "#":
+                continue
             try:
                 collapse_num_dict[line[0]] = int(line[1])
             except:

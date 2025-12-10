@@ -3,6 +3,7 @@
 from multilevel_cluster_v2 import multilevel_cluster
 from collections import defaultdict
 import matplotlib.pyplot as plt
+import networkit as nk
 import networkx as nx
 import igraph as ig
 import pandas as pd
@@ -45,9 +46,10 @@ def read_c(c):
     with open(c, 'r') as file:
         for line in file:
             line = line.strip().split('\t')
-            for utg in line[2].split():
-                cluster_dict[line[0]].append(utg)
-                utg_group_dict[utg].append(line[0])
+            if len(line) >= 3:
+                for utg in line[2].split():
+                    cluster_dict[line[0]].append(utg)
+                    utg_group_dict[utg].append(line[0])
     return cluster_dict, utg_group_dict
 
 
@@ -243,7 +245,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--collase_num', required=True,
                         help='<filepath> collapse num for utgs')
     parser.add_argument('-chr', '--chromosome', required=True,
-                        help='<filepath>all utg for chrompsome')
+                        help='<filepath>all utg for chromesome')
     parser.add_argument('-l', '--links', required=True,
                         help='<filepath>hic links for utgs')
     parser.add_argument('-a', '--allele', required=True,

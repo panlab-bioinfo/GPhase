@@ -164,7 +164,7 @@ def run(correct_collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, clus
             min_allele_group, max_allele_group = list(unreassign_groups_allele_sorted)[0], list(unreassign_groups_allele_sorted)[n_hap - len(reassign_list) -1]
 
             if unreassign_groups_hic_sorted[max_hic_group] == 0 and unreassign_groups_allele_sorted[max_allele_group] ==0:
-                continue
+                break
 
             hic_list = list(unreassign_groups_hic_sorted.keys())
             allele_list = list(unreassign_groups_allele_sorted.values())
@@ -240,7 +240,7 @@ def louvain_reassign_allele(collapse_num_file, chr_file, l, c ,r, a, output_pref
     if find_best_isolated:
         no_expand_allele_dict, no_expand_ctg_allele_dict = read_allele(no_expand_allele)
         variance_list = list()
-        isolated_list = np.arange(1, 10, 0.25).tolist()
+        isolated_list = np.arange(1, 10, 1).tolist()
         for isolated in isolated_list:
             del cluster_dict
             cluster_dict, utg_group_dict = read_c(c)

@@ -8,12 +8,12 @@ usage() {
     echo "|"
     echo "|Required Parameters:"
     echo "|  -f     <fa_file>                : The FASTA file containing the utg sequences."
-    echo "|  -r     <reads_files>            : One or more FASTQ(.gz) files."
     echo "|  -p     <output_prefix>          : The prefix for the output files."
     echo "|  -t     <threads>                : The number of threads (default: 32)."
+    echo "|  -r     <reads_files>            : One or more FASTQ(.gz) files, if there are multiple hifi reads files, the -r parameter needs to be placed last."
     echo "|"
     echo "|Example:"
-    echo "|  bash $0 -f asm.fa -r hifi_read1.fq.gz hifi_read2.fq.gz -p output_prefix -t 32"
+    echo "|  bash $0 -f asm.fa -p output_prefix -t 32 -r hifi_read1.fq.gz"
     exit 1
 }
 
@@ -24,42 +24,32 @@ output_prefix=""
 threads=""
 default_threads=32
 
-reads_files=()
+r_flag=0
 
-TEMP=$(getopt -o f:r:p:t: -- "$@")
-if [ $? != 0 ]; then
-    echo "Error: Invalid arguments."
-    usage
-fi
-eval set -- "$TEMP"
-
-while true; do
-    case "$1" in
-        -f) fa_file="$2"; shift 2 ;;
-        -r) 
-            shift
-            while [[ $# -gt 0 && "$1" != -* ]]; do
-                reads_files+=("$1")
-                shift
-            done
-            ;;
-        -p) output_prefix="$2"; shift 2 ;;
-        -t) 
-            case "$2" in
-                "" | --) threads=$default_threads; shift 1 ;;
-                *) threads="$2"; shift 2 ;;
-            esac
-            ;;
-        --) shift; break ;;
-        *) usage; exit 1 ;;
+while getopts ":f:p:t:r" opt; do
+    case $opt in
+        f) fa_file="$OPTARG" ;;
+        p) output_prefix="$OPTARG" ;;
+        t) threads="$OPTARG" ;;
+        r)
+            r_flag=1 ;;
+        ?) usage; exit 1 ;;
     esac
 done
 
+shift $((OPTIND - 1))
+if [[ $r_flag -eq 1 ]]; then
+    while [[ $# -gt 0 && "$1" != -* ]]; do
+        reads_files+=("$1")
+        shift
+    done
+fi
 
 # Validate required arguments
 if [ -z "$fa_file" ] || [ -z "$output_prefix" ] || [ ${#reads_files[@]} -eq 0 ]; then
     echo "Error: Missing required arguments."
     usage
+    exit 1
 fi
 
 # Check fasta exists
@@ -76,8 +66,8 @@ LOG_INFO() {
     time=$(date "+%Y-%m-%d %H:%M:%S")
     log_file=$1
     flag=$2
-    msg=$3
-    echo "${time} <popCNV_pipeline> [${flag}] ${msg}" >> ${log_file}
+    shift 2
+    echo "${time} <popCNV_pipeline> [${flag}] $* " >> "$log_file"
 }
 
 
