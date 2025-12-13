@@ -79,9 +79,9 @@ def parse_arguments() -> argparse.Namespace:
 
     haphic_group  = parser.add_argument_group('>>> Parameters for HapHiC sort')
     haphic_group .add_argument("--min_len", metavar='\b',type=int, default=100, help="minimum scaffold length(kb), default: 100")
-    haphic_group .add_argument("--mutprob", metavar='\b', type=float, default=0.3, help="mutation probability in the genetic algorithm, default: 0.3")
-    haphic_group .add_argument("--ngen", metavar='\b', type=int, default=5000, help="number of generations for convergence, default: 5000")
-    haphic_group .add_argument("--npop", metavar='\b', type=int, default=100, help="mopulation size, default: 100")
+    haphic_group .add_argument("--mutprob", metavar='\b', type=float, default=0.6, help="mutation probability in the genetic algorithm, default: 0.6")
+    haphic_group .add_argument("--ngen", metavar='\b', type=int, default=20000, help="number of generations for convergence, default: 20000")
+    haphic_group .add_argument("--npop", metavar='\b', type=int, default=200, help="mopulation size, default: 200")
     haphic_group .add_argument("--processes", metavar='\b', type=int, default=32, help="processes for fast sorting and ALLHiC optimization, default: 32")
 
     
@@ -95,7 +95,6 @@ def check_file_exists_and_not_empty(file_path: Union[str, Path], logger: logging
     :param action_name: Descriptive name of the action that was expected to create the file.
     :param min_size: Minimum required size in bytes (default 0).
     :raises FileNotFoundError: If the file does not exist.
-    :raises EOFError: If the file size is less than or equal to min_size.
     """
     file_path = Path(file_path)
     if not file_path.exists():
@@ -115,7 +114,7 @@ def trans_agp(agp_file, original_agp, output_file, logger):
     action_name = f"AGP translation: {agp_file} to {output_file}"
 
     # Parse new AGP to get mapping
-    with open(agp_file) as f:
+    with open(agp_file, 'r') as f:
         for line in f:
             if line.startswith("#") or line.strip() == "":
                 continue
@@ -128,20 +127,20 @@ def trans_agp(agp_file, original_agp, output_file, logger):
 
     # Write translated AGP
     with open(output_file, "w") as out:
-        for i, (scaffold, pairs) in enumerate(scaffold_map.items(), 1):
+        for scaffold, pairs in scaffold_map.items():
             if not pairs:
                 continue
 
             ori, target = pairs[0]
-
-            if len(pairs) == 1:
+            if len(scaffold_map[scaffold]) == 1:
                 # Direct rewrite for single components
-                with open(original_agp) as orig_f:
+                with open(original_agp, 'r') as orig_f:
                     for line in orig_f:
                         if line.startswith("#") or line.strip() == "":
                             out.write(line)
                             continue
                         fields = line.strip().split('\t')
+                        # print(f"{fields[0]}\t{target}")
                         if fields[0] == target:
                             fields[0] = scaffold
                             out.write('\t'.join(fields) + "\n")
@@ -151,7 +150,6 @@ def trans_agp(agp_file, original_agp, output_file, logger):
 
                 with open("joins.txt", "w") as jf:
                     jf.write(join_string)
-                
                 # Run agptools
                 cmd = ["agptools", "join", "joins.txt", original_agp, "-n100"]
                 result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -161,11 +159,10 @@ def trans_agp(agp_file, original_agp, output_file, logger):
                         out.write(line + "\n")
 
                 os.remove("joins.txt")
-    
+
     # Check if the final output file exists and is non-empty
     check_file_exists_and_not_empty(output_file, logger, action_name, min_size=10)
     return True
-                        
 
 def split_pairs(hap_num, chr_num, map_file, logger):
     """Splits HiC pairs file based on the clustered contig list."""
@@ -386,6 +383,21 @@ def process_haplotype(pwd: str, chr_num: int, hap_num: int, args: argparse.Names
         logger.info(f"{action_name} run Get_subgraph_scaffold...")
         try:
             Get_subgraph_scaffold(args.digraph_file, args.RE_file, args.HiC_file, group_file, args.subgraph_file, args.gfa_file)
+            # script_path = os.path.abspath(sys.path[0])
+            # logger.info(f"script_path:{script_path}")
+            # command = [
+            #     "python", os.path.join(script_path, "get_subgraph_scaffold.py"),
+            #     "-c", f"{group_file}",
+            #     "-l", f"{args.HiC_file}",
+            #     "-subgraph", f"{args.subgraph_file}",
+            #     "-graph", f"{args.gfa_file}", 
+            #     "-digraph", f"{args.digraph_file}", 
+            #     "-r", f"{args.RE_file}"
+            # ]
+
+            # if not run_command([command], shell=True, logger=logger, action_prefix=action_name):
+            #     logger.error(f"Run get_subgraph_scaffold.py error...")
+            #     return False
             check_file_exists_and_not_empty(subgraph_agp, logger, "Get_subgraph_scaffold execution", min_size=10)
         except Exception as e:
             logger.error(f"Error in Get_subgraph_scaffold: {str(e)}")
@@ -564,7 +576,7 @@ def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
         script_path_add = os.path.join(script_path, "../src/HapHiC/haphic")
         script_content_1 = f"""
             cd {haphic_dir}
-            {script_path_add} sort {merge_fa} {merge_ht} split_clms/ groups_REs/* --mutprob {args.mutprob} --ngen {args.ngen} --npop {args.npop}  --processes {args.processes}
+            {script_path_add} sort {merge_fa} {merge_ht} split_clms/ groups_REs/* --mutprob {args.mutprob} --ngen {args.ngen} --npop {args.npop}  --processes {args.processes} 
         """
         with tempfile.NamedTemporaryFile(delete=False) as temp_script:
             temp_script.write(script_content_1.encode())
@@ -577,16 +589,16 @@ def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
         logger.info("HapHiC sort completed.")
 
         # Copy singleton tour files
-        os.chdir(os.path.join(haphic_dir, "final_tours"))
         for group in one_contigs_list:
-            os.symlink("../" + group, group)  
+            if not os.path.exists(group):
+                os.symlink("../" + group, group)  
 
         os.chdir(haphic_dir)
         
         # HapHiC build
         script_content_2 = f"""
             cd {haphic_dir}
-            {script_path_add} build {merge_fa} {merge_fa} {merge_fa} final_tours/*tour
+            {script_path_add} build {merge_fa} {merge_fa} {merge_fa} *tour
             seqkit sort {scaffolds_fa} > {scaffolds_sort_fa}
             samtools faidx {scaffolds_sort_fa}
         """
@@ -603,44 +615,19 @@ def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
         if not trans_agp("scaffolds.agp", merge_agp, final_agp, logger):
             logger.error("Final AGP translation failed.")
             return False
-        
+
         # Post-processing and Rescue steps
         os.chdir(os.path.join(haphic_dir, "../"))
 
-        # Rescue and connect utg base graph
-        try:
-            Rescue_base_graph(args.digraph_file, f"HapHiC_sort/{final_agp}", args.gfa_file, args.RE_file, args.fa_file)
-            # Check for rescue AGP files
-            check_file_exists_and_not_empty(final_rescue_agp, logger, "Rescue_base_graph execution", min_size=100)
-            check_file_exists_and_not_empty(final_contig_agp, logger, "Rescue_base_graph execution", min_size=100)
-            logger.info("GPhase rescue completed.")
-        except Exception as e:
-            logger.error(f"Error in Rescue_base_graph: {str(e)}")
-            return False
-
         # Sort files
         sort_file(f"HapHiC_sort/{final_agp}")
-        sort_file(final_rescue_agp)
-        sort_file(final_contig_agp)
-
         Path(f"HapHiC_sort/{final_agp}").rename(f"{final_agp}")
-
-        # Get rescue fasta
-        haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
-        cmd = [f"{haphic_utils_dir}/agp_to_fasta", final_contig_agp, "gphase_final_contig.fasta"]
-        
-        with open(final_contig_fasta, "w") as outfile:
-            if subprocess.run(cmd, stdout=outfile).returncode != 0:
-                logger.error("agp_to_fasta failed to run.")
-                return False
-        # Check rescue FASTA file
-        check_file_exists_and_not_empty(final_contig_fasta, logger, "agp_to_fasta execution", min_size=100)
 
         # Rename scaffolds.sort.fa
         src_file = os.path.join(haphic_dir, scaffolds_sort_fa)
         shutil.copy(src_file, final_fasta)
         check_file_exists_and_not_empty(final_fasta, logger, "Final FASTA copy", min_size=100)
-        
+
         return True
     except (FileNotFoundError, EOFError, Exception) as e:
         logger.error(f"Error during final merge: {str(e)}")
@@ -688,12 +675,50 @@ def main():
                 sys.exit(1)
 
 
-    # Final merge
-    logger.info("Starting HapHiC sort and final rescue...")
+    # haphic sort & build
+    logger.info("Starting HapHiC sort...")
     if not haphic_sort(pwd, args,logger):
         logger.error("Error in HapHiC sort and final rescue. Exiting.")
         sys.exit(1)
-    
+
+    # GPhase rescue using assembly graph 
+    logger.info("Starting final rescue...")
+    try:
+        final_agp = "gphase_final.agp"
+        final_rescue_agp = "gphase_final_rescue.agp"
+        final_contig_agp = "gphase_final_contig.agp"
+        final_contig_fasta = "gphase_final_contig_scaffold.fasta"
+        final_fasta = "gphase_final.fasta"
+
+        # Rescue and connect utg base graph
+        try:
+            Rescue_base_graph(args.digraph_file, f"{final_agp}", args.gfa_file, args.RE_file, args.fa_file)
+            # Check for rescue AGP files
+            check_file_exists_and_not_empty(final_rescue_agp, logger, "Rescue_base_graph execution", min_size=100)
+            check_file_exists_and_not_empty(final_contig_agp, logger, "Rescue_base_graph execution", min_size=100)
+            logger.info("GPhase rescue completed.")
+        except Exception as e:
+            logger.error(f"Error in Rescue_base_graph: {str(e)}")
+            return False
+
+        script_path = os.path.abspath(sys.path[0])
+        haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
+        cmd = [f"{haphic_utils_dir}/agp_to_fasta", final_contig_agp, "gphase_final_contig.fasta"]
+        
+        with open(final_contig_fasta, "w") as outfile:
+            if subprocess.run(cmd, stdout=outfile).returncode != 0:
+                logger.error("agp_to_fasta failed to run.")
+                return False
+        # Check rescue FASTA file
+        check_file_exists_and_not_empty(final_contig_fasta, logger, "agp_to_fasta execution", min_size=100)
+
+        sort_file(final_rescue_agp)
+        sort_file(final_contig_agp)
+
+    except Exception as e:
+        logger.error(f"An exception occurred during rescue using assembly graph: {e}")
+        sys.exit(1)
+
     logger.info("Program completed successfully.")
 
 if __name__ == "__main__":

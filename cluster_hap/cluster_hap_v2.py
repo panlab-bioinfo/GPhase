@@ -207,12 +207,6 @@ def reassign(collapse_num_file, utg_rescue_file, filtered_links_file, cluster_di
 
 def check_cluster_length(cluster_length_list, hap_number):
 
-    # avg = sum(cluster_length_list)/hap_number、
-    # for length in cluster_length_list:
-    #     if length < avg/2:
-    #         return False
-    # return True
-
     if not cluster_length_list:
         return False
     

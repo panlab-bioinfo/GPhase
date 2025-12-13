@@ -67,7 +67,7 @@ LOG_INFO() {
     log_file=$1
     flag=$2
     shift 2
-    echo "${time} <popCNV_pipeline> [${flag}] $* " >> "$log_file"
+    echo "${time} <popCNV_pipeline> [${flag}] $@" >> "$log_file"
 }
 
 

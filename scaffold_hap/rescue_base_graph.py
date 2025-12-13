@@ -9,7 +9,7 @@ import re
 
 
 def read_RE(REFile):
-    """读取RE文件，返回 {ctg: (RE1, RE2)}"""
+    """read RE file"""
     ctg_RE_dict = {}
     with open(REFile, 'r') as fp:
         for line in fp:
@@ -21,7 +21,7 @@ def read_RE(REFile):
     return ctg_RE_dict
 
 def read_gfa(file_path):
-    """读取GFA文件，返回 dict，记录 forward/reverse list"""
+    """read gfa file"""
     gfa_graph = defaultdict(lambda: {"forward_list": [], "reverse_list": [], "edges": {}})
     utgs_set = set()
     with open(file_path, 'r') as f:
@@ -48,7 +48,7 @@ def read_gfa(file_path):
     return gfa_graph, utgs_set
 
 def read_graph_igraph(edge_file):
-    """读取边文件并构建 igraph Graph"""
+    """build igraph Graph"""
     edges = []
     nodes = set()
     with open(edge_file, 'r') as f:
@@ -69,7 +69,7 @@ def read_graph_igraph(edge_file):
     return g, name_to_idx
 
 def read_agp(agp_file):
-    """读取AGP，返回 {scaffold: [(utg, dir), ...]}"""
+    """read agp file, return  {scaffold: [(utg, dir), ...]}"""
     scaffolds = defaultdict(list)
     with open(agp_file, 'r') as f:
         for line in f:
@@ -301,7 +301,6 @@ def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
 
                 if connected:
                     next_seq = utg_seq_dict[next_utg_id]
-                    # 使用 updated_df 第七列和第八列裁剪实际序列
                     try:
                         start_pos = int(row_next.iloc[6])  
                         end_pos = int(row_next.iloc[7])   
@@ -312,7 +311,7 @@ def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
                     except (ValueError, IndexError) as e:
                         actual_length = len(next_seq)
 
-                    # 根据方向转换
+                    # trans direction
                     if next_orientation == '-':
                         next_seq = reverse_complement(next_seq)
 
@@ -338,7 +337,7 @@ def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
 
             i = j if j > i else i + 1
 
-    # 添加未在 AGP 的 contig
+    # add contig that not in AGP 
     agp_utg_ids = set(updated_df[updated_df['type'] == 'W']['object'])
     for utg_id in utg_seq_dict:
         if utg_id not in agp_utg_ids:
@@ -349,7 +348,7 @@ def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
 
                 scaffold_seq_dict[f"{utg_id}:{start}:{end}_+"] = utg_seq_dict[utg_id]
 
-    # 输出 fasta
+    # fasta
     with open("gphase_final_contig.fasta", 'w') as f,  open("gphase_final_ctg2utg.txt", 'w') as f2:
         for idx, (scaffold_name, seq) in enumerate(scaffold_seq_dict.items(), 1):
 
@@ -449,7 +448,7 @@ def utg_to_ctg_agp(updated_df, ctg2utg_file, fasta_file, output_agp="gphase_fina
 
             length = ctg_len.get(ctg)
             if length is None:
-                raise KeyError(f"CTG '{ctg}' 未在 fasta 文件中找到！")
+                raise KeyError(f"CTG '{ctg}' not found in fasta file...")
             agp_lines.append([
                 scaffold,
                 current_pos,

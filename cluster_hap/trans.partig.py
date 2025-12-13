@@ -71,8 +71,8 @@ def read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, graph_alle
                 contig2 = fai_dict[scontig2]
                 if tuple(sorted([contig1, contig2])) in graph_allele_dict:
                     continue
-                # if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1) or ctg_RE_len[contig1][1] < 10000 or ctg_RE_len[contig2][1] < 10000:
-                if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1):
+                if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1) or ctg_RE_len[contig1][1] < 50000 or ctg_RE_len[contig2][1] < 50000:
+                # if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1):
                     continue
 
                 output_f.write(f"{contig1},{contig2},{line[7]}\n")
@@ -80,10 +80,9 @@ def read_partig(partig_file, fai_dict, fai_reverse_dict, output_file, graph_alle
     with open(output_file, 'a') as output_f2:
         for (utg1, utg2) in graph_allele_dict:
 
-            # if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1) or ctg_RE_len[contig1][1] < 10000 or ctg_RE_len[contig2][1] < 10000:
-            if G.has_edge(contig1, contig2) or G.has_edge(contig2, contig1):
+            if G.has_edge(utg1, utg2) or G.has_edge(utg2, utg1) or ctg_RE_len[utg1][1] < 50000 or ctg_RE_len[utg2][1] < 50000:
+            # if G.has_edge(utg1, utg2) or G.has_edge(utg2, utg1):
                 continue
-
             sim = 1 
             output_f2.write(f"{utg1},{utg2},{sim}\n")
 

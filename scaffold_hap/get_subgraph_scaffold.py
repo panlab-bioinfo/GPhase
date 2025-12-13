@@ -19,7 +19,7 @@ def read_group(group_file):
 
 def read_digraph(digraph_file):
 
-    digraph_dict = defaultdict()
+    digraph_dict = defaultdict(tuple)
     with open(digraph_file, 'r') as file:
         for line in file:
             line = line.strip().split(',')
@@ -31,10 +31,7 @@ def read_digraph(digraph_file):
 
 def read_l(l):
     hic_nei_dict = defaultdict(set)
-    hic_links_dict = defaultdict()
-
-    hic_nei_dict = defaultdict(set)
-    hic_links_dict = defaultdict()
+    hic_links_dict = defaultdict(set)
     with open(l, 'r') as file:
         for line in file:
             line = line.strip().split(',')
@@ -59,7 +56,7 @@ def read_RE(REFile):
 def read_subgraph(subgraph_file):
 
     subgraph_ctgs_dict = defaultdict(list)
-    ctg_subgraph_dict = defaultdict()
+    ctg_subgraph_dict = defaultdict(str)
     with open(subgraph_file, 'r') as file:
         for line in file:
             line = line.strip().split()
@@ -74,7 +71,7 @@ def read_subgraph(subgraph_file):
 def filter_subgraph(subgraph_ctgs_dict, ctg_subgraph_dict, ctgs_list):
 
     filter_subgraph_ctgs_dict = defaultdict(list)
-    filter_ctg_subgraph_dict = defaultdict()
+    filter_ctg_subgraph_dict = defaultdict(str)
     for subgraph_num, subgraph_ctgs in subgraph_ctgs_dict.items():
         intersection = set(subgraph_ctgs).intersection(set(ctgs_list))
         if len(intersection):
@@ -85,7 +82,7 @@ def filter_subgraph(subgraph_ctgs_dict, ctg_subgraph_dict, ctgs_list):
 
 def get_subgraph_link(digraph_dict, subgraph_ctgs_dict, ctg_subgraph_dict):
 
-    subgraph_connect_dict = defaultdict()
+    subgraph_connect_dict = defaultdict(tuple)
     for (ctg1, ctg2) in digraph_dict:
         subgraph1 = ctg_subgraph_dict.get(ctg1, None)
         subgraph2 = ctg_subgraph_dict.get(ctg2, None)
@@ -258,7 +255,7 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
 
 
         topo_order = list(nx.topological_sort(subgraph_digraph))
-        #print(f"topo_order:{topo_order}")
+        # print(f"topo_order:{topo_order}")
 
 
         for i in range(len(topo_order)-1):
@@ -298,7 +295,7 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
                         if subgraph in topo_order_list_cp[idx1]:
                             topo_order_list_cp[idx1].remove(subgraph)
     
-    #print(f"Final : {topo_order_list_cp}")
+    # print(f"Final : {topo_order_list_cp}")
     return topo_order_list_cp
 
 
@@ -316,7 +313,7 @@ def get_filter_subgraph_digraph(filter_subgraph_ctgs_dict, filter_ctg_subgraph_d
         global_digraph.nodes[node]['direction'] = 1
 
     graphs_dict = dict()
-    group_subgraph_dict, ctg_group_dict = defaultdict(list), defaultdict()
+    group_subgraph_dict, ctg_group_dict = defaultdict(list), defaultdict(str)
     subgraph_all_list = [ subgraph for subgraph_list in topo_order_list for subgraph in subgraph_list]
     for idx, subgraph_list in enumerate(topo_order_list):
         graph = nx.DiGraph()
@@ -400,7 +397,7 @@ def get_filter_subgraph_digraph(filter_subgraph_ctgs_dict, filter_ctg_subgraph_d
     return graphs_dict, global_digraph
 
 
-def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_digraph):
+def get_topological_sort(ctgs_list, digraph, ctgs, hic_links_dict, hic_nei_dict, global_digraph):
 
     digraph_nk, node_map, rev_map = nx_to_nk_graph(digraph, weighted=True)
 
@@ -413,37 +410,74 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
         else:
             digraph_copy[u][v]['weight'] = 0.0
 
+    # if "" in ctgs:
+    #     output_file = "digraph_copy_edges.csv"
+
+    #     with open(output_file, "w", newline="") as f:
+    #         writer = csv.writer(f, delimiter=",")
+    #         writer.writerow(["source", "target", "weight"])
+
+    #         for u, v, data in digraph_copy.edges(data=True):
+    #             weight = data.get("weight", 0.0)
+    #             writer.writerow([u, v, weight])
 
     if len(ctgs) == 1:
         ctgs_dir_path_filter_dict[0] = [(ctgs[0],1)]
         return ctgs_dir_path_filter_dict
 
-
     while True:
-            digraph_copy_nk, node_map, rev_map = nx_to_nk_graph(digraph_copy, weighted=False)
-            scc = nk.components.StronglyConnectedComponents(digraph_copy_nk)
-            scc.run()
-            components = scc.getComponents()
+        digraph_copy_nk, node_map, rev_map = nx_to_nk_graph(digraph_copy, weighted=False)
+        scc = nk.components.StronglyConnectedComponents(digraph_copy_nk)
+        scc.run()
+        components = scc.getComponents()
 
-            has_cycle = False
+        has_cycle = False
 
-            for comp in components:
-                if len(comp) > 1:
-                    has_cycle = True
-                    nodes = [rev_map[i] for i in comp]
+        for comp in components:
+            if len(comp) > 1:
+                has_cycle = True
+                nodes = [rev_map[i] for i in comp]
 
-                    for u in nodes:
-                        for v in digraph_copy.successors(u):
-                            if v in nodes:
-                                digraph_copy.remove_edge(u, v)
-                                break
-                        else:
-                            continue
-                        break
-                    break 
+                for u in nodes:
+                    for v in digraph_copy.successors(u):
+                        if v in nodes:
+                            digraph_copy.remove_edge(u, v)
+                            break
+                    else:
+                        continue
+                    break
+                break 
 
-            if not has_cycle:
-                break
+        if not has_cycle:
+            break
+
+    # rm tip utg
+    tip_list = list()
+    for node in digraph_copy.nodes():
+        successors = list(digraph_copy.successors(node))
+        predecessors = list(digraph_copy.predecessors(node))
+
+        if len(successors) == 1 and len(predecessors) == 0:
+            successors_node = successors[0]
+            successors_node_predecessors = list(digraph_copy.predecessors(successors_node))
+            if len(successors_node_predecessors) >=2 :
+                tip_list.append(node)
+        if len(predecessors) == 1 and len(successors) == 0:
+            predecessors_node = predecessors[0]
+            predecessors_node_successors = list(digraph_copy.successors(predecessors_node))
+            if len(predecessors_node_successors) >=2 :
+                tip_list.append(node)
+        
+        if len(predecessors) == 1 and len(successors) == 1 and len(set(successors) & set(predecessors)) == 1:  
+            tip_list.append(node)
+
+    # print(f"tip_list:{tip_list}")
+    for node in tip_list:
+        for p in list(digraph_copy.predecessors(node)):
+            digraph_copy.remove_edge(p, node)
+        for s in list(digraph_copy.successors(node)):
+            digraph_copy.remove_edge(node, s)
+        digraph_copy.remove_node(node)
 
     topo_order = list(nx.topological_sort(digraph_copy))
 
@@ -451,7 +485,9 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
 
 
     if len(ctgs_sort) != len(ctgs):
-        ctgs_sort = list(set(graph.nodes()) & set(ctgs))
+        ctgs_sort += set(ctgs) - set(ctgs_sort)
+    
+    # print(ctgs_sort)
     
     ctgs_sort_check = list()
     break_points_list = list()
@@ -463,7 +499,7 @@ def get_topological_sort(digraph, ctgs, hic_links_dict, hic_nei_dict, global_dig
             successors = list(digraph.successors(ctgs_sort[i]))
             predecessors = list(digraph.predecessors(ctgs_sort[i+1]))
 
-            #if len(successors) > 1 or len(predecessors) > 1:
+            # if len(successors) > 1 or len(predecessors) > 1:
             #    break_points_set.add(i+1)
 
 
@@ -535,7 +571,6 @@ def get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict, global_di
 
     filter_subgraph_sort_dir_dict = defaultdict(list)
     filter_subgraph_sort_dict = defaultdict(list)
-    ctg_subgraphList_dict = defaultdict()
     subgraphGroup_RE_dict = defaultdict(tuple)
     
     subgraphGroup_idx = 1
@@ -553,9 +588,7 @@ def get_subgraph_group_inner_sort(graphs_dict, ctgs_list, ctg_RE_dict, global_di
             subgraphGroup_idx += 1
             continue
 
-
-
-        ctgs_dir_path_filter_dict = get_topological_sort(graph, ctgs, hic_links_dict, hic_nei_dict, global_digraph)
+        ctgs_dir_path_filter_dict = get_topological_sort(ctgs_list, graph, ctgs, hic_links_dict, hic_nei_dict, global_digraph)
         
         
         for subgraphGroup, ctgs_dir_path_filter in ctgs_dir_path_filter_dict.items():

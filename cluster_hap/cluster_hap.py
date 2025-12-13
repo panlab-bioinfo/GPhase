@@ -110,7 +110,7 @@ def execute_command(command, error_message,logger):
 # --- Check if file exists and is not empty ---
 def check_file_exists_and_not_empty(filepath: str, logger: logging.Logger, action_name: str) -> None:
     """Check if a file exists and is not empty. Raise an error if it fails."""
-    logger.info(action_name)
+    # logger.info(action_name)
     if not os.path.exists(filepath):
         logger.error(f"File check failed for: {filepath}")
         raise FileNotFoundError(f"{action_name} failed: Required file not found: {filepath}")
@@ -498,7 +498,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                     initial_r=1.0,
                     min_r=0.01,
                     max_r=3,
-                    step=0.01,
+                    step=0.03,
                     cluster_output=cluster_output,
                     csv_file="louvain_nei.csv", 
                     utg_file=utg_rescue_file,

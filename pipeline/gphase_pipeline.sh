@@ -102,7 +102,7 @@ Usage: $(basename "$0") pipeline -f <fa_file> -g <gfa> -c <collapse_num_file> -m
   -g                  <gfa>                      : The GFA file representing the assembly graph.
   -c                  <collapse_num_file>        : The file that number information for collapse unitigs.
   -m                  <map_file>                 : The mapping file used to map the Hi-C reads (bam or pairs).
-  -p                  <output_prefix>            : The prefix for the output files.
+  -p                  <output_prefix>            : The prefix for the output files. Only [a-zA-Z0-9.] allowed.
   --n_chr             <n_chr>                    : The number of chromosomes (integer, > 0).
   --n_hap             <n_hap>                    : The number of haplotypes (integer, > 0).
 
