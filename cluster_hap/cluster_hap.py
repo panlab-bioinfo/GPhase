@@ -619,7 +619,7 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
                     logger.info(
                     f"Chr{chr_num}: The number of clusters loaded from '{cluster_output}' ({df_len}) "
                     f"is not euqal the required haplotype number ({int(args.hap_number)}). "
-                    f"Spectral Clustering will be used to cluster the haplotype. Alternatively, alternatively, you can cluster haplotypes yourself using a reference genome and then use the subsequent steps of GPhase.")
+                    f"Spectral Clustering will be used to cluster the haplotype. Alternatively, You can adjust the --hap_pm parameter and re-cluster the data...")
 
                     # Spectral Clustering
                     run_spectral_clustering_fallback(filtered_links_file, cluster_output, int(args.hap_number), logger)

@@ -118,7 +118,7 @@ Usage: $(basename "$0") pipeline -f <fa_file> -g <gfa> -c <collapse_num_file> -m
   --chr_pm            <partig_chr_pm>            : Similarity of partig when clustering chr [0.8 <= x < 1], default: 0.95.
 
 >>> clustering haplotypes Parameters:
-  --hap_pm            <partig_hap_pm>            : Similarity of partig when clustering hap [0.6 <= x < 1], default: 0.60.
+  --hap_pm            <partig_hap_pm>            : Similarity of partig when clustering hap [0.6 <= x < 1], default: 0.7.
   --expand                                       : Whether to expand the allele, default: False.
   --rescue                                       : Whether to rescue the subgraph, default: False.
   --reassign_number   <reassign_number>          : Number of reassign step [1-3], default: 1.
@@ -152,7 +152,7 @@ cluster_q=1
 scaffold_q=0
 split_gfa_n=5
 chr_pm="0.95"
-hap_pm="0.60"
+hap_pm="0.7"
 thread=12
 min_len=200
 mutprob="0.6"
@@ -215,6 +215,8 @@ while true; do
 done
 
 [[ -z "$fa_file" || -z "$gfa" || -z "$collapse_num_file" || -z "$map_file" || -z "$n_chr" || -z "$n_hap" || -z "$output_prefix" ]] && die "Missing required arguments. See -h/--help."
+
+[[ "$output_prefix" =~ ^[a-zA-Z0-9.]+$ ]] || die "--output_prefix may only contain characters [a-zA-Z0-9.]"
 [[ ! "$n_chr" =~ ^[0-9]+$ || "$n_chr" -le 0 ]] && die "--n_chr must be positive integer"
 [[ ! "$n_hap" =~ ^[0-9]+$ || "$n_hap" -le 0 ]] && die "--n_hap must be positive integer"
 [[ ! "$cluster_q" =~ ^[0-9]+$ ]] && die "--cluster_q must be non-negative integer"
