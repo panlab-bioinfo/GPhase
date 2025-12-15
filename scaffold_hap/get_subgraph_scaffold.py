@@ -114,25 +114,34 @@ def nx_to_nk_graph(nx_graph, weighted=False):
             nk_graph.addEdge(node_map[u], node_map[v])
     return nk_graph, node_map, rev_map
 
-
-def has_multiple_paths(graph, source, target, limit=2):
+def has_multiple_paths(graph, source, target, limit=2, max_depth=5):
+    """
+    Check whether there are more than one path from source to target
+    using DFS (keeps the original logic but adds pruning for speed).
+    Parameters:
+        graph: nx.DiGraph
+        source: starting node
+        target: ending node
+        limit: return True immediately if found >= limit paths
+        max_depth: maximum recursion depth to avoid path explosion
+    """
     count = 0
 
-    def dfs(node, visited):
+    def dfs(node, visited, depth):
         nonlocal count
         if count >= limit:
+            return
+        if depth > max_depth:
             return
         if node == target:
             count += 1
             return
         for neighbor in graph.successors(node):
             if neighbor not in visited:
-                dfs(neighbor, visited | {neighbor})
+                dfs(neighbor, visited | {neighbor}, depth + 1)
 
-    dfs(source, {source})
+    dfs(source, {source}, 0)
     return count >= limit
-
-
 
 def n_hop_predecessors(G, node, N):
     n_hop_predecessors_set = set()
@@ -192,6 +201,8 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
 
             if nx.has_path(graph, node1, node2):
                 continue
+            # if graph.has_edge(node1, node2):
+            #     continue
 
             target_idx = node_map[node2]
             distance = dijkstra.distance(target_idx)
@@ -213,9 +224,6 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
             if len(path) - last_node_in_path_idx < Path_Length_T:
                 graph.add_edge(last_node_in_path, node2)
 
-
-
-
     topo_order_list = list()
     for component in nx.weakly_connected_components(graph):
         break_points_set = set()
@@ -225,7 +233,6 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
             continue
 
         subgraph_digraph = graph.subgraph(component).copy()
-
 
         while True:
             subgraph_digraph_nk, node_map, rev_map = nx_to_nk_graph(subgraph_digraph, weighted=False)
@@ -252,24 +259,17 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
             if not has_cycle:
                 break
 
-
-
         topo_order = list(nx.topological_sort(subgraph_digraph))
         # print(f"topo_order:{topo_order}")
 
-
         for i in range(len(topo_order)-1):
-
-
             is_strongly_connected = nx.has_path(graph, topo_order[i], topo_order[i+1])
             if not is_strongly_connected:
                 break_points_set.add(i+1)
                 continue
-
             # path number > 1
             if has_multiple_paths(graph, topo_order[i], topo_order[i+1]):
                 break_points_set.add(i+1)
-
 
             successors = list(graph.successors(topo_order[i]))
             predecessors = list(graph.predecessors(topo_order[i+1]))
@@ -277,13 +277,11 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
             if len(successors) > 1 or len(predecessors) > 1:
                 break_points_set.add(i+1)
 
-
         start = 0
         for break_points in break_points_set:
             topo_order_list.append(topo_order[start:break_points])
             start = break_points
         topo_order_list.append(topo_order[start:])
-
 
     topo_order_list_cp = cp.deepcopy(topo_order_list)
     for idx1, list1 in enumerate(topo_order_list):
@@ -486,7 +484,6 @@ def get_topological_sort(ctgs_list, digraph, ctgs, hic_links_dict, hic_nei_dict,
 
     if len(ctgs_sort) != len(ctgs):
         ctgs_sort += set(ctgs) - set(ctgs_sort)
-    
     # print(ctgs_sort)
     
     ctgs_sort_check = list()
