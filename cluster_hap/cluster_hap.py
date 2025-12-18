@@ -11,7 +11,7 @@ import argcomplete
 import networkx as nx
 from argcomplete.completers import FilesCompleter
 from multiprocessing import Pool, cpu_count
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
 from find_knees import find_best_knee
 from multilevel_cluster_v2 import multilevel_cluster
@@ -414,11 +414,10 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
 
         if df_len < int(args.hap_number):
             logger.error(
-            f"Chr{chr_num}: The number of UTGs loaded from '{utg_rescue_file}' ({df_len}) "
+            f"Chr{chr_num}: The number of Unitigs loaded from '{utg_rescue_file}' ({df_len}) "
             f"is less than the required haplotype number ({int(args.hap_number)}). "
-            f"Cannot proceed with clustering.")
-            sys.exit(1)
-
+            f"Cannot proceed with clustering. Please check if the chromosome clustering results are incorrect.")
+            raise ValueError(f"The number of Unitigs on chromosome {chr_num} is less than the number of haplotypes...") 
 
         # Process files with ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=args.thread_num) as executor:
@@ -765,14 +764,28 @@ def main():
         # Create partial function with fixed arguments
         process_chr = functools.partial(process_chromosome, args=args, pwd=pwd, partig_file=trans_partig_file,logger=logger)
         
-        # Process chromosomes in parallel
-        results = pool.map(process_chr, range(1, args.chr_number + 1))
-        
-        # Log results
-        for result in results:
-            logger.info(result)
-            if result.startswith("Failed"):
-                 raise Exception(f"Chromosome processing failed: {result}")
+        # # Process chromosomes in parallel
+        # results = pool.map(process_chr, range(1, args.chr_number + 1))
+        # # Log results
+        # for result in results:
+        #     logger.info(result)
+        #     if result.startswith("Failed"):
+        #          raise Exception(f"Chromosome processing failed: {result}")
+
+        try:
+            for result in pool.imap_unordered(process_chr, range(1, args.chr_number + 1)):
+                logger.info(result)
+                
+                if result.startswith("Failed"):
+                    logger.error(f"Chromosome processing failed: {result}")
+                    raise Exception(f"Chromosome processing failed: {result}")
+        except Exception as e:
+            logger.error(f"Aborting parallel processing due to error: {e}")
+            pool.terminate()
+            pool.join()
+            raise
+        else:
+            logger.info("All chromosomes processed successfully")
 
     # Step 4: Merge .reassign.cluster.txt files with modified first column format
     merged_output = f"{args.output_prefix}.hap.cluster.txt"
@@ -832,6 +845,7 @@ def main():
     check_file_exists_and_not_empty(merged_output, logger, "Checking final merged haplotype cluster file")
     
     logger.info(f"Successfully merged haplotypes phaseing files into {merged_output}")
+    logger.info(f"Haplotype clustering was successful; the next step is to scaffolding the haplotypes.")
 
 
 

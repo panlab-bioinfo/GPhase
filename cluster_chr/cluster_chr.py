@@ -673,7 +673,7 @@ def main():
     if check_file_exists_and_not_empty("rescue.cluster.ctg.txt", logger):
         logger.info(f"The clustering results of the {args.chr_number} chromosomes in gphase are stored in file: rescue.cluster.ctg.txt .")
 
-    logger.info("Program finished successfully.")
+    logger.info("Chromosome clustering was successful; haplotype clustering will be performed next.")
 
 if __name__ == "__main__":
     main()

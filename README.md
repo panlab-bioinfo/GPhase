@@ -62,6 +62,13 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
 ```
 
 # Output file
+GPhase will output a folder named gphase_output, which will generate the following four folders in sequence.
+- `preprocessing` : Data preprocessing
+- `cluster_chr` : Results of chromosome clustering
+- `cluster_hap` : Haplotype clustering results within each chromosome
+- `scaffold_hap` : Scaffolding results for each haplotype within each chromosome
+
+# Final assembly result
 - `gphase_final.agp` : unitig level assembly result agp file
 - `gphase_final.fasta` : unitig level assembly result fasta file
 - `gphase_final_rescue.agp` :  unitig level assembly result agp file after rescue

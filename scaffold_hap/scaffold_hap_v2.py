@@ -719,7 +719,7 @@ def main():
         logger.error(f"An exception occurred during rescue using assembly graph: {e}")
         sys.exit(1)
 
-    logger.info("Program completed successfully.")
+    logger.info("GPhase completed successfully.")
 
 if __name__ == "__main__":
     main()
