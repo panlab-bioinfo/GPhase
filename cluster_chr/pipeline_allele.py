@@ -99,7 +99,7 @@ def get_N80(len_list, threshold=0.8):
 def get_All_N80(utgs_list, ctg_RE_dict):
 
     len_list = [int(ctg_RE_dict[utg][1]) for utg in utgs_list if utg in ctg_RE_dict]
-    return get_N80(len_list, threshold=0.9)
+    return get_N80(len_list, threshold=0.85)
     
 
 

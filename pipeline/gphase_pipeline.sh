@@ -118,7 +118,8 @@ Usage: $(basename "$0") pipeline -f <fa_file> -g <gfa> -c <collapse_num_file> -m
   --chr_pm            <partig_chr_pm>            : Similarity of partig when clustering chr [0.8 <= x < 1], default: 0.95.
 
 >>> clustering haplotypes Parameters:
-  --hap_pm            <partig_hap_pm>            : Similarity of partig when clustering hap [0.6 <= x < 1], default: 0.7.
+  --hap_pm            <partig_hap_pm>            : Similarity of partig when clustering hap [0.6 <= x < 1], default: 0.7 .
+                                                  (For higher heterozygosity, a setting of 0.6 is recommended; for lower heterozygosity, a setting of 0.8 is recommended.)
   --expand                                       : Whether to expand the allele, default: False.
   --rescue                                       : Whether to rescue the subgraph, default: False.
   --reassign_number   <reassign_number>          : Number of reassign step [1-3], default: 1.

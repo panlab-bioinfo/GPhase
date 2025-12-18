@@ -413,10 +413,11 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
             raise ValueError(f"Chr{chr_num}: Loaded utg file error...")
 
         if df_len < int(args.hap_number):
-            raise ValueError(
+            logger.error(
             f"Chr{chr_num}: The number of UTGs loaded from '{utg_rescue_file}' ({df_len}) "
             f"is less than the required haplotype number ({int(args.hap_number)}). "
             f"Cannot proceed with clustering.")
+            sys.exit(1)
 
 
         # Process files with ThreadPoolExecutor

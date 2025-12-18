@@ -37,9 +37,8 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
 ```
 /path/to/GPhase/pipeline/popCNV_pipeline.sh \
 -f asm.fa \
--r reads.fq.gz \
 -p output_prefix \
--t 32
+-t 32 -r reads.fq.gz
 ```
 
 
@@ -77,6 +76,7 @@ To help you quickly verify the functionality of the software, we provide a small
 Use the following command to run the test dataset
 ```
 tar -zxvf test_dataset.tar.gz
+export PATH=$PATH:/path/to/GPhase
 bash run_gphase.sh
 ```
 # Contact

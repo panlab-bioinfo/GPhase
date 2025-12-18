@@ -1,5 +1,6 @@
 import pandas as pd
 import networkit as nk
+from statistics import median, mean
 from collections import defaultdict
 import argparse
 
@@ -40,6 +41,33 @@ def Louvain_cluster(g, id_to_node, resolution):
 
     return communities
 
+def calc_n50(lengths):
+    """
+    Calculate N50 from a list of lengths.
+    """
+    if not lengths:
+        return None
+
+    lengths = [x for x in lengths if int(x) > 0]
+    if not lengths:
+        return None
+
+    lengths.sort(reverse=True)
+    total = sum(lengths)
+
+    acc = 0
+    for L in lengths:
+        acc += L
+        if acc >= total / 2:
+            return L
+
+def check(lst):
+    if len(lst) < 2:
+        return []
+    total = sum(lst)
+    n = len(lst)
+    return {i for i, x in enumerate(lst) if x > float((total - x) / (n - 1)/3)}
+
 def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=None, Allele_cluster=None, n_chr=None):
     if RE_file:
         ctg_RE_len = read_REs(RE_file)
@@ -71,23 +99,46 @@ def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=No
 
     if check:
         filtered_chr_list = list()
-        chr_len_max, chr_len_dict = 0, defaultdict(int)
+        chr_len_max, chr_len_dict, chr_avg_dict = 0, defaultdict(int), defaultdict(float)
+        chr_utgs_dict, chr_N50_dict = defaultdict(set), defaultdict(int)
         chr_cluster_dict = defaultdict(set)
         for idx, group in communities.items():
-            sum_length = 0
+            utg_number_flag, sum_length = 0, 0
             for group_member in group:
                 for utg in cluster_dict.get(group_member, []):
                     chr_cluster_dict[idx].add(utg)
                     if utg in ctg_RE_len:
+                        chr_utgs_dict[idx].add(ctg_RE_len[utg][1])
+                        utg_number_flag += 1
                         sum_length += ctg_RE_len[utg][1]
+            if utg_number_flag <=0:
+                continue
+            chr_N50_dict[idx] = calc_n50(list(chr_utgs_dict[idx]))
+            chr_avg_dict[idx] = sum_length / utg_number_flag
             chr_len_dict[idx] = sum_length
             chr_len_max = sum_length if sum_length > chr_len_max else chr_len_max
+        
+        threshold_1 = sum(chr_len_dict.values()) / int(n_chr) / 3
+        filtered_chr_set_1 = {key for key, value in chr_len_dict.items() if value > threshold_1}
 
+        threshold_2 = chr_len_max / 5
+        filtered_chr_set_2 = {key for key, value in chr_len_dict.items() if value > threshold_2}
 
-        # threshold = ctg_len_All / int(n_chr) / 3
-        # threshold_1 = sum(chr_len_dict.values()) / int(n_chr) / 3
-        threshold_2 = chr_len_max / 10
-        filtered_chr_list = [key for key, value in chr_len_dict.items() if value > max(threshold_2, threshold_2)]
+        # Preventing rDNA utg clustering errors
+        threshold_3 = mean(chr_avg_dict.values()) / 3
+        filtered_chr_set_3 = {key for key, value in chr_avg_dict.items() if value > threshold_3}
+
+        # print(f"filtered_chr_set_1: {filtered_chr_set_1}")
+        # print(f"{threshold_1}\t{chr_len_dict}")
+        # print(f"filtered_chr_set_2: {filtered_chr_set_2}")
+        # print(f"filtered_chr_set_3: {filtered_chr_set_3}")
+        # print(f"{threshold_3}\t{chr_N50_dict}")
+
+        filtered_chr_list = list(sorted(
+            filtered_chr_set_1 &
+            filtered_chr_set_2 &
+            filtered_chr_set_3
+        ))
 
         group = 0
         with open(output_file, 'w') as file:
