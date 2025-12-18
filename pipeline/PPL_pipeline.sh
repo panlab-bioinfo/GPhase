@@ -8,12 +8,18 @@ log_path=$(pwd)
 log_file="${log_path}/PPL_pipeline.log"
 
 LOG_INFO() {
-    time=$(date "+%Y-%m-%d %H:%M:%S")
-    log_file=$1
-    flag=$2
-    msg=$3
-    echo "${time} <PPL_pipeline> [${flag}] ${msg}" >> ${log_file}
+    local time=$(date "+%Y-%m-%d %H:%M:%S")
+    local log_file="${1:-}" 
+    local flag="${2:-INFO}"  
+    local msg="${3:-}"  
+
+    if [[ -z "$log_file" ]]; then
+        echo "${time} <PPL_pipeline> [${flag}] ${msg}" >&2
+    else
+        echo "${time} <PPL_pipeline> [${flag}] ${msg}" >> "$log_file"
+    fi
 }
+
 ############################################
 # Print usage
 ############################################
@@ -90,10 +96,11 @@ LOG_INFO ${log_file} ""
 # Main pipeline code with logging
 ############################################
 LOG_INFO ${log_file} "info" "Running utils.VirDigestTool ..."
+clean_site=${site//[\^\$]/}
 java -Xmx64g -cp ${jar} utils.VirDigestTool \
     "$genome" \
     "$site" \
-    "${genome%%.*}.${site}.res.bed" 2>&1 | tee -a "$log_file"
+    ${genome%%.*}.${clean_site}.res.bed 2>&1 | tee -a "$log_file"
 
 LOG_INFO ${log_file} "info" "Running PPL.jar ..."
 java -Xmx64g -jar ${jar} --ligation_type res \
@@ -104,7 +111,7 @@ java -Xmx64g -jar ${jar} --ligation_type res \
     --prefix "${output_prefix}" \
     --skipmap N \
     --start_step 2 \
-    --restrictionsiteFile "${genome%%.*}.${site}.res.bed" \
+    --restrictionsiteFile "${genome%%.*}.${clean_site}.res.bed" \
     --thread "${threads}" \
     --cutoffMapq "${cutoffMapq}" \
     --filter res 2>&1 | tee -a "$log_file"
@@ -113,11 +120,10 @@ LOG_INFO ${log_file} "info" "Generating chromsizes ..."
 samtools faidx "${genome}" 2>&1 | tee -a "$log_file"
 cut -f1,2 "${genome}.fai" > "${genome}.chromsizes"
 LOG_INFO ${log_file} "info" "Chromsizes file: ${genome}.chromsizes"
-
+cd ${output_prefix}
+ln -s ../${genome}.chromsizes
 LOG_INFO ${log_file} "info" "Running utils.FilterHyper ..."
-java -Xmx64g -cp ${jar} utils.FilterHyper ./${output_prefix}/${output_prefix}.final.contacts ./${output_prefix}/${output_prefix}.final.filtered.contacts ${genome}.chromsizes 1000000 0.85
-
+java -Xmx64g -cp ${jar} utils.FilterHyper ${output_prefix}.final.contacts ${output_prefix}.final.filtered.contacts ${genome}.chromsizes 1000000 0.85
 LOG_INFO ${log_file} "info" "Running utils.Contact2Pairs ..."
-java -Xmx64g -cp ${jar} ${jar_path} utils.Contact2Pairs ./${output_prefix}/${output_prefix}.final.filtered.contacts ./${output_prefix}/map.PPL.pairs
-
+java -Xmx64g -cp ${jar} utils.Contact2Pairs ${output_prefix}.final.filtered.contacts map.PPL.pairs
 LOG_INFO ${log_file} "info" "All steps completed successfully!"
