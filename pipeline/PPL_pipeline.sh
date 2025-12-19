@@ -41,7 +41,7 @@ usage() {
     echo "|  -h                  Show help and exit"
     echo "|"
     echo "|Example:"
-    echo "|  bash $0 -j ./PPL-0.1.1.jar -f asm.fa -r reads.fq.gz -p PPL -t 32 -q 1"
+    echo "|  bash $0 -j /path/to/PPL.jar -g asm.fa -f reads.fq.gz -o PPL -t 32"
     exit 1
 }
 

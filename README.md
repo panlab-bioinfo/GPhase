@@ -26,9 +26,10 @@ chromap --preset hic -x index -r asm.fa -q 0 \
 To process Pore-C data, you can use [PPL Toolbox](https://github.com/versarchey/PPL-Toolbox). GPhase provides a script to run PPL Toolbox. You can quickly run it to get the final pairs file `map.PPL.pairs` and input it into GPhase.
 ```
 /path/to/GPhase/pipeline/PPL_pipeline.sh -j /path/to/PPL-Toolbox.jar \
--f asm.fa \
--r reads.fq.gz \
--p PPL
+-j /path/to/PPL.jar \
+-g asm.fa \
+-f reads.fq.gz \
+-o PPL
 ```
 
 
@@ -38,7 +39,8 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
 /path/to/GPhase/pipeline/popCNV_pipeline.sh \
 -f asm.fa \
 -p output_prefix \
--t 32 -r reads.fq.gz
+-t 32 \
+-r reads.fq.gz
 ```
 
 
@@ -69,6 +71,7 @@ GPhase will output a folder named gphase_output, which will generate the followi
 - `scaffold_hap` : Scaffolding results for each haplotype within each chromosome
 
 # Final assembly result
+The final assembly result file is located in the scaffold_hap folder and mainly contains the following:
 - `gphase_final.agp` : unitig level assembly result agp file
 - `gphase_final.fasta` : unitig level assembly result fasta file
 - `gphase_final_rescue.agp` :  unitig level assembly result agp file after rescue
