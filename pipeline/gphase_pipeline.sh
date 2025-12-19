@@ -82,7 +82,9 @@ run_step() {
     local step_name="${2:-command}"
     info "==== Start: ${step_name} ===="
     info "CMD: ${cmd}"
-    eval "${cmd}" >> "${log_file}" 2>&1
+    # eval "${cmd}" >> "${log_file}" 2>&1
+    eval "${cmd}" >> /dev/null 2>> "${log_file}"
+
     local rc=$?
     if [ "$rc" -ne 0 ]; then
         warn "==== Failed: ${step_name} (Exit code ${rc}) ===="
