@@ -86,16 +86,6 @@ def cal_hic_links(hic_links_dict, utg, utgs_list):
 
 def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_dict, allele_key_dict):
 
-    # collapse_num_file = "06.genes.round.cn"
-    # chr_file = "chr06.txt"
-    # l = "rice4.links.nor.csv"
-    # allele_file =  "chr06.allel.csv"
-
-    # collapse_num_dict = read_collapse_num(collapse_num_file)
-    # utgs_list = read_chr_utgs(chr_file)
-    # hic_links_dict, hic_nei_dict = read_l(l)
-    # allele_utg_dict, allele_key_dict = read_allele(allele_file)
-
     for utg in utgs_list:
         if utg not in collapse_num_dict:
             collapse_num_dict[utg] = int(1)
@@ -121,7 +111,7 @@ def run(collapse_num_dict, utgs_list, hic_links_dict, hic_nei_dict, allele_utg_d
         nei_utg = list(hic_nei_dict[utg])
         nei_uncollapse_utg = list(set(nei_utg) & set(uncollapse_list))
 
-        if collapse_num_dict[utg] > 1 and nei_utg and len(nei_uncollapse_utg) > 3:
+        if collapse_num_dict[utg] > 1 and nei_utg and len(nei_uncollapse_utg) >= 3:
 
             nei_uncollapse_utg_links = { pair:value  for pair, value in hic_links_dict.items() if pair[0] in nei_uncollapse_utg and pair[1] in nei_uncollapse_utg }
             with open(f"utgs_cluster/{utg}.links.nor.csv", 'w') as file:

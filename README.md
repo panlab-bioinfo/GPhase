@@ -21,7 +21,8 @@ Hi-C reads you can using Chromap or other mapping tools, such as BWA, can be use
 chromap -i -r asm.fa -o index
 chromap --preset hic -x index -r asm.fa -q 0 \
     -1 HiC_1.fq.gz -2 HiC_2.fq.gz \
-    --remove-pcr-duplicates -t 64 -o map.chromap.pairs
+    --remove-pcr-duplicates -t 64 --SAM -o map.chromap.sam
+samtools view -@ 64 -bh map.chromap.sam -o map.chromap.bam
 ```
 To process Pore-C data, you can use [PPL Toolbox](https://github.com/versarchey/PPL-Toolbox). GPhase provides a script to run PPL Toolbox. You can quickly run it to get the final pairs file `map.PPL.pairs` and input it into GPhase.
 ```
@@ -62,6 +63,12 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
  --n_hap 4 \
  -p output_prefix
 ```
+For more parameters, please refer to the `gphase pipeline -h`.
+Below are some of the more important optional parameters:
+- `--cluster_q` : the HiC/Pore-C data mapping quality score threshold (MAPQ) used during phasing is 1 by default. This applies when the input is a BAM file.
+- `--scaffold_q` : the HiC/Pore-C data mapping quality score threshold (MAPQ) used during scaffolding is 0 by default. This applies when the input is a BAM file.
+- `--hap_pm ` : the threshold for the intensity parameter of homologous sequence identification is 0.7 by default. If the heterozygosity of the assembled species is high, 0.6 can be used; if the heterozygosity of the species is low, 0.8 can be used.
+- `-p` : the prefix for the output file should be specified as "only [a-zA-Z0-9.] allowed", meaning only the character ".", numbers, and uppercase and lowercase letters are allowed.
 
 # Output file
 GPhase will output a folder named gphase_output, which will generate the following four folders in sequence.
@@ -79,6 +86,11 @@ The final assembly result file is located in the scaffold_hap folder and mainly 
 - `gphase_final_contig.fasta` : Contig-level fasta sequence
 - `gphase_final_contig.agp` : contig level assembly result agp file
 - `gphase_final_contig_scaffold.fasta` : contig level assembly result fasta file
+
+# Tips
+1. The `cluster_q` and `scaffold_q` parameters are only enabled when the input mapping file format is BAM. If using pairs, the `mapQ` parameter of the mapping software (e.g., Chromap) can be adjusted, but it is not recommended to set `mapQ` to 0, as this will affect the accuracy of the phasing due to multiple-mapping.
+2. When assembling `polyploids`, it is recommended to use `unitig-level` assembly `sequences` and `graph` for phasing assembly. Generally, unitig results in fewer errors compared to contig. Furthermore, using unitig allows for the utilization of more assembly graph information, leading to better assembly results.
+3. GPhase can largely solve the problem of sequence collapse during assembly, but it cannot solve the problem of `large fragments collapsing` in haplotypes.
 
 # Test dataset
 To help you quickly verify the functionality of the software, we provide a small test dataset. This dataset contains input data that demonstrates the core functionality of the software. You can download it from this link https://drive.google.com/drive/folders/1M_ZlSHBTDwtCHGrUI6uMCVutfIweECaY?usp=sharing
