@@ -118,6 +118,7 @@ Usage: $(basename "$0") pipeline -f <fa_file> -g <gfa> -c <collapse_num_file> -m
 >>> clustering chromosomes Parameters:
   --split_gfa_n       <split_gfa_n>              : Number of common neighbors when splitting GFA [2-5], default: 5.
   --chr_pm            <partig_chr_pm>            : Similarity of partig when clustering chr [0.8 <= x < 1], default: 0.95.
+  --r_max             <r_max>                    : Maximum value of parameter R during Louvain clustering, default: 3.
 
 >>> clustering haplotypes Parameters:
   --hap_pm            <partig_hap_pm>            : Similarity of partig when clustering hap [0.6 <= x < 1], default: 0.7 .
@@ -153,6 +154,7 @@ enzyme_site="GATC"
 cluster_q=1
 scaffold_q=0
 split_gfa_n=5
+r_max=3
 chr_pm="0.95"
 hap_pm="0.7"
 thread=12
@@ -169,7 +171,7 @@ no_scaffold_ec=""
 
 
 # ===== parse args =====
-TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,cluster_q:,scaffold_q:,chr_pm:,hap_pm:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,npop:,processes:,help -- "$@")
+TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,cluster_q:,scaffold_q:,chr_pm:,r_max:,hap_pm:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,npop:,processes:,help -- "$@")
 eval set -- "$TEMP"
 
 while true; do
@@ -190,6 +192,7 @@ while true; do
         --chr_pm) 
             if (($(echo "$2 >= 0.8 && $2 < 1" | bc -l) )); then chr_pm="$2"; else die "--chr_pm must be 0.8 <= x < 1"; fi
             shift 2 ;;
+        --r_max) r_max="$2"; shift 2 ;;
         --hap_pm) 
             if (($(echo "$2 >= 0.6 && $2 < 1" | bc -l) )); then hap_pm="$2"; else die "--hap_pm must be 0.6 <= x < 1"; fi
             shift 2 ;;
@@ -329,7 +332,7 @@ check_file_exists_and_nonempty "$(basename "$gfa")" "GFA in cluster_chr"
 check_file_exists_and_nonempty "${output_prefix}.RE_counts.txt" "RE_counts"
 check_file_exists_and_nonempty "${output_prefix}.map.links.nor.csv" "normalized links"
 
-run_step "python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -g $(basename "$gfa") -pm ${chr_pm} --split_gfa_n ${split_gfa_n}" "cluster_chr.py"
+run_step "python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -g $(basename "$gfa") -pm ${chr_pm} --split_gfa_n ${split_gfa_n} -r_max ${r_max}" "cluster_chr.py"
 
 check_file_exists_and_nonempty "${output_prefix}.digraph.csv" "digraph from cluster_chr"
 check_file_exists_and_nonempty "group_ctgs_All.txt" "group_ctgs_All.txt"

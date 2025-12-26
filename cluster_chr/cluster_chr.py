@@ -225,7 +225,7 @@ def run_pipeline_chr(output_prefix: str, HiC_file: str, logger: logging.Logger) 
     ]
     return run_command(command, "Running pipeline_chr.py (HiC clustering pre-processing)", logger)
 
-def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, chr_number: int, logger: logging.Logger, r_min=0.01, r_max=5.0, tolerance=0.001, max_iter=50) -> bool:
+def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, chr_number: int, logger: logging.Logger, r_min=0.01, r_max=3.0, tolerance=0.001, max_iter=50) -> bool:
     """
     Run multilevel clustering with an optimized binary search for the ratio 'r'
     to achieve the desired cluster count.
@@ -499,6 +499,9 @@ def parse_arguments() -> argparse.Namespace:
     split_GFA_group.add_argument("-n", "--split_gfa_n", metavar='\b', type=int, default=2, help="Number of common neighbors when splitting GFA. Default: 2.")
     split_GFA_group.add_argument("-i", "--split_gfa_iter", metavar='\b', type=int, default=3, help="Number of iterations when splitting GFA. Default: 3.")
 
+    clustering_group  = parser.add_argument_group('>>> Parameter for clustering')
+    clustering_group.add_argument("-r_max", "--r_max", metavar='\b', default=3, help="Maximum value of parameter R during Louvain clustering.")
+
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
     
@@ -624,7 +627,7 @@ def main():
                 continue
                 
             # Run optimized multilevel cluster
-            if run_multilevel_cluster_optimized(filter_HiC_file, args.output_prefix, int(args.chr_number), logger):
+            if run_multilevel_cluster_optimized(filter_HiC_file, args.output_prefix, int(args.chr_number), logger, r_min=0.01, r_max=float(args.r_max)):
                 successful_clustering = True
                 break
             else:
