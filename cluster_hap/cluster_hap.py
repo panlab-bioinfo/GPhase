@@ -77,10 +77,10 @@ def parse_arguments() -> argparse.Namespace:
     genome_group.add_argument("-n_hap", "--hap_number", metavar='\b',type=int, required=True, help="Number of haplotypes")
 
     performance_group  = parser.add_argument_group('>>> Parameters for performance')
-    performance_group.add_argument("--process_num", metavar='\b',type=int, default=20,
-                               help=f"Number of parallel processes (default: 20)")
-    performance_group.add_argument("--thread_num", metavar='\b',type=int,default=20,
-                               help=f"Number of threads per process (default: 20)")
+    performance_group.add_argument("--process_num", metavar='\b',type=int, default=8,
+                               help=f"Number of parallel processes (default: 8)")
+    performance_group.add_argument("--thread_num", metavar='\b',type=int,default=8,
+                               help=f"Number of threads per process (default: 8)")
     
     reassign_group = parser.add_argument_group('>>> Parameters for reassign step')
     reassign_group.add_argument("--reassign_number", metavar='\b',type=int, default=1,
@@ -708,8 +708,44 @@ def log_start(logger, script_name: str, version: str, args: argparse.Namespace):
 
 def main():
     args = parse_arguments()
-    pwd = os.getcwd()
     logger = setup_logging('cluster_hap.log')
+
+    import multiprocessing
+    import os
+    pwd = os.getcwd()
+    total_cores = multiprocessing.cpu_count()
+    max_safe_total = int(total_cores * 0.9)
+    if args.process_num is None or args.process_num <= 0:
+        args.process_num = min(20, total_cores)
+    if args.thread_num is None or args.thread_num <= 0:
+        args.thread_num = 8
+
+    current_total = args.process_num * args.thread_num
+    if current_total > max_safe_total:
+        old_process = args.process_num
+        old_thread = args.thread_num
+        old_total = current_total
+        args.thread_num = max(1, max_safe_total // args.process_num)
+        new_total = args.process_num * args.thread_num
+
+        logger.warning(
+            f"User parallel setting ({old_process} processes × {old_thread} threads) "
+            f"would use {old_total} threads, exceeding {total_cores} cores. "
+            f"Auto adjusted to {args.process_num} processes × {args.thread_num} threads "
+            f"(total {new_total} threads, within safe limit)."
+        )
+    else:
+        logger.info(
+            f"Parallel setting accepted: {args.process_num} processes × {args.thread_num} threads "
+            f"(total {current_total}/{total_cores} cores)"
+        )
+
+    os.environ["OMP_NUM_THREADS"] = str(args.thread_num)
+    os.environ["MKL_NUM_THREADS"] = str(args.thread_num)
+    os.environ["OPENBLAS_NUM_THREADS"] = str(args.thread_num)
+    os.environ["NUMEXPR_NUM_THREADS"] = str(args.thread_num)
+
+    logger.info(f"Final parallel config: {args.process_num} processes × {args.thread_num} threads/process")
     log_start(logger, "cluster_hap.py", "1.0.0", args)
 
     # # # Step 1: Run partig
