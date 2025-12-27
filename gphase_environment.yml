@@ -11,6 +11,7 @@ dependencies:
   - _libgcc_mutex=0.1=conda_forge
   - _openmp_mutex=4.5=2_kmp_llvm
   - arpack=3.9.1=nompi_hf03ea27_102
+  - bc=1.07.1=h7f98852_0
   - biopython=1.78=py311h5eee18b_0
   - blas=1.0=mkl
   - bottleneck=1.4.2=py311hf4808d0_0
