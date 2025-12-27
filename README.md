@@ -27,7 +27,6 @@ samtools view -@ 64 -bh map.chromap.sam -o map.chromap.bam
 To process Pore-C data, you can use [PPL Toolbox](https://github.com/versarchey/PPL-Toolbox). GPhase provides a script to run PPL Toolbox. You can quickly run it to get the final pairs file `map.PPL.pairs` and input it into GPhase.
 ```
 /path/to/GPhase/pipeline/PPL_pipeline.sh -j /path/to/PPL-Toolbox.jar \
--j /path/to/PPL.jar \
 -g asm.fa \
 -f reads.fq.gz \
 -o PPL
