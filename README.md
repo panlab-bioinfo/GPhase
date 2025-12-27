@@ -2,6 +2,17 @@
 
 GPhase leverages an assembly graph and Hi-C/Pore-C data to facilitate genome assembly phasing, automatically resolves and assigns collapsed sequences, and fills assembly gaps based on the graph structure.
 ---
+# Table of contents
+* [Installation](#installation)
+* [Mapping Hi-C data to assembly](#mapping-hi-c-data-to-assembly)
+* [Estimating of the number of contig collapses based on HiFi data and popCNV](#estimating-of-the-number-of-contig-collapses-based-on-hifi-data-and-popcnv)
+* [Running the GPhase scaffolding pipeline](#running-the-gphase-scaffolding-pipeline)
+* [Output file](#output-file)
+* [Final assembly result](#final-assembly-result)
+* [Generate a Hi-C heatmap](#generate-a-hi-c-heatmap)
+* [Tips](#tips)
+* [Test dataset](#test-dataset)
+* [Contact](#contact)
 # Installation
 To install GPhase, follow these steps:
 ```
@@ -86,13 +97,56 @@ The final assembly result file is located in the scaffold_hap folder and mainly 
 - `gphase_final_contig.agp` : contig level assembly result agp file
 - `gphase_final_contig_scaffold.fasta` : contig level assembly result fasta file
 
+# Generate a Hi-C heatmap
+Since the collapsed contig sequences have been duplicated, it is necessary to add markers to the collapsed unitigs in the AGP, fasta, and Hi-C mapping file to distinguish them when generating the Hi-C heatmap. There are two possible solutions:
+### Rename fasta and agp + Remapping Hi-C + Generate Hi-C  heatmap
+
+In short, the process first adds a fixed suffix to the duplicated collapsed unitigs (in both AGP and FASTA files), then remaps the Hi-C data using the mapQ:0 parameter (retaining multiple mappings), and finally generates a Hi-C heatmap using Juicer.
+
+```
+# rename agp and unitigs
+python /Path/to/GPhase/scaffold_hap/rename_collapse_agp_pairs_fasta.py \
+gphase_final.agp asm.fa rename --no-hic 
+
+# chromap remapping
+chromap -i -r rename.fa -o reindex
+chromap --preset hic -x reindex -r rename.fa -q 0 \
+    -1 HiC_1.fq.gz -2 HiC_2.fq.gz \
+    --remove-pcr-duplicates -t 64 -o remap.chromap.pairs
+
+# Generate Hi-C heatmap
+bash /Path/to/GPhase/scaffold_hap/juicebox.sh \
+-f rename.fa \
+-a rename.agp \
+-p remap.chromap.pairs \
+-o final_hic -g /Path/to/GPhase
+
+```
+### Rename fasta,agp and pairs/bam + Generate Hi-C heatmap
+In short, the process first adds a fixed suffix to the duplicated collapse unitigs (in AGP, FASTA, and pairs/bam files), and finally uses Juicer to generate the Hi-C heatmap.
+```
+# rename agp, unitigs and bam
+python /Path/to/GPhase/scaffold_hap/rename_collapse_agp_pairs_fasta.py \
+gphase_final.agp asm.fa rename --hic-file map.chromap.bam
+
+# Generate Hi-C heatmap
+bash /Path/to/GPhase/scaffold_hap/juicebox.sh \
+-f rename.fa \
+-a rename.agp \
+-p rename.pairs \
+-o final_hic -g /Path/to/GPhase
+```
+
+
+
 # Tips
 1. The `cluster_q` and `scaffold_q` parameters are only enabled when the input mapping file format is BAM. If using pairs, the `mapQ` parameter of the mapping software (e.g., Chromap) can be adjusted, but it is not recommended to set `mapQ` to 0, as this will affect the accuracy of the phasing due to multiple-mapping.
 2. When assembling `polyploids`, it is recommended to use `unitig-level` assembly `sequences` and `graph` for phasing assembly. Generally, unitig results in fewer errors compared to contig. Furthermore, using unitig allows for the utilization of more assembly graph information, leading to better assembly results.
 3. GPhase can largely solve the problem of sequence collapse during assembly, but it cannot solve the problem of `large fragments collapsing` in haplotypes.
 
+
 # Test dataset
-To help you quickly verify the functionality of the software, we provide a small test dataset. This dataset contains input data that demonstrates the core functionality of the software. You can download it from this link https://drive.google.com/drive/folders/1M_ZlSHBTDwtCHGrUI6uMCVutfIweECaY?usp=sharing
+To help you quickly verify the installation and use of the software, we provide a small test dataset. This dataset contains input data that demonstrates the core functionality of the software. You can download it from this link https://drive.google.com/drive/folders/1M_ZlSHBTDwtCHGrUI6uMCVutfIweECaY?usp=sharing
 
 Use the following command to run the test dataset
 ```
