@@ -71,7 +71,8 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
  -m map.chromap.bam \
  --n_chr 12 \
  --n_hap 4 \
- -p output_prefix
+ -p output_prefix \
+ --min_len 50
 ```
 For more parameters, please refer to the `gphase pipeline -h`.
 Below are some of the more important optional parameters:
@@ -122,7 +123,7 @@ bash /Path/to/GPhase/scaffold_hap/juicebox.sh \
 -o final_hic -g /Path/to/GPhase
 
 ```
-### Rename fasta,agp and pairs/bam + Generate Hi-C heatmap
+### Rename fasta, agp and pairs/bam + Generate Hi-C heatmap
 In short, the process first adds a fixed suffix to the duplicated collapse unitigs (in AGP, FASTA, and pairs/bam files), and finally uses Juicer to generate the Hi-C heatmap.
 ```
 # rename agp, unitigs and bam

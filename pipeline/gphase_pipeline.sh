@@ -130,7 +130,7 @@ Usage: $(basename "$0") pipeline -f <fa_file> -g <gfa> -c <collapse_num_file> -m
   --thread            <thread>                   : Number of parallel processes, default: 12.
   --no_contig_ec                                 : do not do contig error correction in YaHS, default: False.
   --no_scaffold_ec                               : do not do scaffold error correction in YaHS, default: False.
-  --min_len           <min_len>                  : minimum scaffold length(kb) in haphic sort [0-1000], default: 200.
+  --min_len           <min_len>                  : minimum scaffold length(kb) in haphic sort [0-1000], default: 50.
   --mutprob           <mutprob>                  : mutation probability [0.1-0.9] default: 0.6.
   --ngen              <ngen>                     : generations for GA, default: 20000.
   --npop              <npop>                     : population size, default: 200.
@@ -158,7 +158,7 @@ r_max=3
 chr_pm="0.95"
 hap_pm="0.7"
 thread=12
-min_len=200
+min_len=50
 mutprob="0.6"
 ngen=20000
 npop=200
