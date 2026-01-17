@@ -118,14 +118,14 @@ def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=No
             chr_len_dict[idx] = sum_length
             chr_len_max = sum_length if sum_length > chr_len_max else chr_len_max
         
-        threshold_1 = sum(chr_len_dict.values()) / int(n_chr) / 3
+        threshold_1 = sum(chr_len_dict.values()) / int(n_chr) / 5
         filtered_chr_set_1 = {key for key, value in chr_len_dict.items() if value > threshold_1}
 
         # threshold_2 = chr_len_max / 5
         # filtered_chr_set_2 = {key for key, value in chr_len_dict.items() if value > threshold_2}
 
         # Preventing rDNA utg clustering errors
-        threshold_3 = mean(chr_avg_dict.values()) / 3
+        threshold_3 = mean(chr_avg_dict.values()) / 5
         filtered_chr_set_3 = {key for key, value in chr_avg_dict.items() if value > threshold_3}
 
         # print(f"filtered_chr_set_1: {filtered_chr_set_1}")
