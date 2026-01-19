@@ -236,7 +236,7 @@ def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, ch
     
     if not all(check_file_exists_and_not_empty(f, logger) for f in [input_hic_file, input_RE_counts]):
         return False
-        
+
     r = 1.0
     r_start = r_min
     r_end = r_max
@@ -271,10 +271,48 @@ def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, ch
                 return True
             elif cluster_count > chr_number:
                 logger.info(f"Cluster count {cluster_count} > target {chr_number}. Decreasing r (r_end = {r:.4f}).")
+
+                # r=1 and cluster_count - chr_number <=3
+                if r==1:
+                    r_lst = [i / 100 for i in range(90, 101)]
+                    for r_iter in r_lst:
+                        cluster_count = Multilevel_cluster(
+                            input_hic_file,
+                            chr_cluster_output,
+                            float(r_iter),
+                            True,
+                            input_RE_counts,
+                            allele_cluster,
+                            int(chr_number)
+                        )
+                        logger.info(f"Cluster count {cluster_count} -> target {chr_number}. Increasing r (r_start = {float(r_iter):.4f}).")
+                        if cluster_count == chr_number:
+                            logger.info(f"Success: Desired cluster count {chr_number} achieved with r={r_iter:.4f}.")
+                            return True
+
                 r_end = r
                 r = (r_start + r_end) / 2
             else: # cluster_count < chr_number
                 logger.info(f"Cluster count {cluster_count} < target {chr_number}. Increasing r (r_start = {r:.4f}).")
+
+                # r=1 and chr_number - cluster_count <=3
+                if r==1:
+                    r_lst = [i / 100 for i in range(100, 111)]
+                    for r_iter in r_lst:
+                        cluster_count = Multilevel_cluster(
+                            input_hic_file,
+                            chr_cluster_output,
+                            float(r_iter),
+                            True,
+                            input_RE_counts,
+                            allele_cluster,
+                            int(chr_number)
+                        )
+                        logger.info(f"Cluster count {cluster_count} -> target {chr_number}. Increasing r (r_start = {float(r_iter):.4f}).")
+                        if cluster_count == chr_number:
+                            logger.info(f"Success: Desired cluster count {chr_number} achieved with r={r_iter:.4f}.")
+                            return True
+
                 r_start = r
                 r = (r_start + r_end) / 2
                 
