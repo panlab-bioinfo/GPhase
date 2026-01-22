@@ -4,13 +4,13 @@
 usage() {
     echo "|"
     echo "|The popcnv software was run to estimate the collapse number of unitigs based on unitigs fasta file and HiFi reads"
-    echo "|    Usage: $0 -f <fa_file>  -r <reads1.fastq.gz [reads2.fastq.gz ...]> -p <output_prefix> -t <threads>"
+    echo "|    Usage: $0 -f <fa_file> -p <output_prefix> -t <threads> -r <reads1.fastq.gz [reads2.fastq.gz ...]>"
     echo "|"
     echo "|Required Parameters:"
     echo "|  -f     <fa_file>                : The FASTA file containing the utg sequences."
     echo "|  -p     <output_prefix>          : The prefix for the output files."
     echo "|  -t     <threads>                : The number of threads (default: 32)."
-    echo "|  -r     <reads_files>            : One or more FASTQ(.gz) files, if there are multiple hifi reads files, the -r parameter needs to be placed last."
+    echo "|  -r     <reads_files>            : FASTQ(.gz) files."
     echo "|"
     echo "|Example:"
     echo "|  bash $0 -f asm.fa -p output_prefix -t 32 -r hifi_read1.fq.gz"
@@ -26,24 +26,34 @@ default_threads=32
 
 r_flag=0
 
-while getopts ":f:p:t:r" opt; do
-    case $opt in
-        f) fa_file="$OPTARG" ;;
-        p) output_prefix="$OPTARG" ;;
-        t) threads="$OPTARG" ;;
-        r)
-            r_flag=1 ;;
-        ?) usage; exit 1 ;;
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -f)
+            fa_file="$2"
+            shift 2
+            ;;
+        -p)
+            output_prefix="$2"
+            shift 2
+            ;;
+        -t)
+            threads="$2"
+            shift 2
+            ;;
+        -r)
+            r_flag=1
+            shift
+            while [[ $# -gt 0 && ! "$1" =~ ^- ]]; do
+                reads_files+=("$1")
+                shift
+            done
+            ;;
+        *)
+            echo "Error: Unknown option $1"
+            exit 1
+            ;;
     esac
 done
-
-shift $((OPTIND - 1))
-if [[ $r_flag -eq 1 ]]; then
-    while [[ $# -gt 0 && "$1" != -* ]]; do
-        reads_files+=("$1")
-        shift
-    done
-fi
 
 # Validate required arguments
 if [ -z "$fa_file" ] || [ -z "$output_prefix" ] || [ ${#reads_files[@]} -eq 0 ]; then
