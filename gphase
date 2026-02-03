@@ -58,6 +58,7 @@ def main():
 
     mapping = {
         'pipeline': ['bash', os.path.join(BASE_DIR, 'pipeline/gphase_pipeline.sh')],
+        'popcnv': ['bash', os.path.join(BASE_DIR, 'pipeline/popCNV_pipeline.sh')],
         'cluster_chr': ['python3', os.path.join(BASE_DIR,'cluster_chr/cluster_chr.py')],
         'cluster_hap': ['python3', os.path.join(BASE_DIR,'cluster_hap/cluster_hap.py')],
         'scaffold_hap': ['python3', os.path.join(BASE_DIR,'scaffold_hap/scaffold_hap_v2.py')]

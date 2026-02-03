@@ -1,12 +1,12 @@
-# GPhase: A Phasing Assembly Tool Leveraging an Assembly Graph and Hi-C/Pore-C Data
+# GPhase: A Phasing Assembly Tool Leveraging an Assembly Graph and Hi-C/Pore-C/Omni-C Data
 
 GPhase leverages an assembly graph and Hi-C/Pore-C data to facilitate genome assembly phasing, automatically resolves and assigns collapsed sequences, and fills assembly gaps based on the graph structure.
 ---
 # Table of contents
 * [Installation](#installation)
-* [Mapping Hi-C data to assembly](#mapping-hi-c-data-to-assembly)
-* [Estimating of the number of contig collapses based on HiFi data and popCNV](#estimating-of-the-number-of-contig-collapses-based-on-hifi-data-and-popcnv)
-* [Running the GPhase scaffolding pipeline](#running-the-gphase-scaffolding-pipeline)
+* [Step1: Mapping Hi-C data to assembly](#mapping-hi-c-data-to-assembly)
+* [Step2: Estimating of the number of contig collapses based on HiFi data and popCNV](#estimating-of-the-number-of-contig-collapses-based-on-hifi-data-and-popcnv)
+* [Step3: Running the GPhase scaffolding pipeline](#running-the-gphase-scaffolding-pipeline)
 * [Output file](#output-file)
 * [Final assembly result](#final-assembly-result)
 * [Generate a Hi-C heatmap](#generate-a-hi-c-heatmap)
@@ -16,16 +16,26 @@ GPhase leverages an assembly graph and Hi-C/Pore-C data to facilitate genome ass
 # Installation
 To install GPhase, follow these steps:
 ```
+# conda
 git clone https://github.com/panlab-bioinfo/GPhase.git
 cd GPhase
 git submodule update --init  --recursive
 conda env create -f gphase_environment.yml
 conda activate gphase
 ./gphase -h
+
+# docker
+docker pull --platform linux/amd64 tanging1024/gphase:latest
+docker run --platform linux/amd64 -v /your/data/path:/your/data/path -w /your/data/path tanging1024/gphase:latest gphase -h
+
+# singularity
+singularity pull gphase.sif docker://tanging1024/gphase:latest
+singularity exec --bind /your/data/path:/your/data/path gphase.sif gphase
+
 ```
 
-# Mapping Hi-C data to assembly
-GPhase supports multiple data types, including Hi-C and Pore-C. It also supports their pairs(pa5) and bam(BAM) format mapping files.
+# Step1: Mapping Hi-C data to assembly
+GPhase supports multiple data types, including Hi-C, Pore-C and Omni-C. It also supports their pairs(pa5) and bam(BAM) format mapping files.
 
 Hi-C reads you can using Chromap or other mapping tools, such as BWA, can be used. When using Chromap, if the default MAPQ parameters do not produce satisfactory results, the `--MAPQ-threshold` value can be lowered to include more Hi-C mapping information. When using other mapping software, the BAM files need to be sorted.
 ```
@@ -44,7 +54,7 @@ To process Pore-C data, you can use [PPL Toolbox](https://github.com/versarchey/
 ```
 
 
-# Estimating of the number of contig collapses based on HiFi data and popCNV
+# Step2: Estimating of the number of contig collapses based on HiFi data and popCNV
 The popCNV_pipeline.sh script estimates the copy number of collapsed contigs collapse based on HiFi data using the popCNV software. The file used by popCNV for GPhase input is `collapse_num.txt` : popcnv/06.genes.round.cn. For details, see [popCNV](https://github.com/sc-zhang/popCNV)
 ```
 /path/to/GPhase/pipeline/popCNV_pipeline.sh \
@@ -55,7 +65,7 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
 ```
 
 
-# Running the GPhase scaffolding pipeline
+# Step3: Running the GPhase scaffolding pipeline
 1. `asm.fa` :  Genome assembly file in FASTA format (unitigs).
 2. `p_utg.gfa` : Assembly graph file in GFA format.
 3. `collapse_num.txt` : File with contig collapse information (from popCNV: popcnv/06.genes.round.cn).
