@@ -110,6 +110,7 @@ Usage: $(basename "$0") pipeline -f <fa_file> -g <gfa> -c <collapse_num_file> -m
 
 >>> Optional parameters:
   -e                  <enzyme_site>              : The restriction enzyme cutting site, default: GATC.
+  --nor_hic           <nor_hic>                  : Selects the normalization mode for 3C link connections. Choices: 'no', 'ratio', or 'length', default: ratio.
 
 >>> preprocessing Parameters:
   --cluster_q         <cluster_q>                : Filtered mapQ value for clustering, default: 1 (Enable only when the input mapping file is in BAM format).
@@ -151,6 +152,7 @@ n_chr=""
 n_hap=""
 output_prefix=""
 enzyme_site="GATC"
+nor_hic="ratio"
 cluster_q=1
 scaffold_q=0
 split_gfa_n=5
@@ -171,7 +173,7 @@ no_scaffold_ec=""
 
 
 # ===== parse args =====
-TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,cluster_q:,scaffold_q:,chr_pm:,r_max:,hap_pm:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,npop:,processes:,help -- "$@")
+TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,cluster_q:,nor_hic:,scaffold_q:,chr_pm:,r_max:,hap_pm:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,npop:,processes:,help -- "$@")
 eval set -- "$TEMP"
 
 while true; do
@@ -184,6 +186,18 @@ while true; do
         --n_hap) n_hap="$2"; shift 2 ;;
         -p) output_prefix="$2"; shift 2 ;;
         -e) enzyme_site="$2"; shift 2 ;;
+        --nor_hic) 
+            case "$2" in
+                no|ratio|length) 
+                    nor_hic="$2"
+                    ;;
+                *)
+                    echo "Error: Invalid value for --nor_hic: '$2'"
+                    echo "Supported methods: no, ratio, length (Default: ratio)"
+                    exit 1
+                    ;;
+            esac
+            shift 2 ;;
         --cluster_q) cluster_q="$2"; shift 2 ;;
         --scaffold_q) scaffold_q="$2"; shift 2 ;;
         --split_gfa_n) 
@@ -294,7 +308,8 @@ elif [[ "$map_basename" =~ \.bam$ ]]; then
         echo "##columns: readID chrom1 pos1 chrom2 pos2 mapQ"
         awk '{print "##chromsize: "$1" "$2}' "$(basename "$fa_file").fai"
     } > "$tmp_pairs"
-    
+
+    # get filtered pairs using scaffold_q
     run_step "samtools view -@ ${thread} \"$map_file\" | awk -v q=\"${scaffold_q}\" '(\$5+0 >= q && \$7!=\"=\"){print \$1\"\t\"\$3\"\t\"\$4\"\t\"\$7\"\t\"\$8\"\t\"\$5}' >> \"$tmp_pairs\"" "BAM to pairs conversion"
     mv "$tmp_pairs" map.pairs
 else
@@ -303,7 +318,7 @@ fi
 
 check_file_exists_and_nonempty "map.pairs" "generated map.pairs"
 
-# 3. get_links.py
+# 3. get_links.py : Obtain 3C connections between unitigs.
 run_step "python ${SCRIPT_DIR}/../cluster_chr/get_links.py -i map.pairs -o ${output_prefix} -q ${cluster_q}" "get_links.py"
 links_csv="${output_prefix}.map.links.csv"
 
@@ -312,8 +327,8 @@ if [[ "${lines}" -eq 1 ]]; then
     die "Error: The link file ${links_csv} must contain exactly 1 data line."
 fi
 
-# 4. nor_hic.py
-run_step "python ${SCRIPT_DIR}/../cluster_chr/nor_hic.py -f ${links_csv} -r ${expected_RE} -o ${output_prefix}.map.links.nor.csv" "nor_hic.py"
+# 4. nor_hic.py : Standardized 3C connection
+run_step "python ${SCRIPT_DIR}/../cluster_chr/nor_hic.py -f ${links_csv} -r ${expected_RE} -o ${output_prefix}.map.links.nor.csv -m ${nor_hic}" "nor_hic.py"
 normalized_links="${output_prefix}.map.links.nor.csv"
 check_file_exists_and_nonempty "$normalized_links" "normalized links"
 
@@ -332,6 +347,7 @@ check_file_exists_and_nonempty "$(basename "$gfa")" "GFA in cluster_chr"
 check_file_exists_and_nonempty "${output_prefix}.RE_counts.txt" "RE_counts"
 check_file_exists_and_nonempty "${output_prefix}.map.links.nor.csv" "normalized links"
 
+# Chromosome clustering pipeline
 run_step "python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -g $(basename "$gfa") -pm ${chr_pm} --split_gfa_n ${split_gfa_n} -r_max ${r_max}" "cluster_chr.py"
 
 check_file_exists_and_nonempty "${output_prefix}.digraph.csv" "digraph from cluster_chr"
@@ -359,6 +375,7 @@ safe_ln "${cluster_chr_dir}/${output_prefix}.chr.cluster.ctg.txt"
 
 cr_file="${cluster_chr_dir}/rescue.cluster.ctg.txt"
 
+# phasing pipeline
 run_step "python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file $(basename "$collapse_num_file") -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr_file} -pm ${hap_pm} --reassign_number ${reassign_number} ${rescue_flag} ${expand_flag}" "cluster_hap.py"
 
 for chr_id in $(seq 1 "$n_chr"); do

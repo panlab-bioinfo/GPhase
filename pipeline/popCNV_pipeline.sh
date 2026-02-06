@@ -12,6 +12,7 @@ usage() {
     echo "|  -t     <threads>                : The number of threads (default: 32)."
     echo "|  -r     <reads_files>            : FASTQ(.gz) files."
     echo "|"
+    echo "|  -h                              : Show this help message and exit."
     echo "|Example:"
     echo "|  bash $0 -f asm.fa -p output_prefix -t 32 -r hifi_read1.fq.gz"
     exit 1
@@ -28,6 +29,9 @@ r_flag=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        -h|--help)
+            usage
+            ;;
         -f)
             fa_file="$2"
             shift 2
