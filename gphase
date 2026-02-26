@@ -15,7 +15,7 @@ def print_gphase_ascii():
     \033[44;37m                 \033[92m ╚██████╔╝██║     ██║  ██║██║  ██║███████║███████╗                  \033[0m
     \033[44;37m                 \033[92m  ╚═════╝ ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝                  \033[0m
     \033[44;37m                                                                                     \033[0m
-    \033[47;32m     GPhase: A Phasing assembly tool using assembly graphs and Hi-C/Pore-C data      \033[0m
+    \033[47;32m   GPhase: A Phasing assembly tool using assembly graph and Hi-C/Pore-C/Omni-C data  \033[0m
     """
     print(TITLE_GPHASE)
 
@@ -30,9 +30,11 @@ def print_HELP_MESSAGE():
                         haplotype clustering, and haplotype scaffolding steps        (→ pipeline/gphase_pipeline.sh)
   📦  \033[1mpopcnv\033[0m         Run the popcnv pipeline, estimating of the number of 
                         collapses of Unitig using hifi data based on popCNV software (→ pipeline/popCNV_pipeline.sh)
+  📦  \033[1mppl\033[0m            Run the ppl pipeline, Mapping Pore-C sequences and 
+                                            generating pairwise interactions         (→ pipeline/PPL_pipeline.sh)
   🧩  \033[1mcluster_chr\033[0m    Step 1: Cluster contigs into chromosomes                        (→ cluster_chr/cluster_chr.py)
   🧩  \033[1mcluster_hap\033[0m    Step 2: Cluster chromosome contigs into haplotypes              (→ cluster_hap/cluster_hap.py)
-  🧩  \033[1mscaffold_hap\033[0m   Step 3: Scaffold haplotype contigs into phased assemblies       (→ scaffold_hap/scaffold_hap.py)
+  🧩  \033[1mscaffold_hap\033[0m   Step 3: Scaffold haplotype contigs into phased assemblies       (→ scaffold_hap/scaffold_hap_v2.py)
 
 \033[1;34mEXAMPLE:\033[0m
   💡 gphase pipeline -f genome.fa -g genome.bp.p_utg.gfa -c collapse_num.txt \\
@@ -59,6 +61,7 @@ def main():
     mapping = {
         'pipeline': ['bash', os.path.join(BASE_DIR, 'pipeline/gphase_pipeline.sh')],
         'popcnv': ['bash', os.path.join(BASE_DIR, 'pipeline/popCNV_pipeline.sh')],
+        'ppl': ['bash', os.path.join(BASE_DIR, 'pipeline/PPL_pipeline.sh')],
         'cluster_chr': ['python3', os.path.join(BASE_DIR,'cluster_chr/cluster_chr.py')],
         'cluster_hap': ['python3', os.path.join(BASE_DIR,'cluster_hap/cluster_hap.py')],
         'scaffold_hap': ['python3', os.path.join(BASE_DIR,'scaffold_hap/scaffold_hap_v2.py')]
