@@ -92,12 +92,17 @@ LOG_INFO ${log_file} "path" "Script dir : ${SCRIPT_DIR}"
 LOG_INFO ${log_file} "run" "samtools faidx ${fa_file}"
 samtools faidx ${fa_file}
 
+# Estimate the size of the genome
+genome_estimate_size=$(awk '{s+=$2}END{print int((s+1e9-1)/1e9)}' ${fa_file}.fai)
+minimap2_I=$(( genome_size > 8 ? genome_size : 8 ))
+LOG_INFO ${log_file} "run" "Based on the estimated genome size of ${genome_estimate_size}, the -I parameter in minimap2 was set to ${minimap2_I}."
+
 LOG_INFO ${log_file} "info" "input FASTA files: ${fa_file}"
 LOG_INFO ${log_file} "info" "input HiFi files: ${reads_files[@]}"
 
 # Mapping
 LOG_INFO ${log_file} "run" "Mapping HiFi data to ${fa_file} using minimap2"
-minimap2 -t ${threads} -ax map-hifi ${fa_file} "${reads_files[@]}" \
+minimap2 -t ${threads} -I "${minimap2_I}G" -ax map-hifi ${fa_file} "${reads_files[@]}" \
     | samtools view -bhS -t ${fa_file}.fai \
     | samtools sort -@ ${threads} > ${output_prefix}.bam
 
