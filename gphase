@@ -70,10 +70,12 @@ def main():
     if command not in mapping:
         print(f"[ERROR] Unknown command: {command}\n")
         print_HELP_MESSAGE()
-        return
+        sys.exit(1)
 
     full_command = mapping[command] + args
-    subprocess.run(full_command)
+    result = subprocess.run(full_command)
+    # Propagate subcommand exit status to the top-level CLI.
+    sys.exit(result.returncode)
 
 if __name__ == "__main__":
     main()

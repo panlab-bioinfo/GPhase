@@ -1,4 +1,16 @@
 #!/bin/bash
+set -euo pipefail
+IFS=$'\n\t'
+
+timestamp() { date "+%Y-%m-%d %H:%M:%S"; }
+
+on_error() {
+    local rc=$?
+    local line="${1:-unknown}"
+    echo "$(timestamp) <popCNV_pipeline> [ERROR] Exit code ${rc} at line ${line}. Last command: ${BASH_COMMAND}" >&2
+    exit "${rc}"
+}
+trap 'on_error ${LINENO}' ERR
 
 # Function for displaying usage
 usage() {
@@ -22,8 +34,7 @@ usage() {
 fa_file=""
 reads_files=()
 output_prefix=""
-threads=""
-default_threads=32
+threads=32
 
 r_flag=0
 
@@ -71,8 +82,23 @@ if [ ! -f "$fa_file" ]; then
     echo "Error: File '$fa_file' does not exist."
     exit 1
 fi
+if ! [[ "${threads}" =~ ^[0-9]+$ ]] || [ "${threads}" -le 0 ]; then
+    echo "Error: Invalid threads value '${threads}'. It must be a positive integer."
+    exit 1
+fi
+for f in "${reads_files[@]}"; do
+    if [ ! -f "$f" ]; then
+        echo "Error: Reads file '$f' does not exist."
+        exit 1
+    fi
+done
+for cmd in samtools minimap2 awk python; do
+    if ! command -v "${cmd}" >/dev/null 2>&1; then
+        echo "Error: Required command not found: ${cmd}"
+        exit 1
+    fi
+done
 
-set -e
 log_path=$(pwd)
 log_file="${log_path}/popCNV_pipeline.log"
 
@@ -125,3 +151,5 @@ python ${SCRIPT_DIR}/../src/popCNV/popCNV.py \
     -b bam_files/ -l gene.list \
     -w ./popcnv --group group.list \
     --wild 0 -t ${threads}
+
+LOG_INFO ${log_file} "info" "All steps completed successfully."

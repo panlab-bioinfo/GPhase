@@ -147,7 +147,7 @@ def trans_net(utgs_list, graph, ctg_RE_dict):
             file.write(f"{group}\t{group_ctg_filter_dict[group]['length']}\t{','.join(list(group_ctg_filter_dict[group]['ctgs']))}\n")
 
     with open("group_ctgs_All.txt", 'w') as f:
-        subprocess.run(['cat', 'group_ctgs_save.txt', 'group_ctgs_filter.txt'], stdout=f, text=True)
+        subprocess.run(['cat', 'group_ctgs_save.txt', 'group_ctgs_filter.txt'], stdout=f, text=True, check=True)
     
     return group_ctg_dict, ctg_group_dict
 

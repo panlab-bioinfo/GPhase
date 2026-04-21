@@ -152,12 +152,14 @@ def trans_agp(agp_file, original_agp, output_file, logger):
                     jf.write(join_string)
                 # Run agptools
                 cmd = ["agptools", "join", "joins.txt", original_agp, "-n100"]
-                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
 
                 for line in result.stdout.splitlines():
                     if scaffold in line:
                         out.write(line + "\n")
 
+                if result.stderr:
+                    logger.warning(f"agptools join stderr for {scaffold}: {result.stderr.strip()}")
                 os.remove("joins.txt")
 
     # Check if the final output file exists and is non-empty
