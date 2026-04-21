@@ -1,0 +1,19 @@
+name: haphic-py311
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy>=1.24
+  - scipy>=1.10
+  - scikit-learn>=1.3
+  - networkx>=3.0
+  - matplotlib-base>=3.7
+  - pysam>=0.22
+  - portion>=2.4
+  - sortedcontainers>=2.4
+  - samtools>=1.18
+  - minimap2>=2.26
+  # Optional acceleration in HapHiC; omitted to improve solver success.

@@ -1,6 +1,0 @@
-[submodule "src/HapHiC"]
-    path = src/HapHiC
-    url = https://github.com/zengxiaofei/HapHiC
-[submodule "src/popCNV"]
-	path = src/popCNV
-	url = https://github.com/sc-zhang/popCNV.git
