@@ -94,7 +94,7 @@ samtools faidx ${fa_file}
 
 # Estimate the size of the genome
 genome_estimate_size=$(awk '{s+=$2}END{print int((s+1e9-1)/1e9)}' ${fa_file}.fai)
-minimap2_I=$(( genome_size > 8 ? genome_size : 8 ))
+minimap2_I=$(( genome_estimate_size > 8 ? genome_estimate_size : 8 ))
 LOG_INFO ${log_file} "run" "Based on the estimated genome size of ${genome_estimate_size}, the -I parameter in minimap2 was set to ${minimap2_I}."
 
 LOG_INFO ${log_file} "info" "input FASTA files: ${fa_file}"
