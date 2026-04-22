@@ -2,29 +2,27 @@ name: gphase
 channels:
   - conda-forge
   - bioconda
+  - defaults
 dependencies:
-  - python=3.11.11
-  - pip=25.0
+  - python=3.11
+  - pip
 
   # Python dependencies used by GPhase + submodules
-  - numpy=1.26.4
-  - pandas=2.2.3
-  - scipy=1.15.1
-  - scikit-learn=1.6.1
-  - statsmodels=0.14.4
-  - matplotlib-base=3.10.0
-  - networkx=3.4.2
-  - networkit=11.1.post1
-  - python-igraph=0.10.4
-  - igraph=0.10.15
-  - pysam=0.22.1
+  - numpy=1.26
+  - pandas=2.2
+  - scipy=1.15
+  - scikit-learn=1.6
+  - statsmodels=0.14
+  - matplotlib-base=3.10
+  - networkx=3.4
+  - python-igraph>=0.10.4,<0.12
+  - pysam=0.22
   - biopython=1.78
-  - argcomplete=3.5.3
   - kneed=0.8.5
   - python-louvain=0.16
-  - portion=2.6.0
   - sortedcontainers=2.4.0
   - pathos=0.3.3
+  - pysocks
 
   # popCNV GUI (optional, but bundled in this repo)
   #- pyside6=6.7.2
@@ -44,3 +42,6 @@ dependencies:
 
   - pip:
       - bio-agptools==0.0.3
+      - argcomplete==3.5.3
+      - networkit==11.1.post1
+      - portion==2.6.0

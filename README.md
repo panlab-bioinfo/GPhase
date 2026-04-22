@@ -19,7 +19,6 @@ To install GPhase, follow these steps:
 # conda
 git clone https://github.com/panlab-bioinfo/GPhase.git
 cd GPhase
-git submodule update --init  --recursive
 conda env create -f gphase_environment.yml
 conda activate gphase
 ./gphase -h
