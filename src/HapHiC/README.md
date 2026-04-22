@@ -2,8 +2,6 @@
 
 
 
-![](./images/HapHiC1.png)
-
 HapHiC is an allele-aware scaffolding tool that uses Hi-C data to scaffold haplotype-phased genome assemblies into chromosome-scale pseudomolecules. Unlike [ALLHiC](https://github.com/tangerzhang/ALLHiC), another allele-aware scaffolder, HapHiC can achieve this without the need for reference genomes. Our evaluations indicate that HapHiC outperforms other Hi-C scaffolding tools with higher tolerance to low contig N50, low Hi-C sequencing depth, and various types of assembly errors. Additionally, HapHiC is super-fast and also suitable for haplotype-collapsed diploid and allopolyploid genome assemblies.
 
 **Features:**
@@ -408,8 +406,6 @@ $ /path/to/HapHiC/utils/juicer post -o out_JBAT out_JBAT.review.assembly out_JBA
 
 ## <span id="visualization">Visualization</span>
 
-![](./images/HapHiC2.png)
-
 Since HapHiC version 1.0.2, we have introduced a `haphic plot` command to generate highly customizable Hi-C contact maps. This command requires two input files: a filtered BAM file `HiC.filtered.bam` and a scaffold AGP file containing contig IDs that match those in the BAM file:
 
 ```bash
@@ -477,10 +473,6 @@ $ haphic refsort 04.build/scaffolds.raw.agp asm_to_ref.paf --ref_order chr1,chr2
 The generated `scaffolds.refsort.agp` file can be directly used for [Juicebox curation](#juicebox) and for `haphic plot` [visualization](#visualization). Please note that **this function is NOT reference-based scaffolding and will NOT alter your scaffolds**, it only changes the way of presentation through overall ordering and orientation of the entire scaffolds. 
 
 Here is an example of the autotetraploid sugarcane Np-X assembly:
-
-![](./images/refsort_example.png)
-
-
 
 ## <span id="faqs">Frequently asked questions (FAQs)</span>
 

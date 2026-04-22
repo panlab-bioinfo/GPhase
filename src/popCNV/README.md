@@ -69,4 +69,3 @@ Download executable file in releases.
 python3 gpopCNV.py
 ```
 The main form is like below:
-![](images/main_form.png)
