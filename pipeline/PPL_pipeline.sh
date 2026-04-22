@@ -21,19 +21,25 @@ LOG_INFO() {
 }
 
 ############################################
+# Get PPL location
+############################################
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+default_jar="${script_dir}/../bin/PPL-0.1.1.jar"
+
+############################################
 # Print usage
 ############################################
 usage() {
     echo "|"
     echo "|Run the PPL software using the fasta file and the fastq.gz file"
-    echo "|Usage: $0 -j ./PPL-0.1.1.jar -g <genome.fa> -f <reads.fq> [options]"
+    echo "|Usage: $0 -g <genome.fa> -f <reads.fq> [options]"
     echo "|"
     echo "| Required:"
-    echo "|  -j <jar_path>       PPL jar file (required)"
     echo "|  -g <genome.fa>      Genome FASTA file (required)"
     echo "|  -f <reads.fq>       Fastq file (required)"
     echo "|"
     echo "| Optional:"
+    echo "|  -j <jar_path>       PPL jar file (default: ${default_jar})"
     echo "|  -s <site>           Restriction enzyme site (default: GATC)"
     echo "|  -o <prefix>         Output prefix (default: PPL)"
     echo "|  -t <threads>        Threads (default: 12)"
@@ -41,7 +47,7 @@ usage() {
     echo "|  -h                  Show help and exit"
     echo "|"
     echo "|Example:"
-    echo "|  bash $0 -j /path/to/PPL.jar -g asm.fa -f reads.fq.gz -o PPL -t 32"
+    echo "|  bash $0 -g asm.fa -f reads.fq.gz -o PPL -t 32"
     exit 1
 }
 
@@ -52,6 +58,7 @@ site="^GATC"
 output_prefix="PPL"
 threads=12
 cutoffMapq=1
+jar="${default_jar}"
 
 ############################################
 # Parse options
@@ -73,8 +80,8 @@ done
 ############################################
 # Check required parameters
 ############################################
-if [[ -z "${jar:-}" ]] || [[ -z "${genome:-}" ]] || [[ -z "${fq_file:-}" ]]; then
-    LOG_INFO ${log_file} "error" "ERROR: -j <jar_path> -g <genome.fa> and -f <reads.fq> are required."
+if [[ -z "${genome:-}" ]] || [[ -z "${fq_file:-}" ]]; then
+    LOG_INFO ${log_file} "error" "ERROR: -g <genome.fa> and -f <reads.fq> are required."
     usage
 fi
 
