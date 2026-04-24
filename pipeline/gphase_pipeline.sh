@@ -120,6 +120,8 @@ Usage: $(basename "$0") pipeline -f <fa_file> -g <gfa> -c <collapse_num_file> -m
   --split_gfa_n       <split_gfa_n>              : Number of common neighbors when splitting GFA [2-5], default: 5.
   --chr_pm            <partig_chr_pm>            : Similarity of partig when clustering chr [0.8 <= x < 1], default: 0.95.
   --r_max             <r_max>                    : Maximum value of parameter R during Louvain clustering, default: 3.
+  --t_len_T           <t_len_T>                  : Threshold for filtering the total length of the cluster, default: 7. Without filtering, it is set to 0.
+  --a_len_T           <a_len_T>                  : Threshold for filtering the average Unitig length within a cluster , default: 7. Without filtering, it is set to 0
 
 >>> clustering haplotypes Parameters:
   --hap_pm            <partig_hap_pm>            : Similarity of partig when clustering hap [0.6 <= x < 1], default: 0.7 .
@@ -157,6 +159,8 @@ cluster_q=1
 scaffold_q=0
 split_gfa_n=5
 r_max=3
+t_len_T=7
+a_len_T=7
 chr_pm="0.95"
 hap_pm="0.7"
 thread=12
@@ -173,7 +177,7 @@ no_scaffold_ec=""
 
 
 # ===== parse args =====
-TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,cluster_q:,nor_hic:,scaffold_q:,chr_pm:,r_max:,hap_pm:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,npop:,processes:,help -- "$@")
+TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,cluster_q:,nor_hic:,scaffold_q:,chr_pm:,r_max:,t_len_T:,a_len_T:,hap_pm:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,npop:,processes:,help -- "$@")
 eval set -- "$TEMP"
 
 while true; do
@@ -207,6 +211,8 @@ while true; do
             if (($(echo "$2 >= 0.8 && $2 < 1" | bc -l) )); then chr_pm="$2"; else die "--chr_pm must be 0.8 <= x < 1"; fi
             shift 2 ;;
         --r_max) r_max="$2"; shift 2 ;;
+        --t_len_T) t_len_T="$2"; shift 2 ;;
+        --a_len_T) a_len_T="$2"; shift 2 ;;
         --hap_pm) 
             if (($(echo "$2 >= 0.6 && $2 < 1" | bc -l) )); then hap_pm="$2"; else die "--hap_pm must be 0.6 <= x < 1"; fi
             shift 2 ;;
@@ -249,7 +255,7 @@ done
 
 case "${map_file,,}" in
     *.pairs|*.bam) ;;
-    *) die "Error: Hi-C/Pore-C mapping file must be *.pairs (PA5 format) or *.bam (BAM format): $map_file" ;;
+    *) die "Error: Hi-C/Pore-C/Omni-C mapping file must be *.pairs (PA5 format) or *.bam (BAM format): $map_file" ;;
 esac
 
 [[ ! -f "$fa_file" ]] && die "Input FASTA file not found: $fa_file"
@@ -348,7 +354,7 @@ check_file_exists_and_nonempty "${output_prefix}.RE_counts.txt" "RE_counts"
 check_file_exists_and_nonempty "${output_prefix}.map.links.nor.csv" "normalized links"
 
 # Chromosome clustering pipeline
-run_step "python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -g $(basename "$gfa") -pm ${chr_pm} --split_gfa_n ${split_gfa_n} -r_max ${r_max}" "cluster_chr.py"
+run_step "python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -g $(basename "$gfa") -pm ${chr_pm} --split_gfa_n ${split_gfa_n} -r_max ${r_max} -t_len_T ${t_len_T} -a_len_T ${a_len_T}" "cluster_chr.py"
 
 check_file_exists_and_nonempty "${output_prefix}.digraph.csv" "digraph from cluster_chr"
 check_file_exists_and_nonempty "group_ctgs_All.txt" "group_ctgs_All.txt"
@@ -410,9 +416,16 @@ for f in \
     "gphase_output/preprocessing/${normalized_links}" \
     "gphase_output/cluster_chr/${output_prefix}.digraph.csv" \
     "gphase_output/cluster_chr/group_ctgs_All.txt" \
-    "gphase_output/scaffold_hap/${output_prefix}.scaffolds.fasta" \
-    "gphase_output/scaffold_hap/${output_prefix}.scaffolds.agp"; do
-    [[ -s "${f}" ]] && info "OK   ${f}" || warn "MISSING ${f}"
+    "gphase_output/cluster_chr/rescue.cluster.ctg.txt" \
+    "gphase_output/cluster_hap/${output_prefix}.hap.cluster.txt" \
+    "gphase_output/scaffold_hap/gphase_final.agp" \
+    "gphase_output/scaffold_hap/gphase_final.fasta" \
+    "gphase_output/scaffold_hap/gphase_final_contig.agp" \
+    "gphase_output/scaffold_hap/gphase_final_contig.fasta" \
+    "gphase_output/scaffold_hap/gphase_final_contig_scaffold.fasta" \
+    "gphase_output/scaffold_hap/gphase_final_ctg2utg.txt" \
+    "gphase_output/scaffold_hap/gphase_final_rescue.agp"; do
+    [[ -s "${f}" ]] && info "OK  ${f}" || warn "MISSING ${f}"
 done
 
 info "Full log: ${log_file}"

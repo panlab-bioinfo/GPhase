@@ -407,12 +407,13 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         
         # check utg number
         try:
-            df = pd.read_csv(utg_rescue_file, sep='\t', skipinitialspace=True)
+            df = pd.read_csv(utg_rescue_file, sep='\t', header=None, skipinitialspace=True)
             df_len = len(df)
         except Exception as e:
             raise ValueError(f"Chr{chr_num}: Loaded utg file error...")
 
         if df_len < int(args.hap_number):
+            logger.error(utg_rescue_file)
             logger.error(
             f"Chr{chr_num}: The number of Unitigs loaded from '{utg_rescue_file}' ({df_len}) "
             f"is less than the required haplotype number ({int(args.hap_number)}). "
