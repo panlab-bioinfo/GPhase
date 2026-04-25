@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import shutil
 import argparse
 import subprocess
 import logging
@@ -128,24 +129,25 @@ def create_symlink(source, dest,logger):
         logger.warning(f"Symlink already exists: {dest}")
 
 def filter_links_by_utgs(flag, utg_file, input_file, output_file,logger):
+    # Filter chromosome links from all links.
     temp_file = f"temp_utg_file_{flag}.txt"
     try:
         command = f"cut -f1 {utg_file} > {temp_file}"
         execute_command(command, f"Failed to create temp file from {utg_file}", logger)
         # --- Check temp file ---
         check_file_exists_and_not_empty(temp_file, logger, f"Creating temporary UTG list for {flag}")
-        # --- End  ---
-        
-        command = (
-            f"awk -F \"[,\\t ]\" 'NR==FNR{{lines[$1]; next}} ($1 in lines && $2 in lines)' "
-            f"{temp_file} {input_file} > {output_file}"
-        )
-        execute_command(command, f"Failed to filter links for {output_file}", logger)
 
-        # --- Check output file ---
-        check_file_exists_and_not_empty(output_file, logger, f"Filtering links for {flag}")
-        # --- End ---
-        
+        if os.path.exists(temp_file) and os.path.getsize(temp_file) > 0:
+            # print(f"{temp_file}\t{input_file}\t{output_file}")
+            command = (
+                f"awk -F \"[,\\t ]\" 'NR==FNR{{lines[$1]; next}} ($1 in lines && $2 in lines)' "
+                f"{temp_file} {input_file} > {output_file}"
+            )
+            execute_command(command, f"Failed to filter links for {output_file}", logger)
+        else:
+            shutil.copyfile(input_file, output_file)
+            logger.info(f"Skip filtering: {temp_file} is empty or not found")
+
         command = f"rm {temp_file}"
         execute_command(command, f"Failed to remove temp file {temp_file}", logger)
         
@@ -413,12 +415,24 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
             raise ValueError(f"Chr{chr_num}: Loaded utg file error...")
 
         if df_len < int(args.hap_number):
-            logger.error(utg_rescue_file)
-            logger.error(
+            logger.info(
             f"Chr{chr_num}: The number of Unitigs loaded from '{utg_rescue_file}' ({df_len}) "
             f"is less than the required haplotype number ({int(args.hap_number)}). "
-            f"Cannot proceed with clustering. Please check if the chromosome clustering results are incorrect.")
-            raise ValueError(f"The number of Unitigs on chromosome {chr_num} is less than the number of haplotypes...") 
+            f"Forcefully align the count of collapsed Unitig with the haplotype count.")
+
+            utg_list = df.iloc[:, 0].astype(str).tolist()
+            force_output_file = f"{args.output_prefix}.reassign.cluster.txt"
+
+            with open(force_output_file, "w") as f:
+                for i in range(1, int(args.hap_number) + 1):
+                    group_name = f"group{i}"
+                    utg_count = len(utg_list)
+                    line = f"{group_name}\t{utg_count}\t" + "\t".join(utg_list) + "\n"
+                    f.write(line)
+
+            logger.info(f"Chr{chr_num}: Fallback cluster file generated -> {force_output_file}")
+            return f"Successfully processed chromosome {chr_num}"
+
 
         # Process files with ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=args.thread_num) as executor:
@@ -438,18 +452,41 @@ def process_chromosome(chr_num, args, pwd, partig_file,logger):
         cut_value = filter_edges_by_density(chr_num, links_file, utg_rescue_file, filter_edge_file, logger=logger, step=0.5)
 
         filtered_links_file = f"{args.output_prefix}.chr{chr_num}.links.nor.filterAllele.csv"
-        # --- Check partig_file_chr ---
-        check_file_exists_and_not_empty(partig_file_chr, logger, f"Checking Partig file for filtering allele links for Chr{chr_num}")
-        # --- End ---
 
-        command = (
-            f"awk -F '[, \\t]' 'NR==FNR{{lines[$1\",\"$2];next}}!($1\",\"$2 in lines)' "
-            f"{partig_file_chr} {filter_edge_file} > {filtered_links_file}"
-        )
-        execute_command(command, f"Failed to filter allele links for {filtered_links_file}",logger)
+        if os.path.exists(partig_file_chr) and os.path.getsize(partig_file_chr) > 0:
+            command = (
+                f"awk -F '[, \\t]' 'NR==FNR{{lines[$1\",\"$2];next}}!($1\",\"$2 in lines)' "
+                f"{partig_file_chr} {filter_edge_file} > {filtered_links_file}"
+            )
+            execute_command(command, f"Failed to filter allele links for {filtered_links_file}",logger)
+        else:
+            shutil.copyfile(filter_edge_file, filtered_links_file)
+
         check_file_exists_and_not_empty(filtered_links_file, logger, f"Checking filtered links file for Chr{chr_num}")
         execute_command(f"sed '1isource,target,links' -i {args.HiC_file}", f"Failed to add header to {args.HiC_file}",logger)
         execute_command(f"sed '1isource,target,links' -i {filtered_links_file}", f"Failed to add header to {filtered_links_file}",logger)
+
+        with open(filtered_links_file) as f:
+            filtered_line_count = sum(1 for _ in f)
+
+        if filtered_line_count < 20:
+            logger.info(
+                f"Chr{chr_num}: '{filtered_links_file}' has only {filtered_line_count} lines (<20). "
+                f"Trigger fallback clustering."
+            )
+
+            utg_list = df.iloc[:, 0].astype(str).tolist()
+            force_output_file = f"{args.output_prefix}.reassign.cluster.txt"
+
+            with open(force_output_file, "w") as f:
+                for i in range(1, int(args.hap_number) + 1):
+                    group_name = f"group{i}"
+                    utg_count = len(utg_list)
+                    line = f"{group_name}\t{utg_count}\t" + "\t".join(utg_list) + "\n"
+                    f.write(line)
+
+            logger.info(f"Chr{chr_num}: Fallback cluster file generated -> {force_output_file}")
+            return f"Successfully processed chromosome {chr_num}"
 
 
         # # The knee is used to filter HiC signals
