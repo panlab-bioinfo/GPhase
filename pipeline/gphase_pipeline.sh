@@ -324,13 +324,15 @@ fi
 
 check_file_exists_and_nonempty "map.pairs" "generated map.pairs"
 
+
 # 3. get_links.py : Obtain 3C connections between unitigs.
 run_step "python ${SCRIPT_DIR}/../cluster_chr/get_links.py -i map.pairs -o ${output_prefix} -q ${cluster_q}" "get_links.py"
 links_csv="${output_prefix}.map.links.csv"
 
+
 lines=$(wc -l "${links_csv}" | awk '{print $1}')
-if [[ "${lines}" -eq 1 ]]; then
-    die "Error: The link file ${links_csv} must contain exactly 1 data line."
+if [[ "${lines}" -le 1 ]]; then
+    die "${output_prefix}.map.links.csv is empty. Please check whether the input 3C mapping file is correct or if the --cluster_q parameter is set too high.."
 fi
 
 # 4. nor_hic.py : Standardized 3C connection
