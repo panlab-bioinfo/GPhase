@@ -269,6 +269,32 @@ collapse_num_file="$(realpath "$collapse_num_file")" && check_file_exists_and_no
 map_file="$(realpath "$map_file")"
 [[ -e "$map_file" ]] || die "Hi-C/Pore-C Mapping file not accessible after realpath: $map_file"
 
+# File Matching Detection
+FAI_FILE="${fa_file}.fai"
+if [ ! -s "$FAI_FILE" ]; then
+    run_step "samtools faidx $fa_file" "samtools faidx"
+fi
+if [ ! -f "$FAI_FILE" ]; then
+    die "Critical Error: Index file $FAI_FILE was not created by samtools."
+fi
+
+errors=$(awk -v f2="$gfa" -v f3="$collapse_num_file" '
+            ARGIND==1 { if($1=="S") g[$2]=1; next }
+            ARGIND==2 { c[$1]=1; next }
+            {
+                if (!($1 in g)) print f2 ":" $1
+                if (!($1 in c)) print f3 ":" $1
+            }
+        ' "$gfa" "$collapse_num_file" "$FAI_FILE")
+        
+if [ -n "$errors" ]; then
+    echo "$errors" | while read -r line; do
+        info "Input GFA file and collapsed number file are missing the following unitigs: $line"
+    done
+    die "Data integrity check failed: Some unitigs are missing in GFA file or Collapsed number file."
+fi
+info "Checked OK: All unitigs are consistent across files."
+
 
 workdir="${current_dir}/gphase_output"
 mkdir -p "${workdir}"
@@ -304,15 +330,19 @@ elif [[ "$map_basename" =~ \.bam$ ]]; then
     safe_ln "$map_file" "$map_file"
     check_file_exists_and_nonempty "$(basename "$fa_file")" "FASTA for samtools faidx"
     
-    info "Indexing FASTA for samtools"
-    run_step "samtools faidx $(basename "$fa_file")" "samtools faidx"
+    if [ ! -s "${fa_file}.fai" ]; then
+        info "Indexing FASTA for samtools"
+        run_step "samtools faidx "${fa_file}"" "samtools faidx"
+    else
+        info "Existing index file detected: ${fa_file}.fai. Skipping indexing step."
+    fi
 
     info "Converting BAM to map.pairs format (mapQ >= $scaffold_q)"
     tmp_pairs="map.pairs.$$"
     {
         echo "## pairs format v1.0.0"
         echo "##columns: readID chrom1 pos1 chrom2 pos2 mapQ"
-        awk '{print "##chromsize: "$1" "$2}' "$(basename "$fa_file").fai"
+        awk '{print "##chromsize: "$1" "$2}' "${fa_file}.fai"
     } > "$tmp_pairs"
 
     # get filtered pairs using scaffold_q
@@ -386,7 +416,7 @@ cr_file="${cluster_chr_dir}/rescue.cluster.ctg.txt"
 # phasing pipeline
 run_step "python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file $(basename "$collapse_num_file") -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr_file} -pm ${hap_pm} --reassign_number ${reassign_number} ${rescue_flag} ${expand_flag}" "cluster_hap.py"
 
-for chr_id in $(seq 1 "$n_chr"); do
+for chr_id in $(seq 1 "$n_chr");do
     reassign_file="${output_prefix}.reassign.cluster.txt"
     check_file_exists_and_nonempty "chr${chr_id}/$reassign_file" "reassign cluster file for chromosome ${chr_id}"
 done
