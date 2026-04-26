@@ -68,7 +68,7 @@ def check(lst):
     n = len(lst)
     return {i for i, x in enumerate(lst) if x > float((total - x) / (n - 1)/3)}
 
-def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=None, Allele_cluster=None, n_chr=None):
+def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=None, Allele_cluster=None, n_chr=None, t_len_T=7, a_len_T=7):
     if RE_file:
         ctg_RE_len = read_REs(RE_file)
     if Allele_cluster:
@@ -118,15 +118,23 @@ def Multilevel_cluster(csv_file, output_file, resolution, check=None, RE_file=No
             chr_len_dict[idx] = sum_length
             chr_len_max = sum_length if sum_length > chr_len_max else chr_len_max
         
-        threshold_1 = sum(chr_len_dict.values()) / int(n_chr) / 3
-        filtered_chr_set_1 = {key for key, value in chr_len_dict.items() if value > threshold_1}
+        if t_len_T:
+            threshold_1 = sum(chr_len_dict.values()) / int(n_chr) / float(t_len_T)
+            filtered_chr_set_1 = {key for key, value in chr_len_dict.items() if value > threshold_1}
+        else:
+            threshold_1 = 0
+            filtered_chr_set_1 = set(chr_len_dict.keys())
 
         # threshold_2 = chr_len_max / 5
         # filtered_chr_set_2 = {key for key, value in chr_len_dict.items() if value > threshold_2}
 
         # Preventing rDNA utg clustering errors
-        threshold_3 = mean(chr_avg_dict.values()) / 3
-        filtered_chr_set_3 = {key for key, value in chr_avg_dict.items() if value > threshold_3}
+        if a_len_T:
+            threshold_3 = mean(chr_avg_dict.values()) / float(a_len_T)
+            filtered_chr_set_3 = {key for key, value in chr_avg_dict.items() if value > threshold_3}
+        else:
+            threshold_3 = 0
+            filtered_chr_set_3 = set(chr_avg_dict.keys())
 
         # print(f"filtered_chr_set_1: {filtered_chr_set_1}")
         # print(f"{threshold_1}\t{chr_len_dict}")
@@ -165,6 +173,9 @@ if __name__ == '__main__':
     parser.add_argument('--Allele_cluster', help='File path required when --check is enabled')
     parser.add_argument('--n_chr', type=int, metavar='\b', help='Expected number of chromosomes, required when --check is enabled')
 
+    parser.add_argument('--t_len_T', type=int, default=7, metavar='\b', help='Threshold for filtering the total length of the cluster is 7 by default, required when --check is enabled. Without filtering, it is set to 0')
+    parser.add_argument('--a_len_T', type=int, default=7, metavar='\b', help='Threshold for filtering the average Unitig length within a cluster is 7 by default, required when --check is enabled. Without filtering, it is set to 0')
+
     args = parser.parse_args()
 
     if args.check:
@@ -178,4 +189,4 @@ if __name__ == '__main__':
     if not args.check:
         Multilevel_cluster(args.csv_file, args.output_file, args.resolution)
     else:
-        Multilevel_cluster(args.csv_file, args.output_file, args.resolution, args.check, args.RE_file, args.Allele_cluster, int(args.n_chr))
+        Multilevel_cluster(args.csv_file, args.output_file, args.resolution, args.check, args.RE_file, args.Allele_cluster, int(args.n_chr), args.t_len_T, args.a_len_T)

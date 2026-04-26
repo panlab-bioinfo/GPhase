@@ -120,6 +120,8 @@ Usage: $(basename "$0") pipeline -f <fa_file> -g <gfa> -c <collapse_num_file> -m
   --split_gfa_n       <split_gfa_n>              : Number of common neighbors when splitting GFA [2-5], default: 5.
   --chr_pm            <partig_chr_pm>            : Similarity of partig when clustering chr [0.8 <= x < 1], default: 0.95.
   --r_max             <r_max>                    : Maximum value of parameter R during Louvain clustering, default: 3.
+  --t_len_T           <t_len_T>                  : Threshold for filtering the total length of the cluster, default: 7. Without filtering, it is set to 0.
+  --a_len_T           <a_len_T>                  : Threshold for filtering the average Unitig length within a cluster , default: 7. Without filtering, it is set to 0
 
 >>> clustering haplotypes Parameters:
   --hap_pm            <partig_hap_pm>            : Similarity of partig when clustering hap [0.6 <= x < 1], default: 0.7 .
@@ -157,6 +159,8 @@ cluster_q=1
 scaffold_q=0
 split_gfa_n=5
 r_max=3
+t_len_T=7
+a_len_T=7
 chr_pm="0.95"
 hap_pm="0.7"
 thread=12
@@ -173,7 +177,7 @@ no_scaffold_ec=""
 
 
 # ===== parse args =====
-TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,cluster_q:,nor_hic:,scaffold_q:,chr_pm:,r_max:,hap_pm:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,npop:,processes:,help -- "$@")
+TEMP=$(getopt -o f:g:c:m:p:e:h --long n_chr:,n_hap:,cluster_q:,nor_hic:,scaffold_q:,chr_pm:,r_max:,t_len_T:,a_len_T:,hap_pm:,split_gfa_n:,rescue,expand,reassign_number:,thread:,no_contig_ec,no_scaffold_ec,min_len:,mutprob:,ngen:,npop:,processes:,help -- "$@")
 eval set -- "$TEMP"
 
 while true; do
@@ -207,6 +211,8 @@ while true; do
             if (($(echo "$2 >= 0.8 && $2 < 1" | bc -l) )); then chr_pm="$2"; else die "--chr_pm must be 0.8 <= x < 1"; fi
             shift 2 ;;
         --r_max) r_max="$2"; shift 2 ;;
+        --t_len_T) t_len_T="$2"; shift 2 ;;
+        --a_len_T) a_len_T="$2"; shift 2 ;;
         --hap_pm) 
             if (($(echo "$2 >= 0.6 && $2 < 1" | bc -l) )); then hap_pm="$2"; else die "--hap_pm must be 0.6 <= x < 1"; fi
             shift 2 ;;
@@ -249,7 +255,7 @@ done
 
 case "${map_file,,}" in
     *.pairs|*.bam) ;;
-    *) die "Error: Hi-C/Pore-C mapping file must be *.pairs (PA5 format) or *.bam (BAM format): $map_file" ;;
+    *) die "Error: Hi-C/Pore-C/Omni-C mapping file must be *.pairs (PA5 format) or *.bam (BAM format): $map_file" ;;
 esac
 
 [[ ! -f "$fa_file" ]] && die "Input FASTA file not found: $fa_file"
@@ -262,6 +268,32 @@ gfa="$(realpath "$gfa")" && check_file_exists_and_nonempty "$gfa" "input GFA"
 collapse_num_file="$(realpath "$collapse_num_file")" && check_file_exists_and_nonempty "$collapse_num_file" "collapse number file"
 map_file="$(realpath "$map_file")"
 [[ -e "$map_file" ]] || die "Hi-C/Pore-C Mapping file not accessible after realpath: $map_file"
+
+# File Matching Detection
+FAI_FILE="${fa_file}.fai"
+if [ ! -s "$FAI_FILE" ]; then
+    run_step "samtools faidx $fa_file" "samtools faidx"
+fi
+if [ ! -f "$FAI_FILE" ]; then
+    die "Critical Error: Index file $FAI_FILE was not created by samtools."
+fi
+
+errors=$(awk -v f2="$gfa" -v f3="$collapse_num_file" '
+            ARGIND==1 { if($1=="S") g[$2]=1; next }
+            ARGIND==2 { c[$1]=1; next }
+            {
+                if (!($1 in g)) print f2 ":" $1
+                if (!($1 in c)) print f3 ":" $1
+            }
+        ' "$gfa" "$collapse_num_file" "$FAI_FILE")
+        
+if [ -n "$errors" ]; then
+    echo "$errors" | while read -r line; do
+        info "Input GFA file and collapsed number file are missing the following unitigs: $line"
+    done
+    die "Data integrity check failed: Some unitigs are missing in GFA file or Collapsed number file."
+fi
+info "Checked OK: All unitigs are consistent across files."
 
 
 workdir="${current_dir}/gphase_output"
@@ -298,15 +330,19 @@ elif [[ "$map_basename" =~ \.bam$ ]]; then
     safe_ln "$map_file" "$map_file"
     check_file_exists_and_nonempty "$(basename "$fa_file")" "FASTA for samtools faidx"
     
-    info "Indexing FASTA for samtools"
-    run_step "samtools faidx $(basename "$fa_file")" "samtools faidx"
+    if [ ! -s "${fa_file}.fai" ]; then
+        info "Indexing FASTA for samtools"
+        run_step "samtools faidx "${fa_file}"" "samtools faidx"
+    else
+        info "Existing index file detected: ${fa_file}.fai. Skipping indexing step."
+    fi
 
     info "Converting BAM to map.pairs format (mapQ >= $scaffold_q)"
     tmp_pairs="map.pairs.$$"
     {
         echo "## pairs format v1.0.0"
         echo "##columns: readID chrom1 pos1 chrom2 pos2 mapQ"
-        awk '{print "##chromsize: "$1" "$2}' "$(basename "$fa_file").fai"
+        awk '{print "##chromsize: "$1" "$2}' "${fa_file}.fai"
     } > "$tmp_pairs"
 
     # get filtered pairs using scaffold_q
@@ -318,13 +354,15 @@ fi
 
 check_file_exists_and_nonempty "map.pairs" "generated map.pairs"
 
+
 # 3. get_links.py : Obtain 3C connections between unitigs.
 run_step "python ${SCRIPT_DIR}/../cluster_chr/get_links.py -i map.pairs -o ${output_prefix} -q ${cluster_q}" "get_links.py"
 links_csv="${output_prefix}.map.links.csv"
 
+
 lines=$(wc -l "${links_csv}" | awk '{print $1}')
-if [[ "${lines}" -eq 1 ]]; then
-    die "Error: The link file ${links_csv} must contain exactly 1 data line."
+if [[ "${lines}" -le 1 ]]; then
+    die "${output_prefix}.map.links.csv is empty. Please check whether the input 3C mapping file is correct or if the --cluster_q parameter is set too high.."
 fi
 
 # 4. nor_hic.py : Standardized 3C connection
@@ -348,7 +386,7 @@ check_file_exists_and_nonempty "${output_prefix}.RE_counts.txt" "RE_counts"
 check_file_exists_and_nonempty "${output_prefix}.map.links.nor.csv" "normalized links"
 
 # Chromosome clustering pipeline
-run_step "python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -g $(basename "$gfa") -pm ${chr_pm} --split_gfa_n ${split_gfa_n} -r_max ${r_max}" "cluster_chr.py"
+run_step "python ${SCRIPT_DIR}/../cluster_chr/cluster_chr.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -g $(basename "$gfa") -pm ${chr_pm} --split_gfa_n ${split_gfa_n} -r_max ${r_max} -t_len_T ${t_len_T} -a_len_T ${a_len_T}" "cluster_chr.py"
 
 check_file_exists_and_nonempty "${output_prefix}.digraph.csv" "digraph from cluster_chr"
 check_file_exists_and_nonempty "group_ctgs_All.txt" "group_ctgs_All.txt"
@@ -378,7 +416,7 @@ cr_file="${cluster_chr_dir}/rescue.cluster.ctg.txt"
 # phasing pipeline
 run_step "python ${SCRIPT_DIR}/../cluster_hap/cluster_hap.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} --collapse_num_file $(basename "$collapse_num_file") -d ${output_prefix}.digraph.csv -s group_ctgs_All.txt -c ${output_prefix}.chr.cluster.ctg.txt -cr ${cr_file} -pm ${hap_pm} --reassign_number ${reassign_number} ${rescue_flag} ${expand_flag}" "cluster_hap.py"
 
-for chr_id in $(seq 1 "$n_chr"); do
+for chr_id in $(seq 1 "$n_chr");do
     reassign_file="${output_prefix}.reassign.cluster.txt"
     check_file_exists_and_nonempty "chr${chr_id}/$reassign_file" "reassign cluster file for chromosome ${chr_id}"
 done
@@ -410,9 +448,16 @@ for f in \
     "gphase_output/preprocessing/${normalized_links}" \
     "gphase_output/cluster_chr/${output_prefix}.digraph.csv" \
     "gphase_output/cluster_chr/group_ctgs_All.txt" \
-    "gphase_output/scaffold_hap/${output_prefix}.scaffolds.fasta" \
-    "gphase_output/scaffold_hap/${output_prefix}.scaffolds.agp"; do
-    [[ -s "${f}" ]] && info "OK   ${f}" || warn "MISSING ${f}"
+    "gphase_output/cluster_chr/rescue.cluster.ctg.txt" \
+    "gphase_output/cluster_hap/${output_prefix}.hap.cluster.txt" \
+    "gphase_output/scaffold_hap/gphase_final.agp" \
+    "gphase_output/scaffold_hap/gphase_final.fasta" \
+    "gphase_output/scaffold_hap/gphase_final_contig.agp" \
+    "gphase_output/scaffold_hap/gphase_final_contig.fasta" \
+    "gphase_output/scaffold_hap/gphase_final_contig_scaffold.fasta" \
+    "gphase_output/scaffold_hap/gphase_final_ctg2utg.txt" \
+    "gphase_output/scaffold_hap/gphase_final_rescue.agp"; do
+    [[ -s "${f}" ]] && info "OK  ${f}" || warn "MISSING ${f}"
 done
 
 info "Full log: ${log_file}"

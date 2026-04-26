@@ -225,7 +225,7 @@ def run_pipeline_chr(output_prefix: str, HiC_file: str, logger: logging.Logger) 
     ]
     return run_command(command, "Running pipeline_chr.py (HiC clustering pre-processing)", logger)
 
-def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, chr_number: int, logger: logging.Logger, r_min=0.01, r_max=3.0, tolerance=0.001, max_iter=50) -> bool:
+def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, chr_number: int, logger: logging.Logger, r_min=0.01, r_max=3.0, tolerance=0.001, max_iter=50, t_len_T=7.0, a_len_T=7.0) -> bool:
     """
     Run multilevel clustering with an optimized binary search for the ratio 'r'
     to achieve the desired cluster count.
@@ -258,7 +258,9 @@ def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, ch
                 True,
                 input_RE_counts,
                 allele_cluster,
-                int(chr_number)
+                int(chr_number),
+                t_len_T,
+                a_len_T
             )
             if cluster_count is None:
                 logger.error("Multilevel_cluster returned None, check inner component errors.")
@@ -283,7 +285,9 @@ def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, ch
                             True,
                             input_RE_counts,
                             allele_cluster,
-                            int(chr_number)
+                            int(chr_number),
+                            t_len_T,
+                            a_len_T
                         )
                         logger.info(f"Cluster count {cluster_count} -> target {chr_number}. Increasing r (r_start = {float(r_iter):.4f}).")
                         if cluster_count == chr_number:
@@ -306,7 +310,9 @@ def run_multilevel_cluster_optimized(input_hic_file: str, output_prefix: str, ch
                             True,
                             input_RE_counts,
                             allele_cluster,
-                            int(chr_number)
+                            int(chr_number),
+                            t_len_T,
+                            a_len_T
                         )
                         logger.info(f"Cluster count {cluster_count} -> target {chr_number}. Increasing r (r_start = {float(r_iter):.4f}).")
                         if cluster_count == chr_number:
@@ -539,6 +545,8 @@ def parse_arguments() -> argparse.Namespace:
 
     clustering_group  = parser.add_argument_group('>>> Parameter for clustering')
     clustering_group.add_argument("-r_max", "--r_max", metavar='\b', default=3, help="Maximum value of parameter R during Louvain clustering.")
+    clustering_group.add_argument("-t_len_T", "--t_len_T", metavar='\b', default=7, help="Threshold for filtering the total length of the cluster is 7 by default.  Without filtering, it is set to 0.")
+    clustering_group.add_argument("-a_len_T", "--a_len_T", metavar='\b', default=7, help="Threshold for filtering the average Unitig length within a cluster is 7 by default. Without filtering, it is set to 0.")
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
@@ -665,7 +673,7 @@ def main():
                 continue
                 
             # Run optimized multilevel cluster
-            if run_multilevel_cluster_optimized(filter_HiC_file, args.output_prefix, int(args.chr_number), logger, r_min=0.01, r_max=float(args.r_max)):
+            if run_multilevel_cluster_optimized(filter_HiC_file, args.output_prefix, int(args.chr_number), logger, r_min=0.01, r_max=float(args.r_max),t_len_T=float(args.t_len_T), a_len_T=float(args.a_len_T)):
                 successful_clustering = True
                 break
             else:
