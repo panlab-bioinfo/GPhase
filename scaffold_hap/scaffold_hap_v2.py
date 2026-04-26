@@ -644,6 +644,50 @@ def log_start(logger: logging.Logger, script_name: str, version: str, args: argp
     logger.info(f"Command: {' '.join(sys.argv)}")
     logger.info(f"Arguments: {args}")
 
+def append_unplaced_utgs(agp_path, all_utg_fasta, target_fasta):
+    """
+    Identify the Unitigs present in the input FASTA but absent from the final AGP,
+    and append them to the end of both the final AGP file and the final FASTA.
+    """
+    used_utgs = set()
+    if os.path.exists(agp_path):
+        with open(agp_path, 'r') as f:
+            for line in f:
+                if line.startswith('#') or not line.strip():
+                    continue
+                parts = line.split('\t')
+                if len(parts) >= 9 and parts[4].upper() not in ['N', 'U']:
+                    used_utgs.add(parts[5].strip())
+
+    def append_to_files(utg_id, sequence, f_agp, f_fa):
+        length = len(sequence)
+        f_agp.write(f"{utg_id}\t1\t{length}\t1\tW\t{utg_id}\t1\t{length}\t+\n")
+        f_fa.write(f">{utg_id}\n")
+        for i in range(0, length, 80):
+            f_fa.write(sequence[i:i+80] + "\n")
+
+    count = 0
+    with open(agp_path, 'a') as f_agp, open(target_fasta, 'a') as f_fa:
+        current_id = None
+        current_seq = []
+        
+        with open(all_utg_fasta, 'r') as f_in:
+            for line in f_in:
+                line = line.strip()
+                if line.startswith(">"):
+                    if current_id and current_id not in used_utgs:
+                        append_to_files(current_id, "".join(current_seq), f_agp, f_fa)
+                        count += 1
+                    current_id = line[1:].split()[0]
+                    current_seq = []
+                else:
+                    current_seq.append(line)
+            if current_id and current_id not in used_utgs:
+                append_to_files(current_id, "".join(current_seq), f_agp, f_fa)
+                count += 1
+                
+    return count
+
 def main():
     args = parse_arguments()
     logger = setup_logging('scaffold_hap.log') 
@@ -682,6 +726,10 @@ def main():
     if not haphic_sort(pwd, args,logger):
         logger.error("Error in HapHiC sort and final rescue. Exiting.")
         sys.exit(1)
+
+    # add unitigs discarded during the clustering stage
+    added_num = append_unplaced_utgs("gphase_final.agp", args.fa_file, "gphase_final.fasta")
+    logger.info(f"A total of {added_num} missing unitigs have been added to the AGP and FASTA files.")
 
     # GPhase rescue using assembly graph 
     logger.info("Starting final rescue...")
