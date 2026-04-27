@@ -33,10 +33,10 @@ singularity exec --bind /your/data/path:/your/data/path gphase.sif gphase
 
 ```
 
-# Step1: Mapping Hi-C data to assembly
+# Step1: Mapping Hi-C/Pore-C data to assembly
 GPhase supports multiple data types, including Hi-C, Pore-C and Omni-C. It also supports their pairs(pa5) and bam(BAM) format mapping files.
 
-Hi-C reads you can using Chromap or other mapping tools, such as BWA, can be used. When using Chromap, if the default MAPQ parameters do not produce satisfactory results, the `--MAPQ-threshold` value can be lowered to include more Hi-C mapping information. When using other mapping software, the BAM files need to be sorted.
+1. Hi-C reads you can using Chromap or other mapping tools, such as BWA, can be used. When using Chromap, if the default MAPQ parameters do not produce satisfactory results, the `--MAPQ-threshold` value can be lowered to include more Hi-C mapping information. When using other mapping software, the BAM files need to be sorted.
 ```
 chromap -i -r asm.fa -o index
 chromap --preset hic -x index -r asm.fa -q 0 \
@@ -44,23 +44,32 @@ chromap --preset hic -x index -r asm.fa -q 0 \
     --remove-pcr-duplicates -t 64 --SAM -o map.chromap.sam
 samtools view -@ 64 -bh map.chromap.sam -o map.chromap.bam
 ```
-To process Pore-C data, you can use [PPL Toolbox](https://github.com/versarchey/PPL-Toolbox). GPhase provides a script to run PPL Toolbox. You can quickly run it to get the final pairs file `map.PPL.pairs` and input it into GPhase.
+2. For Pore-C data, we recommend using `poreC_pipeline.sh` as the default workflow. This script is designed for ONT-based concatemer/Pore-C reads and always performs the ONT read mapping internally with minimap2. It then converts the alignments to a Hi-C-like BAM file `map.concatemer2pe.bam` with `concatemer2pe.py`, and that BAM can be passed directly to `gphase pipeline -m`. You can run it directly or through `gphase porec`. The `-o` option specifies the output directory prefix, and the final BAM path is `<prefix>/map.concatemer2pe.bam`.
 ```
-/path/to/GPhase/pipeline/PPL_pipeline.sh -j /path/to/PPL-Toolbox.jar \
--g asm.fa \
--f reads.fq.gz \
--o PPL
+/path/to/GPhase/gphase porec \
+    asm.fa \
+    reads.fq.gz \
+    -o porec \
+    -t 32
+```
+
+The previous Pore-C workflow based on [PPL Toolbox](https://github.com/versarchey/PPL-Toolbox) is still available as a backup workflow. If you need to reproduce the results reported in the paper, you can use this PPL-based process to generate the final pairs file `map.PPL.pairs` and then input it into GPhase.
+```
+/path/to/GPhase/gphase ppl -j /path/to/GPhase/bin/PPL-Toolbox.jar \
+    -g asm.fa \
+    -f reads.fq.gz \
+    -o PPL
 ```
 
 
 # Step2: Estimating of the number of contig collapses based on HiFi data and popCNV
 The popCNV_pipeline.sh script estimates the copy number of collapsed contigs collapse based on HiFi data using the popCNV software. The file used by popCNV for GPhase input is `collapse_num.txt` : popcnv/06.genes.round.cn. For details, see [popCNV](https://github.com/sc-zhang/popCNV)
 ```
-/path/to/GPhase/pipeline/popCNV_pipeline.sh \
--f asm.fa \
--p output_prefix \
--t 32 \
--r reads.fq.gz
+/path/to/GPhase/gphase popcnv \
+    -f asm.fa \
+    -p output_prefix \
+    -t 32 \
+    -r reads.fq.gz
 ```
 
 
@@ -68,20 +77,20 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
 1. `asm.fa` :  Genome assembly file in FASTA format (unitigs).
 2. `p_utg.gfa` : Assembly graph file in GFA format.
 3. `collapse_num.txt` : File with contig collapse information (from popCNV: popcnv/06.genes.round.cn).
-4. `map.chromap.bam` : pairs/bam file with mapped Hi-C reads.
+4. `map.chromap.bam` : pairs/bam file with mapped Hi-C/Pore-C reads. For Pore-C data, the recommended input is `porec/map.concatemer2pe.bam`, where `concatemer2pe` is the `-o` output directory/prefix used by `gphase porec`; for paper reproduction, `PPL/map.PPL.pairs` can also be used.
 5. `n_chr` : Number of chromosomes.
 6. `n_hap` : Number of haplotypes.
 7. `p` : Prefix for output files.
 ```
 /path/to/GPhase/gphase pipeline\
- -f asm.fa \
- -g genome.bp.p_utg.gfa \
- -c collapse_num.txt \
- -m map.chromap.bam \
- --n_chr 12 \
- --n_hap 4 \
- -p output_prefix \
- --min_len 50
+    -f asm.fa \
+    -g genome.bp.p_utg.gfa \
+    -c collapse_num.txt \
+    -m map.chromap.bam \
+    --n_chr 12 \
+    --n_hap 4 \
+    -p output_prefix \
+    --min_len 50
 ```
 For more parameters, please refer to the `gphase pipeline -h`.
 Below are some of the more important optional parameters:

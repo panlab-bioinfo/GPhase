@@ -30,6 +30,8 @@ def print_HELP_MESSAGE():
                         haplotype clustering, and haplotype scaffolding steps        (→ pipeline/gphase_pipeline.sh)
   📦  \033[1mpopcnv\033[0m         Run the popcnv pipeline, estimating of the number of 
                         collapses of Unitig using hifi data based on popCNV software (→ pipeline/popCNV_pipeline.sh)
+  📦  \033[1mporec\033[0m          Run the porec pipeline, mapping ONT Pore-C sequences and
+                                            generating Hi-C-like BAM                (→ pipeline/poreC_pipeline.sh)
   📦  \033[1mppl\033[0m            Run the ppl pipeline, Mapping Pore-C sequences and 
                                             generating pairwise interactions         (→ pipeline/PPL_pipeline.sh)
   🧩  \033[1mcluster_chr\033[0m    Step 1: Cluster contigs into chromosomes                        (→ cluster_chr/cluster_chr.py)
@@ -61,6 +63,7 @@ def main():
     mapping = {
         'pipeline': ['bash', os.path.join(BASE_DIR, 'pipeline/gphase_pipeline.sh')],
         'popcnv': ['bash', os.path.join(BASE_DIR, 'pipeline/popCNV_pipeline.sh')],
+        'porec': ['bash', os.path.join(BASE_DIR, 'pipeline/poreC_pipeline.sh')],
         'ppl': ['bash', os.path.join(BASE_DIR, 'pipeline/PPL_pipeline.sh')],
         'cluster_chr': ['python3', os.path.join(BASE_DIR,'cluster_chr/cluster_chr.py')],
         'cluster_hap': ['python3', os.path.join(BASE_DIR,'cluster_hap/cluster_hap.py')],
