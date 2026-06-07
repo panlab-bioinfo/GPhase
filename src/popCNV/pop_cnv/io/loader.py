@@ -3,14 +3,15 @@ class GCLoader:
     This class is used for loading gc file like below:
     Chromosome    Start_position  End_position    value
     """
+
     def __init__(self):
         self.bed_db = {}
 
     def load(self, gc_file):
         with open(gc_file, 'r') as fin:
             for line in fin:
-                data = line.strip().split()
-                chrn = data[0]
+                data = line.strip().split('\t')
+                chrn = data[0].split()[0]
                 sp = int(data[1])
                 ep = int(data[2])
                 self.bed_db[tuple([chrn, sp, ep])] = int(data[3])
@@ -21,13 +22,14 @@ class BEDLoader:
     This class is used for loading files like below:
     Sample  Chromosome    Start_position  End_position    value
     """
+
     def __init__(self):
         self.bed_db = {}
 
     def load(self, bed_file):
         with open(bed_file, 'r') as fin:
             for line in fin:
-                data = line.strip().split()
+                data = line.strip().split('\t')
                 smp = data[0]
                 chrn = data[1]
                 sp = int(data[2])
@@ -42,6 +44,7 @@ class DepthLoader:
     This class is used for loading sequence depth file which contain two columns:
     Sample  depth
     """
+
     def __init__(self):
         self.depth_db = {}
 
@@ -63,7 +66,8 @@ class FastaLoader:
             sid = ''
             for line in fin:
                 if line[0] == '>':
-                    sid = line.strip()[1:]
+                    # only keep the id before first space
+                    sid = line.strip().split()[0][1:]
                     fa_db[sid] = []
                 else:
                     fa_db[sid].append(line.strip())
@@ -77,6 +81,7 @@ class GeneLoader:
     This class is used for loading gc file like below:
     Chromosome    Start_position  End_position    GeneID
     """
+
     def __init__(self):
         self.bed_db = {}
 
@@ -96,6 +101,7 @@ class GeneCNLoader:
     This class is used for loading gc file like below:
     Gene    sample1_cn  sample2_cn  sample3_cn ...
     """
+
     def __init__(self):
         self.gene_cn = {}
 
@@ -109,7 +115,7 @@ class GeneCNLoader:
                     gn = data[0]
                     self.gene_cn[gn] = {}
                     for _ in range(len(sample_list)):
-                        self.gene_cn[gn][sample_list[_]] = float(data[_+1])
+                        self.gene_cn[gn][sample_list[_]] = float(data[_ + 1])
 
 
 class GRPLoader:
@@ -120,6 +126,7 @@ class GRPLoader:
     Sample3 Group2
     ...
     """
+
     def __init__(self):
         self.grp_db = {}
 
@@ -145,7 +152,7 @@ class RFDLoader:
                         gn = data[0]
                         self.rfd_db[gn] = {}
                         for _ in range(len(smp_list)):
-                            rfd, pval = data[_+1].split(',')
+                            rfd, pval = data[_ + 1].split(',')
                             self.rfd_db[gn][smp_list[_]] = [float(rfd), float(pval)]
         else:
             with open(rfd_file, 'r') as fin:
