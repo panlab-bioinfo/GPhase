@@ -13,6 +13,7 @@ try:
     import pysam
 except ModuleNotFoundError as e:
     import sys
+
     # Only raise error when loading this module by popCNV.py
     if path.basename(sys.argv[0]) == "popCNV.py":
         print("ERROR: popCNV.py cannot running without pysam")
@@ -45,15 +46,18 @@ class GC:
         pool = multiprocessing.Pool(processes=threads)
         res = []
         for chrn in self.__fa_db:
-            r = pool.apply_async(self.__sub_stat, args=(self.__bins[chrn], self.__fa_db[chrn], chrn, ))
+            r = pool.apply_async(self.__sub_stat, args=(self.__bins[chrn], self.__fa_db[chrn], chrn,))
             res.append(r)
         pool.close()
         pool.join()
 
         for r in res:
-            gc_list, chrn = r.get()
-            for sp, ep, gc_prop in gc_list:
-                self.gc_db[tuple([chrn, sp, ep])] = gc_prop
+            try:
+                gc_list, chrn = r.get()
+                for sp, ep, gc_prop in gc_list:
+                    self.gc_db[tuple([chrn, sp, ep])] = gc_prop
+            except Exception as e:
+                Message().warn(repr(e))
 
         del self.__fa_db
         collect()
@@ -91,8 +95,12 @@ class SeqDepth:
         pool.join()
 
         for r in res:
-            depth, smp = r.get()
-            self.depth_db[smp] = depth
+            try:
+                depth, smp = r.get()
+                self.depth_db[smp] = depth
+            except Exception as e:
+                Message().error(repr(e))
+                exit(-1)
 
 
 class BamDepth:
@@ -130,9 +138,9 @@ class Norm:
             for line in fin:
                 data = line.strip().split()
                 chrn = data[0]
-                sp = int(data[1])+1
+                sp = int(data[1]) + 1
                 ep = int(data[2])
-                rd = float(data[-1])*1./s_ratio
+                rd = float(data[-1]) * 1. / s_ratio
                 rd_db[tuple([chrn, sp, ep])] = rd
         with open("__tmp__%s.rd" % smp, 'w') as fout:
             for _ in rd_db:
@@ -142,6 +150,7 @@ class Norm:
     def norm(self, mos_path, sample_depth_db, threads):
         pool = multiprocessing.Pool(processes=threads)
         smp_list = []
+        res = []
         for fn in listdir(mos_path):
             if not fn.endswith(".regions.bed.gz"):
                 continue
@@ -149,10 +158,22 @@ class Norm:
             if smp not in sample_depth_db:
                 continue
             mos_file = path.join(mos_path, fn)
-            pool.apply_async(self.__sub_norm, args=(mos_file, smp, sample_depth_db[smp],))
+            r = pool.apply_async(self.__sub_norm, args=(mos_file, smp, sample_depth_db[smp],))
+            res.append(r)
             smp_list.append(smp)
         pool.close()
         pool.join()
+
+        for r in res:
+            try:
+                r.get()
+            except Exception as e:
+                Message().error(repr(e))
+                exit(-1)
+
+        if len(smp_list) == 0:
+            Message().error("No mosdepth result found, exiting...")
+            exit(-1)
 
         for smp in smp_list:
             tmp_file = '__tmp__%s.rd' % smp
@@ -189,6 +210,10 @@ class CN:
                 sub_rd_db[tuple([chrn, sp, ep])] = rd
         for _ in gc_db:
             gc = gc_db[_]
+            if _ not in sub_rd_db:
+                Message().error("{} could not found in GC database, "
+                                "genome could not match bam reference, exiting...".format(_))
+                raise KeyError
             rd = sub_rd_db[_]
             if gc not in conv_gc_db:
                 conv_gc_db[gc] = []
@@ -199,11 +224,14 @@ class CN:
             conv_cn_db[gc] = cn
         cn_db = {}
         for _ in gc_db:
-            cn = conv_cn_db[gc_db[_]]
-            if cn:
-                cn_db[_] = sub_rd_db[_]*1./cn
-            else:
-                cn_db[_] = float('nan')
+            try:
+                cn = conv_cn_db[gc_db[_]]
+                if cn:
+                    cn_db[_] = sub_rd_db[_] * 1. / cn
+                else:
+                    cn_db[_] = float('nan')
+            except Exception as e:
+                Message().warn(repr(e))
         tmp_file = '__tmp__%s.cn' % smp
         with open(tmp_file, 'w') as fout:
             for _ in cn_db:
@@ -211,7 +239,12 @@ class CN:
                 fout.write("%s\t%d\t%d\t%s\n" % (chrn, sp, ep, str(cn_db[_])))
 
     def convert(self, gc_db, rd_db, threads):
+        if not rd_db:
+            Message().error("No read depth database found, exiting...")
+            exit(-1)
+
         pool = multiprocessing.Pool(processes=threads)
+        res = []
         for smp in rd_db:
             rd_tmp_file = '__tmp__%s.rd' % smp
             if not path.exists(rd_tmp_file):
@@ -219,10 +252,17 @@ class CN:
                     for _ in rd_db[smp]:
                         chrn, sp, ep = _
                         fout.write("%s\t%d\t%d\t%s\n" % (chrn, sp, ep, str(rd_db[smp][_])))
-            pool.apply_async(self.__sub_convert, args=(gc_db, rd_tmp_file, smp, ))
+            r = pool.apply_async(self.__sub_convert, args=(gc_db, rd_tmp_file, smp,))
+            res.append(r)
         pool.close()
         pool.join()
 
+        for r in res:
+            try:
+                r.get()
+            except Exception as e:
+                Message().error(repr(e))
+                exit(-1)
         for smp in rd_db:
             rd_tmp_file = '__tmp__%s.rd' % smp
             cn_tmp_file = '__tmp__%s.cn' % smp
@@ -285,7 +325,8 @@ class GeneCN:
                     continue
                 cn_list = []
                 for i in range(nsp, nep + 1):
-                    cn_list.append(conv_cn_db[smp][chrn][i][2])
+                    if (not isinf(conv_cn_db[smp][chrn][i][2])) and (not isnan(conv_cn_db[smp][chrn][i][2])):
+                        cn_list.append(conv_cn_db[smp][chrn][i][2])
                 try:
                     gn_cn[gn][smp] = median(cn_list)
                 except Exception as e:
@@ -325,11 +366,11 @@ class RFD:
             f_db = {}
             if len(pop_list) == 0:
                 continue
-            f_pop = max(bincount(pop_list))*1./len(pop_list)
+            f_pop = max(bincount(pop_list)) * 1. / len(pop_list)
             for grp in cn_db:
                 if len(cn_db[grp]) == 0:
                     continue
-                f_db[grp] = max(bincount(cn_db[grp]))*1./len(cn_db[grp])
+                f_db[grp] = max(bincount(cn_db[grp])) * 1. / len(cn_db[grp])
             if wild_grp not in f_db:
                 continue
             for grp in f_db:
@@ -340,7 +381,7 @@ class RFD:
                 except Exception as e:
                     Message().warn(repr(e))
                     p_value = float('nan')
-                rfd_val = (f_db[grp]-f_db[wild_grp])*1./f_pop
+                rfd_val = (f_db[grp] - f_db[wild_grp]) * 1. / f_pop
                 if grp not in self.rfd_db:
                     self.rfd_db[grp] = []
                 self.rfd_db[grp].append([rfd_val, p_value, gn])

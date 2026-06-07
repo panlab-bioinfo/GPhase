@@ -1,4 +1,4 @@
-from os import makedirs, path, chdir
+from os import makedirs, path, chdir, listdir
 from gc import collect
 from pop_cnv.io import message, loader, writer
 from pop_cnv.worker import calculator
@@ -37,9 +37,9 @@ class Pipeline:
             msg.error("Mosdepth not found, exiting")
             exit(-1)
         mos_path = path.join(self.workdir, step_list[0])
-        if not path.exists(mos_path):
+        if not path.exists(mos_path) or len(listdir(mos_path)) == 0:
             msg.info("Running mosdepth...")
-            makedirs(mos_path)
+            makedirs(mos_path, exist_ok=True)
             mos_runner = calculator.BamDepth()
             mos_runner.run(self.bam_path, self.win_size, mos_path, self.threads)
             msg.info("Done")
