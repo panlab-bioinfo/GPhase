@@ -2,17 +2,17 @@
 
 GPhase leverages an assembly graph and Hi-C/Pore-C data to facilitate genome assembly phasing, automatically resolves and assigns collapsed sequences, and fills assembly gaps based on the graph structure.
 ---
-# Table of contents
-* [Installation](#installation)
-* [Step1: Mapping Hi-C data to assembly](#mapping-hi-c-data-to-assembly)
-* [Step2: Estimating of the number of contig collapses based on HiFi data and popCNV](#estimating-of-the-number-of-contig-collapses-based-on-hifi-data-and-popcnv)
-* [Step3: Running the GPhase scaffolding pipeline](#running-the-gphase-scaffolding-pipeline)
-* [Output file](#output-file)
-* [Final assembly result](#final-assembly-result)
-* [Generate a Hi-C heatmap](#generate-a-hi-c-heatmap)
-* [Tips](#tips)
-* [Test dataset](#test-dataset)
-* [Contact](#contact)
+# Table of Contents
+- [Installation](#installation)
+- [Step1: Mapping Hi-C/Pore-C data to assembly](#step1-mapping-hi-cpore-c-data-to-assembly)
+- [Step2: Estimating of the number of contig collapses based on HiFi data and popCNV](#step2-estimating-of-the-number-of-contig-collapses-based-on-hifi-data-and-popcnv)
+- [Step3: Running the GPhase scaffolding pipeline](#step3-running-the-gphase-scaffolding-pipeline)
+- [Output file](#output-file)
+- [Final assembly result](#final-assembly-result)
+- [Generate a Hi-C heatmap](#generate-a-hi-c-heatmap)
+- [Tips](#tips)
+- [Test dataset](#test-dataset)
+- [Contact](#contact)
 # Installation
 To install GPhase, follow these steps:
 ```
@@ -32,6 +32,10 @@ singularity pull gphase.sif docker://tanging1024/gphase:latest
 singularity exec --bind /your/data/path:/your/data/path gphase.sif gphase
 
 ```
+
+> **Warning**
+>
+> GPhase requires the raw, unprocessed hifiasm primary unitig FASTA (`*.p_utg.fa`) as the assembly input. This FASTA must correspond exactly to the hifiasm primary unitig GFA (`*.p_utg.gfa`), with matching sequence IDs and graph records. Do not rename, reorder, filter, polish, purge, scaffold, or otherwise modify the primary unitigs before running GPhase. The target genome should also have sufficient heterozygosity; if the genome is nearly homozygous, haplotype phasing will have little biological meaning.
 
 # Step1: Mapping Hi-C/Pore-C data to assembly
 GPhase supports multiple data types, including Hi-C, Pore-C and Omni-C. It also supports their pairs(pa5) and bam(BAM) format mapping files.
