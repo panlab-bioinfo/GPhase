@@ -33,9 +33,9 @@ singularity exec --bind /your/data/path:/your/data/path gphase.sif gphase
 
 ```
 
-> **Warning**
+> [!WARNING]
 >
-> GPhase requires the raw, unprocessed hifiasm primary unitig FASTA (`*.p_utg.fa`) as the assembly input. This FASTA must correspond exactly to the hifiasm primary unitig GFA (`*.p_utg.gfa`), with matching sequence IDs and graph records. Do not rename, reorder, filter, polish, purge, scaffold, or otherwise modify the primary unitigs before running GPhase. The target genome should also have sufficient heterozygosity; if the genome is nearly homozygous, haplotype phasing will have little biological meaning.
+> GPhase requires the raw, unprocessed hifiasm unitig FASTA (`*.p_utg.fa`) as the assembly input. This FASTA must correspond exactly to the hifiasm primary unitig GFA (`*.p_utg.gfa`), with matching sequence IDs and graph records. Do not rename, reorder, filter, polish, purge, scaffold, or otherwise modify the primary unitigs before running GPhase. The target genome should also have sufficient heterozygosity; if the genome is nearly homozygous, haplotype phasing will have little biological meaning.
 
 # Step1: Mapping Hi-C/Pore-C data to assembly
 GPhase supports multiple data types, including Hi-C, Pore-C and Omni-C. It also supports their pairs(pa5) and bam(BAM) format mapping files.
