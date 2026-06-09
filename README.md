@@ -95,6 +95,7 @@ The popCNV_pipeline.sh script estimates the copy number of collapsed contigs col
     --n_chr 12 \
     --n_hap 4 \
     -p output_prefix \
+    --resuce \
     --min_len 50
 ```
 For more parameters, please refer to `gphase pipeline -h` or [doc/README.md#gphase-pipeline](doc/README.md#gphase-pipeline).
