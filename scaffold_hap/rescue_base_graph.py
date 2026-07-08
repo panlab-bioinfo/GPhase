@@ -177,11 +177,13 @@ def update_agp_with_insert_lists(agp_df, insert_dict, ctg_RE_dict, utgs_set):
                     # insert insert_path
                     path = insert_dict[key]
                     insert_path = path[1:-1]
+                    n_inserted = 0
 
                     for idx, _utg in enumerate(insert_path):
 
-                        if _utg not in utgs_set:
+                        if _utg[0] not in utgs_set:
                             continue
+                        n_inserted += 1
                         insert_begin = int(row["start"]) + bp_set_off
 
                         new_group.append({
@@ -213,7 +215,7 @@ def update_agp_with_insert_lists(agp_df, insert_dict, ctg_RE_dict, utgs_set):
                         idx_set_off += 1
 
                     new_row = row.copy()
-                    new_row['start'] = int(row['start']) + bp_set_off + 1
+                    new_row['start'] = int(row['start']) + bp_set_off + (1 if n_inserted > 0 else 0)
                     new_row['end'] = int(row['end']) + bp_set_off
                     new_row['part_num'] = int(row['part_num']) + idx_set_off
                     new_group.append(new_row.to_dict())
