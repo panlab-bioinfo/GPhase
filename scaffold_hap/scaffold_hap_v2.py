@@ -24,14 +24,10 @@ from get_RE import Get_RE
 # Output filenames
 INTERMEDIATE_UNITIG_AGP = "gphase_final.agp"
 FINAL_UNITIG_SCAFFOLD_FASTA = "gphase_final.unitig.scaffold.fasta"
-RESCUE_RESCUE_AGP = "gphase_final_rescue.agp"
-FINAL_RESCUE_AGP = "gphase_final.unitig.rescue.agp"
+FINAL_RESCUE_AGP = "gphase_final_rescue.agp"
 RESCUE_CONTIG_AGP = "gphase_final_contig.agp"
 FINAL_CONTIG_AGP = "gphase_final.contig.scaffold.agp"
-RESCUE_CONTIG_FASTA = "gphase_final_contig.fasta"
-FINAL_CONTIG_FASTA = "gphase_final.contig.fasta"
-RESCUE_CTG2UTG = "gphase_final_ctg2utg.txt"
-FINAL_CTG2UTG = "gphase_final.ctg2utg.txt"
+FINAL_CONTIG_FASTA_TMP = "gphase_final_contig.fasta"
 FINAL_CONTIG_SCAFFOLD_FASTA = "gphase_final.contig.scaffold.fasta"
 RENAME_COLLAPSE_PREFIX = "gphase_final.unitig.scaffold"
 FINAL_UNITIG_SCAFFOLD_AGP = f"{RENAME_COLLAPSE_PREFIX}.agp"
@@ -750,19 +746,11 @@ def main():
         # Rescue and connect utg base graph
         try:
             Rescue_base_graph(args.digraph_file, INTERMEDIATE_UNITIG_AGP, args.gfa_file, args.RE_file, args.fa_file)
-            check_file_exists_and_not_empty(RESCUE_RESCUE_AGP, logger, "Rescue_base_graph execution", min_size=100)
+            check_file_exists_and_not_empty(FINAL_RESCUE_AGP, logger, "Rescue_base_graph execution", min_size=100)
             check_file_exists_and_not_empty(RESCUE_CONTIG_AGP, logger, "Rescue_base_graph execution", min_size=100)
-            check_file_exists_and_not_empty(RESCUE_CONTIG_FASTA, logger, "Rescue_base_graph execution", min_size=100)
-            check_file_exists_and_not_empty(RESCUE_CTG2UTG, logger, "Rescue_base_graph execution", min_size=10)
 
-            Path(RESCUE_RESCUE_AGP).rename(FINAL_RESCUE_AGP)
             Path(RESCUE_CONTIG_AGP).rename(FINAL_CONTIG_AGP)
-            Path(RESCUE_CONTIG_FASTA).rename(FINAL_CONTIG_FASTA)
-            Path(RESCUE_CTG2UTG).rename(FINAL_CTG2UTG)
-            check_file_exists_and_not_empty(FINAL_RESCUE_AGP, logger, "Rename rescue AGP", min_size=100)
             check_file_exists_and_not_empty(FINAL_CONTIG_AGP, logger, "Rename contig AGP", min_size=100)
-            check_file_exists_and_not_empty(FINAL_CONTIG_FASTA, logger, "Rename contig fasta", min_size=100)
-            check_file_exists_and_not_empty(FINAL_CTG2UTG, logger, "Rename ctg2utg", min_size=10)
             logger.info("GPhase rescue completed.")
         except Exception as e:
             logger.error(f"Error in Rescue_base_graph: {str(e)}")
@@ -770,7 +758,7 @@ def main():
 
         script_path = os.path.abspath(sys.path[0])
         haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
-        cmd = [f"{haphic_utils_dir}/agp_to_fasta", FINAL_CONTIG_AGP, FINAL_CONTIG_FASTA]
+        cmd = [f"{haphic_utils_dir}/agp_to_fasta", FINAL_CONTIG_AGP, FINAL_CONTIG_FASTA_TMP]
 
         with open(FINAL_CONTIG_SCAFFOLD_FASTA, "w") as outfile:
             if subprocess.run(cmd, stdout=outfile).returncode != 0:
@@ -804,9 +792,6 @@ def main():
         Path(f"{RENAME_COLLAPSE_PREFIX}.fa").rename(FINAL_UNITIG_FASTA)
         check_file_exists_and_not_empty(FINAL_UNITIG_FASTA, logger, "Rename unitig fasta", min_size=100)
         logger.info("rename_collapse completed.")
-
-        Path(INTERMEDIATE_UNITIG_AGP).unlink(missing_ok=True)
-        logger.info(f"Removed intermediate file: {INTERMEDIATE_UNITIG_AGP}")
 
     except Exception as e:
         logger.error(f"An exception occurred during rescue using assembly graph: {e}")

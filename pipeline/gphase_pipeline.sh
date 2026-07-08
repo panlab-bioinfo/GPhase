@@ -450,13 +450,14 @@ for f in \
     "gphase_output/cluster_chr/group_ctgs_All.txt" \
     "gphase_output/cluster_chr/rescue.cluster.ctg.txt" \
     "gphase_output/cluster_hap/${output_prefix}.hap.cluster.txt" \
-    "gphase_output/scaffold_hap/gphase_final.agp" \
-    "gphase_output/scaffold_hap/gphase_final.fasta" \
-    "gphase_output/scaffold_hap/gphase_final_contig.agp" \
-    "gphase_output/scaffold_hap/gphase_final_contig.fasta" \
-    "gphase_output/scaffold_hap/gphase_final_contig_scaffold.fasta" \
-    "gphase_output/scaffold_hap/gphase_final_ctg2utg.txt" \
-    "gphase_output/scaffold_hap/gphase_final_rescue.agp"; do
+    "gphase_output/scaffold_hap/gphase_final.contig.fasta" \
+    "gphase_output/scaffold_hap/gphase_final.contig.scaffold.agp" \
+    "gphase_output/scaffold_hap/gphase_final.contig.scaffold.fasta" \
+    "gphase_output/scaffold_hap/gphase_final.ctg2utg.txt" \
+    "gphase_output/scaffold_hap/gphase_final.unitig.fasta" \
+    "gphase_output/scaffold_hap/gphase_final.unitig.rescue.agp" \
+    "gphase_output/scaffold_hap/gphase_final.unitig.scaffold.agp" \
+    "gphase_output/scaffold_hap/gphase_final.unitig.scaffold.fasta"; do
     [[ -s "${f}" ]] && info "OK  ${f}" || warn "MISSING ${f}"
 done
 
