@@ -1,14 +1,14 @@
-# GPhase: A Phasing Assembly Tool Leveraging an Assembly Graph and Hi-C/Pore-C/Omni-C Data
+# GPhase: An assembly graph-assisted haplotype-resolved scaffolding tool using 3C-based long-range data
 
-GPhase leverages an assembly graph and Hi-C/Pore-C data to facilitate genome assembly phasing, automatically resolves and assigns collapsed sequences, and fills assembly gaps based on the graph structure.
+GPhase leverages an assembly graph and 3C-based long-range data (e.g., Hi-C, Omni-C, Pore-C, and CiFi) to facilitate genome assembly phasing, automatically resolves and assigns collapsed sequences, and fills assembly gaps.
 ---
 
 ## Table of Contents
 
 - [Installation](#installation)
-- [Step1: Mapping Hi-C/Pore-C data to assembly](#step1-mapping-hi-cpore-c-data-to-assembly)
-- [Step2: Estimating the number of contig collapses based on HiFi data and popCNV](#step2-estimating-the-number-of-contig-collapses-based-on-hifi-data-and-popcnv)
-- [Step3: Running the GPhase scaffolding pipeline](#step3-running-the-gphase-scaffolding-pipeline)
+- [Step1: Mapping long-range data to assembly](#step1-mapping-long-range-data-to-assembly)
+- [Step2: Estimating the copy numbers of unitigs based on HiFi data](#step2-estimating-the-copy-numbers-of-unitigs-based-on-hifi-data)
+- [Step3: Running the GPhase pipeline](#step3-running-the-gphase-pipeline)
 - [Output directory structure](#output-directory-structure)
 - [Final assembly files](#final-assembly-files)
 - [Visualization and curation in Juicebox](#visualization-and-curation-in-juicebox)
@@ -41,11 +41,11 @@ singularity exec --bind /your/data/path:/your/data/path gphase.sif gphase
 >
 > GPhase requires the raw, unprocessed hifiasm unitig FASTA (`*.p_utg.fa`) as the assembly input. This FASTA must correspond exactly to the hifiasm primary unitig GFA (`*.p_utg.gfa`), with matching sequence IDs and graph records. Do not rename, reorder, filter, polish, purge, scaffold, or otherwise modify the primary unitigs before running GPhase. The target genome should also have sufficient heterozygosity; if the genome is nearly homozygous, haplotype phasing will have little biological meaning.
 
-## Step1: Mapping Hi-C/Pore-C data to assembly
+## Step1: Mapping long-range data to assembly
 
-GPhase supports multiple long-range data types, including Hi-C, Pore-C and Omni-C. It also supports mapping files in pairs (PA5) and BAM formats.
+GPhase supports multiple 3C-based long-range data types, including Hi-C, Omni-C, Pore-C and CiFi. It also supports mapping files in pairs (PA5) and BAM formats.
 
-1. For Hi-C reads, you can use Chromap or other mapping tools, such as BWA. When using Chromap, if the default MAPQ parameters do not produce satisfactory results, the `--MAPQ-threshold` value can be lowered to include more Hi-C mapping information. When using other mapping software, the BAM files need to be sorted.
+1. For Hi-C reads, you can use Chromap or other mapping tools, such as BWA. When using Chromap, we recommend using `-q 0` (i.e., no MAPQ filtering). GPhase will internally handle MAPQ filtering: by default, it selects contact signals with MAPQ ≥ 1 for clustering, and uses all contacts (MAPQ ≥ 0) for scaffolding.
 ```
 chromap -i -r p_utg.fa -o index
 chromap --preset hic -x index -r p_utg.fa -q 0 \
@@ -53,7 +53,7 @@ chromap --preset hic -x index -r p_utg.fa -q 0 \
     --remove-pcr-duplicates -t 64 --SAM -o map.chromap.sam
 samtools view -@ 64 -bh map.chromap.sam -o map.chromap.bam
 ```
-2. For contact-pair long reads, including Pore-C and CiFi, we recommend using `gphase contact-pair` as the default workflow. This command performs read mapping internally with minimap2, then converts the alignments to a Hi-C-like BAM file `map.concatemer2pe.bam` with `concatemer2pe.py`. That BAM can be passed directly to `gphase pipeline -m`. Use `-x map-ont` for Pore-C reads and `-x map-hifi` for CiFi reads. The `-o` option specifies the output directory prefix, and the final BAM path is `<prefix>/map.concatemer2pe.bam`. For all `contact-pair` parameters, see [doc/README.md#gphase-contact-pair](doc/README.md#gphase-contact-pair).
+2. For concatemer reads generated from long-read sequencing platforms (e.g., Pore-C and CiFi), we recommend using `gphase contact-pair` as the default workflow. This command performs read mapping internally with minimap2, then converts the alignments to a Hi-C-like BAM file. That BAM can be passed directly to `gphase pipeline -m`. Use `-x map-ont` for Pore-C reads and `-x map-hifi` for CiFi reads. The `-o` option specifies the output directory prefix, and the final BAM path is `<prefix>/map.concatemer2pe.bam`. For all `contact-pair` parameters, see [doc/README.md#gphase-contact-pair](doc/README.md#gphase-contact-pair).
 ```
 /path/to/GPhase/gphase contact-pair \
     p_utg.fa \
@@ -63,7 +63,7 @@ samtools view -@ 64 -bh map.chromap.sam -o map.chromap.bam
     -t 32
 ```
 
-The previous Pore-C workflow based on [PPL Toolbox](https://github.com/versarchey/PPL-Toolbox) is still available as a backup workflow. If you need to reproduce the results reported in the paper, you can use this PPL-based process to generate the final pairs file `map.PPL.pairs` and then input it into GPhase. For all `ppl` parameters, see [doc/README.md#gphase-ppl](doc/README.md#gphase-ppl).
+The previous Pore-C workflow based on [PPL Toolbox](https://github.com/versarchey/PPL-Toolbox) is deprecated and retained only for reproducing the results reported in our paper. It does not support genomes larger than 8 Gb or CiFi data. To use it, run the PPL-based process below to generate the final pairs file `map.PPL.pairs` and pass it to GPhase. For all `ppl` parameters, see [doc/README.md#gphase-ppl](doc/README.md#gphase-ppl).
 ```
 /path/to/GPhase/gphase ppl \
     -g p_utg.fa \
@@ -71,9 +71,9 @@ The previous Pore-C workflow based on [PPL Toolbox](https://github.com/versarche
     -o PPL
 ```
 
-## Step2: Estimating the number of contig collapses based on HiFi data and popCNV
+## Step2: Estimating the copy numbers of unitigs based on HiFi data
 
-The `gphase popcnv` command estimates the copy number of collapsed contigs based on HiFi data using the popCNV software. The file used by popCNV for GPhase input is `collapse_num.txt` : `popcnv/06.genes.round.cn`. For details, see [popCNV](https://github.com/sc-zhang/popCNV). For all `popcnv` parameters, see [doc/README.md#gphase-popcnv](doc/README.md#gphase-popcnv).
+The `gphase popcnv` command estimates the copy numbers of unitigs based on HiFi data using the popCNV software. The key output is `popcnv/06.genes.round.cn`, which is used as the collapse information input for the GPhase pipeline. For details, see [popCNV](https://github.com/sc-zhang/popCNV). For all `popcnv` parameters, see [doc/README.md#gphase-popcnv](doc/README.md#gphase-popcnv).
 ```
 /path/to/GPhase/gphase popcnv \
     -f p_utg.fa \
@@ -82,13 +82,13 @@ The `gphase popcnv` command estimates the copy number of collapsed contigs based
     -r reads.fq.gz
 ```
 
-## Step3: Running the GPhase scaffolding pipeline
+## Step3: Running the GPhase pipeline
 
 ```
 /path/to/GPhase/gphase pipeline \
     -f p_utg.fa \
     -g p_utg.gfa \
-    -c collapse_num.txt \
+    -c popcnv/06.genes.round.cn \
     -m map.chromap.bam \
     --n_chr 12 \
     --n_hap 4 \
@@ -100,15 +100,15 @@ The `gphase popcnv` command estimates the copy number of collapsed contigs based
 Required parameters:
 - `-f` : Genome assembly file in FASTA format (unitigs).
 - `-g` : Assembly graph file in GFA format.
-- `-c` : File with contig collapse information (from popCNV: `popcnv/06.genes.round.cn`).
-- `-m` : Hi-C/Pore-C/Omni-C/CiFi mapping file in `.bam` or `.pairs` format. For contact-pair data, the recommended input is `contact_pair/map.concatemer2pe.bam`, where `contact_pair` is the `-o` output directory/prefix used by `gphase contact-pair`; for paper reproduction, `PPL/map.PPL.pairs` can also be used.
+- `-c` : Path to the collapse information file generated by popCNV (`popcnv/06.genes.round.cn`).
+- `-m` : Mapping file in `.bam` or `.pairs` format, generated from Hi-C, Omni-C, Pore-C, or CiFi data (see [Step1](#step1-mapping-long-range-data-to-assembly)).
 - `--n_chr` : Number of chromosomes.
 - `--n_hap` : Number of haplotypes.
 - `-p` : Prefix for output files. Only the character `.`, numbers, and uppercase/lowercase letters are allowed (`[a-zA-Z0-9.]`).
 
 Below are some of the more important optional parameters:
-- `--cluster_q` : Hi-C/Pore-C/Omni-C/CiFi mapping quality score threshold (MAPQ) used during clustering. The default is `1`. This applies when the input is a BAM file.
-- `--scaffold_q` : Hi-C/Pore-C/Omni-C/CiFi mapping quality score threshold (MAPQ) used during scaffolding. The default is `0`. This applies when the input is a BAM file.
+- `--cluster_q` : Mapping quality (MAPQ) threshold used during clustering. The default is `1`. This only applies when the input is a BAM file.
+- `--scaffold_q` : Mapping quality (MAPQ) threshold used during scaffolding. The default is `0`. This only applies when the input is a BAM file.
 - `--hap_pm` : The threshold for the intensity parameter of homologous sequence identification. The default is `0.7`. If the heterozygosity of the assembled species is high, `0.6` can be used; if the heterozygosity of the species is low, `0.8` can be used.
 - `--chr_pm` : Similarity threshold for chromosome-level partig clustering. The default is `0.95`.
 - `--nor_hic` : Normalization mode for 3C link connections. Choices are `no`, `ratio`, and `length`; default is `ratio`.
@@ -138,7 +138,7 @@ Unitigs are unbranched paths in the assembly graph. They are typically short but
 
 ### Results based on contigs
 
-Contigs are formed by stitching adjacent unitigs after phasing and scaffolding — equivalent to gap closing along the correct path identified from branched paths in the assembly graph. The following files contain results where adjacent unitigs have been merged into contigs:
+Contigs are formed by stitching adjacent unitigs after phasing and scaffolding, which is equivalent to gap closing along the correct path identified from branched paths in the assembly graph. The following files contain results where adjacent unitigs have been merged into contigs:
 - `gphase_final.contig.fasta` : Contig sequences (obtained by merging adjacent unitigs) in FASTA format.
 - `gphase_final.contig.scaffold.agp` : Chromosome-level scaffold structure of contigs in AGP format.
 - `gphase_final.contig.scaffold.fasta` : Chromosome-level scaffold sequences assembled from contigs in FASTA format.
@@ -147,9 +147,9 @@ The correspondence between unitigs and contigs can be found in `gphase_final_ctg
 
 ## Visualization and curation in Juicebox
 
-The input for this workflow can be either the unitig-based results (`gphase_final.unitig.fasta` and `gphase_final.unitig.scaffold.agp`) or the contig-based results (`gphase_final.contig.fasta` and `gphase_final.contig.scaffold.agp`), depending on your needs. Unitigs offer lower contiguity but rarely contain phasing errors, making them simpler to curate in Juicebox. Contigs provide higher contiguity, but if phasing errors are present, correcting them first requires breaking contigs at misjoined sites, which is difficult to perform accurately.
+The input for this workflow can be either the unitig-based results (`gphase_final.unitig.fasta` and `gphase_final.unitig.scaffold.agp`) or the contig-based results (`gphase_final.contig.fasta` and `gphase_final.contig.scaffold.agp`), depending on your needs. Unitigs offer lower contiguity but individual unitigs rarely contain phasing errors, making unitig-based results easier to curate in Juicebox. Contigs provide higher contiguity, but if phasing errors are present, correcting them first requires breaking contigs at misjoined sites, which is difficult to perform accurately.
 
-### Remapping long-range data
+### 1. Remapping long-range data
 
 In the following instructions, `<prefix>.fasta` and `<prefix>.scaffold.agp` refer to the input files chosen above (e.g., `gphase_final.unitig` or `gphase_final.contig`).
 
@@ -184,29 +184,29 @@ chromap --preset hic -x reindex -r <prefix>.fasta -q 1 \
 >
 > During visualization, Hi-C/Omni-C alignments are filtered at MAPQ ≥ 1 by default (`-q 1`), and Pore-C/CiFi alignments at MAPQ ≥ 2 (`-q 2`), to exclude unreliable multi-mapped reads. If the resulting contact heatmap appears too sparse, you may lower these thresholds. Note that lower thresholds can introduce a large number of spurious contact signals.
 
-### Generating .assembly and .hic files
+### 2. Generating .assembly and .hic files
 
-Use `juicebox.sh` to generate `.assembly` and `.hic` files from the assembly and the remapped long-range data. Replace `<mapfile>` with `remap.chromap.pairs` for Hi-C/Omni-C, or `remapping/map.concatemer2pe.bam` for Pore-C/CiFi:
+Use `juicebox.sh` to generate `.assembly` and `.hic` files from the assembly and the remapped long-range data. Replace `<map_file>` with `remap.chromap.pairs` for Hi-C/Omni-C, or `remapping/map.concatemer2pe.bam` for Pore-C/CiFi:
 
 ```
-bash /Path/to/GPhase/scaffold_hap/juicebox.sh \
+bash /path/to/GPhase/scaffold_hap/juicebox.sh \
     -f <prefix>.fasta \
     -a <prefix>.scaffold.agp \
-    -p <mapfile> \
+    -p <map_file> \
     -o juicebox \
-    -g /Path/to/GPhase
+    -g /path/to/GPhase
 ```
 
-### Curating in Juicebox
+### 3. Curating in Juicebox
 
 1. Open Juicebox Assembly Tools (JBAT).
 2. Load `juicebox.hic` and `juicebox.assembly`.
 3. Manually correct misassemblies as needed.
 4. Export the modified results as `juicebox.review.assembly`.
 
-### Regenerating the curated assembly
+### 4. Regenerating the curated assembly
 
-After manual curation, use `juicer post` to regenerate the scaffold AGP and FASTA files by rearranging `<prefix>.fasta` according to the chromosome assignment, order and orientation specified in `juicebox.review.assembly`:
+After manual curation, use `juicer post` to regenerate the scaffold AGP and FASTA files by rearranging `<prefix>.fasta` according to the chromosome assignment, order, and orientation specified in `juicebox.review.assembly`:
 
 ```
 /path/to/GPhase/src/HapHiC/utils/juicer post \
@@ -221,13 +221,13 @@ After manual curation, use `juicer post` to regenerate the scaffold AGP and FAST
 
 ## Tips
 
-1. The `cluster_q` and `scaffold_q` parameters are only enabled when the input mapping file format is BAM. If using pairs, the `mapQ` parameter of the mapping software (e.g., Chromap) can be adjusted, but it is not recommended to set `mapQ` to 0, as this will affect the accuracy of the phasing due to multiple mapping.
-2. When assembling `polyploids`, it is recommended to use `unitig-level` assembly `sequences` and `graph` for phasing assembly. Generally, unitigs results in fewer errors compared to contig. Furthermore, using unitigs incorporates more assembly graph information, leading to better assembly results.
-3. GPhase can largely resolve sequence collapse during assembly, but cannot resolve the large fragment collapse in haplotypes.
+1. The `--cluster_q` and `--scaffold_q` parameters only take effect when the input is a BAM file. When using pairs format, GPhase cannot dynamically adjust mapping quality (MAPQ) thresholds per step. In this case, the MAPQ threshold must be set during mapping (e.g., Chromap's `-q`). Setting it to 0 is not recommended, as multi-mapped reads will affect phasing accuracy.
+2. GPhase requires hifiasm unitigs (`p_utg`) as input (see the [note](#installation)). For polyploids, assemblers such as hifiasm cannot produce accurately phased contigs. Unitigs, though shorter, are reliably phased. The unitig assembly graph also provides rich overlap information that GPhase leverages to resolve polyploid phasing and scaffolding.
+3. GPhase can largely resolve sequence collapses during assembly, but cannot resolve the large fragment collapses in haplotypes.
 
 ## Test dataset
 
-To help you quickly verify the installation and use of the software, we provide a small test dataset. This dataset contains input data that demonstrates the core functionality of the software. You can download it from this link https://drive.google.com/drive/folders/1M_ZlSHBTDwtCHGrUI6uMCVutfIweECaY?usp=sharing
+To help you quickly verify the installation and use of the software, we provide a small test dataset. This dataset contains input data that demonstrates the core functionality of the software. You can download it from this link: https://drive.google.com/drive/folders/1M_ZlSHBTDwtCHGrUI6uMCVutfIweECaY?usp=sharing
 
 Use the following command to run the test dataset:
 ```
@@ -238,9 +238,9 @@ bash run_gphase.sh
 
 ## Contact
 
-This software is developed by Professor Wei-Hua Pan's team at the Shenzhen Institute of Genome Research, Chinese Academy of Agricultural Sciences.
+This software is developed by Professor Weihua Pan's team from the Agricultural Genomics Institute at Shenzhen, Chinese Academy of Agricultural Sciences.
 
 If you have any questions or concerns while using the software, please submit an issue in the repository or contact us through the following methods:
 ### Email:
 #### Prof. Pan: panweihua@caas.cn
-#### Du Wenjie: duwenjie1024@163.com
+#### Wenjie Du: duwenjie1024@163.com
