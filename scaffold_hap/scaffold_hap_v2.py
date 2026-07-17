@@ -21,6 +21,22 @@ from rescue_base_graph import Rescue_base_graph
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'cluster_chr')))
 from get_RE import Get_RE
 
+# Output filenames
+INTERMEDIATE_UNITIG_AGP = "gphase_final.agp"
+FINAL_UNITIG_SCAFFOLD_FASTA = "gphase_final.unitig.scaffold.fasta"
+RESCUE_RESCUE_AGP = "gphase_final_rescue.agp"
+FINAL_RESCUE_AGP = "gphase_final.unitig.rescue.agp"
+RESCUE_CONTIG_AGP = "gphase_final_contig.agp"
+FINAL_CONTIG_AGP = "gphase_final.contig.scaffold.agp"
+RESCUE_CONTIG_FASTA = "gphase_final_contig.fasta"
+FINAL_CONTIG_FASTA = "gphase_final.contig.fasta"
+RESCUE_CTG2UTG = "gphase_final_ctg2utg.txt"
+FINAL_CTG2UTG = "gphase_final.ctg2utg.txt"
+FINAL_CONTIG_SCAFFOLD_FASTA = "gphase_final.contig.scaffold.fasta"
+RENAME_COLLAPSE_PREFIX = "gphase_final.unitig.scaffold"
+FINAL_UNITIG_SCAFFOLD_AGP = f"{RENAME_COLLAPSE_PREFIX}.agp"
+FINAL_UNITIG_FASTA = "gphase_final.unitig.fasta"
+
 
 def setup_logging(log_file: str = "scaffold.log") -> logging.Logger:
     """Configure logging to both file and console."""
@@ -125,6 +141,39 @@ def trans_agp(agp_file, original_agp, output_file, logger):
                 ori = fields[8]
                 scaffold_map[scaffold].append((ori, target))
 
+    def flip_ori(o):
+        if o == '+':
+            return '-'
+        if o == '-':
+            return '+'
+        return o
+
+    def emit_target_lines(scaffold, target_lines, reverse):
+        """Rename target AGP rows to scaffold; if reverse, flip order and W orientations."""
+        lines = [list(f) for f in target_lines]
+        if reverse:
+            lines.reverse()
+            for fields in lines:
+                if fields[4].upper() == 'W':
+                    fields[8] = flip_ori(fields[8])
+        pos = 1
+        out_rows = []
+        for part_num, fields in enumerate(lines, 1):
+            fields[0] = scaffold
+            fields[3] = str(part_num)
+            ctype = fields[4].upper()
+            if ctype == 'W':
+                length = int(fields[7]) - int(fields[6]) + 1
+            elif ctype in ('N', 'U'):
+                length = int(fields[5])
+            else:
+                length = int(fields[2]) - int(fields[1]) + 1
+            fields[1] = str(pos)
+            fields[2] = str(pos + length - 1)
+            pos += length
+            out_rows.append('\t'.join(fields) + '\n')
+        return out_rows
+
     # Write translated AGP
     with open(output_file, "w") as out:
         for scaffold, pairs in scaffold_map.items():
@@ -133,17 +182,17 @@ def trans_agp(agp_file, original_agp, output_file, logger):
 
             ori, target = pairs[0]
             if len(scaffold_map[scaffold]) == 1:
-                # Direct rewrite for single components
+                # Direct rewrite for single components; honor parent orientation
+                target_lines = []
                 with open(original_agp, 'r') as orig_f:
                     for line in orig_f:
                         if line.startswith("#") or line.strip() == "":
-                            out.write(line)
                             continue
                         fields = line.strip().split('\t')
-                        # print(f"{fields[0]}\t{target}")
                         if fields[0] == target:
-                            fields[0] = scaffold
-                            out.write('\t'.join(fields) + "\n")
+                            target_lines.append(fields)
+                for row in emit_target_lines(scaffold, target_lines, reverse=(ori == '-')):
+                    out.write(row)
             else:
                 # Use agptools join for multiple components
                 join_string = ",".join([ori + tgt for ori, tgt in pairs]) + "\t" + scaffold
@@ -151,7 +200,7 @@ def trans_agp(agp_file, original_agp, output_file, logger):
                 with open("joins.txt", "w") as jf:
                     jf.write(join_string)
                 # Run agptools
-                cmd = ["agptools", "join", "joins.txt", original_agp, "-n100"]
+                cmd = ["agptools", "join", "joins.txt", original_agp, "-n100", "-tscaffold", "-eproximity_ligation"]
                 result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
 
                 for line in result.stdout.splitlines():
@@ -298,6 +347,36 @@ def sort_file(input_file):
             f.write(hl)
         for _, _, line in lines_to_sort:
             f.write(line)
+
+
+def normalize_agp_n_gaps(agp_file):
+    """Convert AGP gap rows with type N to U and set linkage evidence to proximity_ligation.
+
+    AGP gap line: object, beg, end, part, type(N/U), gap_len, gap_type, linkage,
+    linkage_evidence. Change type N -> U and last column -> proximity_ligation.
+    """
+    converted = 0
+    lines = []
+    with open(agp_file, 'r') as f:
+        for line in f:
+            if line.startswith('#') or not line.strip():
+                lines.append(line)
+                continue
+            parts = line.rstrip('\n').split('\t')
+            if len(parts) >= 5 and parts[4].upper() == 'N':
+                parts[4] = 'U'
+                if len(parts) >= 9:
+                    parts[-1] = 'proximity_ligation'
+                else:
+                    parts.append('proximity_ligation')
+                converted += 1
+                lines.append('\t'.join(parts) + '\n')
+            else:
+                lines.append(line if line.endswith('\n') else line + '\n')
+
+    with open(agp_file, 'w') as f:
+        f.writelines(lines)
+    return converted
 
 
 def process_chromosome(pwd: str, chr_num: int, args: argparse.Namespace,logger) -> bool:
@@ -518,11 +597,8 @@ def haphic_sort(pwd: str, args: argparse.Namespace,logger) -> bool:
     merge_agp = f"{args.output_prefix}.merge.agp"
     scaffolds_fa = "scaffolds.fa"
     scaffolds_sort_fa = "scaffolds.sort.fa"
-    final_agp = "gphase_final.agp"
-    final_rescue_agp = "gphase_final_rescue.agp"
-    final_contig_agp = "gphase_final_contig.agp"
-    final_contig_fasta = "gphase_final_contig_scaffold.fasta"
-    final_fasta = "gphase_final.fasta"
+    final_agp = INTERMEDIATE_UNITIG_AGP
+    final_fasta = FINAL_UNITIG_SCAFFOLD_FASTA
     
     try:
         os.chdir(pwd)
@@ -644,6 +720,119 @@ def log_start(logger: logging.Logger, script_name: str, version: str, args: argp
     logger.info(f"Command: {' '.join(sys.argv)}")
     logger.info(f"Arguments: {args}")
 
+_COMPLEMENT = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
+
+
+def _reverse_complement(seq: str) -> str:
+    return seq.translate(_COMPLEMENT)[::-1]
+
+
+def fix_reversed_singleton_utg_scaffolds(agp_path, scaffold_fasta, utg_fasta, logger):
+    """
+    For scaffolds that contain exactly one W component with orientation '+':
+    if the scaffold sequence equals the reverse complement of the source utg
+    (a YaHS/trans_agp orientation sync bug), reverse-complement the FASTA entry
+    back so it matches the original utg direction. AGP is left unchanged.
+    """
+    scaffold_components = defaultdict(list)
+    with open(agp_path, "r") as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) < 9:
+                continue
+            scaffold_components[parts[0]].append(parts)
+
+    # scaffold_id -> (utg_id, contig_start, contig_end)
+    singleton_plus = {}
+    for scaffold_id, comps in scaffold_components.items():
+        w_comps = [c for c in comps if c[4].upper() == "W"]
+        if len(w_comps) != 1:
+            continue
+        w = w_comps[0]
+        if w[8] != "+":
+            continue
+        try:
+            start, end = int(w[6]), int(w[7])
+        except ValueError:
+            continue
+        singleton_plus[scaffold_id] = (w[5], start, end)
+
+    if not singleton_plus:
+        logger.info("No singleton '+' scaffolds to check for reversed orientation.")
+        return 0
+
+    needed_utgs = {utg_id for utg_id, _, _ in singleton_plus.values()}
+    utg_seq = {}
+    current_id = None
+    current_seq = []
+    with open(utg_fasta, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith(">"):
+                if current_id and current_id in needed_utgs:
+                    utg_seq[current_id] = "".join(current_seq)
+                current_id = line[1:].split()[0]
+                current_seq = []
+            else:
+                if current_id in needed_utgs:
+                    current_seq.append(line)
+        if current_id and current_id in needed_utgs:
+            utg_seq[current_id] = "".join(current_seq)
+
+    records = []
+    current_id = None
+    current_seq = []
+    with open(scaffold_fasta, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith(">"):
+                if current_id is not None:
+                    records.append((current_id, "".join(current_seq)))
+                current_id = line[1:].split()[0]
+                current_seq = []
+            else:
+                current_seq.append(line)
+        if current_id is not None:
+            records.append((current_id, "".join(current_seq)))
+
+    fixed = 0
+    new_records = []
+    for scaffold_id, seq in records:
+        info = singleton_plus.get(scaffold_id)
+        if not info:
+            new_records.append((scaffold_id, seq))
+            continue
+        utg_id, start, end = info
+        src = utg_seq.get(utg_id)
+        if src is None:
+            logger.warning(
+                f"Singleton scaffold {scaffold_id}: utg {utg_id} not found in {utg_fasta}"
+            )
+            new_records.append((scaffold_id, seq))
+            continue
+        expected = src[start - 1 : end]
+        if len(seq) == len(expected) and seq == _reverse_complement(expected) and seq != expected:
+            new_records.append((scaffold_id, _reverse_complement(seq)))
+            fixed += 1
+            logger.info(
+                f"Reversed singleton scaffold {scaffold_id} back to match {utg_id} (+)"
+            )
+        else:
+            new_records.append((scaffold_id, seq))
+
+    if fixed:
+        with open(scaffold_fasta, "w") as out:
+            for scaffold_id, seq in new_records:
+                out.write(f">{scaffold_id}\n")
+                for i in range(0, len(seq), 80):
+                    out.write(seq[i : i + 80] + "\n")
+
+    logger.info(f"Fixed {fixed} reversed singleton-utg scaffold(s) in {scaffold_fasta}")
+    return fixed
+
+
 def append_unplaced_utgs(agp_path, all_utg_fasta, target_fasta):
     """
     Identify the Unitigs present in the input FASTA but absent from the final AGP,
@@ -728,42 +917,107 @@ def main():
         sys.exit(1)
 
     # add unitigs discarded during the clustering stage
-    added_num = append_unplaced_utgs("gphase_final.agp", args.fa_file, "gphase_final.fasta")
+    added_num = append_unplaced_utgs(INTERMEDIATE_UNITIG_AGP, args.fa_file, FINAL_UNITIG_SCAFFOLD_FASTA)
     logger.info(f"A total of {added_num} missing unitigs have been added to the AGP and FASTA files.")
+
+    # Singleton utg scaffolds: if FASTA is RC of source utg while AGP says '+', flip FASTA back
+    fixed_num = fix_reversed_singleton_utg_scaffolds(
+        INTERMEDIATE_UNITIG_AGP,
+        FINAL_UNITIG_SCAFFOLD_FASTA,
+        args.fa_file,
+        logger,
+    )
+    logger.info(f"Singleton orientation fix done ({fixed_num} scaffold(s) corrected).")
 
     # GPhase rescue using assembly graph 
     logger.info("Starting final rescue...")
     try:
-        final_agp = "gphase_final.agp"
-        final_rescue_agp = "gphase_final_rescue.agp"
-        final_contig_agp = "gphase_final_contig.agp"
-        final_contig_fasta = "gphase_final_contig_scaffold.fasta"
-        final_fasta = "gphase_final.fasta"
-
         # Rescue and connect utg base graph
         try:
-            Rescue_base_graph(args.digraph_file, f"{final_agp}", args.gfa_file, args.RE_file, args.fa_file)
-            # Check for rescue AGP files
-            check_file_exists_and_not_empty(final_rescue_agp, logger, "Rescue_base_graph execution", min_size=100)
-            check_file_exists_and_not_empty(final_contig_agp, logger, "Rescue_base_graph execution", min_size=100)
+            Rescue_base_graph(args.digraph_file, INTERMEDIATE_UNITIG_AGP, args.gfa_file, args.RE_file, args.fa_file)
+            check_file_exists_and_not_empty(RESCUE_RESCUE_AGP, logger, "Rescue_base_graph execution", min_size=100)
+            check_file_exists_and_not_empty(RESCUE_CONTIG_AGP, logger, "Rescue_base_graph execution", min_size=100)
+            check_file_exists_and_not_empty(RESCUE_CONTIG_FASTA, logger, "Rescue_base_graph execution", min_size=100)
+            check_file_exists_and_not_empty(RESCUE_CTG2UTG, logger, "Rescue_base_graph execution", min_size=10)
+
+            Path(RESCUE_RESCUE_AGP).rename(FINAL_RESCUE_AGP)
+            Path(RESCUE_CONTIG_AGP).rename(FINAL_CONTIG_AGP)
+            Path(RESCUE_CONTIG_FASTA).rename(FINAL_CONTIG_FASTA)
+            Path(RESCUE_CTG2UTG).rename(FINAL_CTG2UTG)
+            check_file_exists_and_not_empty(FINAL_RESCUE_AGP, logger, "Rename rescue AGP", min_size=100)
+            check_file_exists_and_not_empty(FINAL_CONTIG_AGP, logger, "Rename contig AGP", min_size=100)
+            check_file_exists_and_not_empty(FINAL_CONTIG_FASTA, logger, "Rename contig fasta", min_size=100)
+            check_file_exists_and_not_empty(FINAL_CTG2UTG, logger, "Rename ctg2utg", min_size=10)
             logger.info("GPhase rescue completed.")
         except Exception as e:
             logger.error(f"Error in Rescue_base_graph: {str(e)}")
-            return False
+            sys.exit(1)
 
         script_path = os.path.abspath(sys.path[0])
         haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
-        cmd = [f"{haphic_utils_dir}/agp_to_fasta", final_contig_agp, "gphase_final_contig.fasta"]
-        
-        with open(final_contig_fasta, "w") as outfile:
+
+        sort_file(FINAL_RESCUE_AGP)
+        sort_file(FINAL_CONTIG_AGP)
+
+        # Rename duplicated collapsed unitigs/contigs for Hi-C heatmap
+        logger.info("Starting rename_collapse for duplicated unitigs...")
+        rename_script = os.path.join(script_path, "rename_collapse_agp_pairs_fasta.py")
+        rename_unitig_fa = f"{RENAME_COLLAPSE_PREFIX}.fa"
+        rename_rescue_agp = f"{RENAME_COLLAPSE_PREFIX}.rescue.agp"
+        rename_contig_agp = f"{RENAME_COLLAPSE_PREFIX}.contig.agp"
+        rename_contig_fa = f"{RENAME_COLLAPSE_PREFIX}.contig.fa"
+        rename_cmd = [
+            "python", rename_script,
+            INTERMEDIATE_UNITIG_AGP,
+            args.fa_file,
+            RENAME_COLLAPSE_PREFIX,
+            "--no-hic",
+            "--rescue-agp", FINAL_RESCUE_AGP,
+            "--contig-agp", FINAL_CONTIG_AGP,
+            "--contig-fasta", FINAL_CONTIG_FASTA,
+        ]
+        rename_outputs = [
+            FINAL_UNITIG_SCAFFOLD_AGP,
+            rename_unitig_fa,
+            rename_rescue_agp,
+            rename_contig_agp,
+            rename_contig_fa,
+        ]
+        if not run_command(
+            rename_cmd,
+            logger=logger,
+            check_files=rename_outputs,
+            action_prefix="rename_collapse_agp_pairs_fasta",
+        ):
+            logger.error("rename_collapse_agp_pairs_fasta failed.")
+            sys.exit(1)
+
+        Path(rename_unitig_fa).replace(FINAL_UNITIG_FASTA)
+        Path(rename_rescue_agp).replace(FINAL_RESCUE_AGP)
+        Path(rename_contig_agp).replace(FINAL_CONTIG_AGP)
+        Path(rename_contig_fa).replace(FINAL_CONTIG_FASTA)
+        check_file_exists_and_not_empty(FINAL_UNITIG_FASTA, logger, "Rename unitig fasta", min_size=100)
+        check_file_exists_and_not_empty(FINAL_RESCUE_AGP, logger, "Rename rescue AGP", min_size=100)
+        check_file_exists_and_not_empty(FINAL_CONTIG_AGP, logger, "Rename contig AGP", min_size=100)
+        check_file_exists_and_not_empty(FINAL_CONTIG_FASTA, logger, "Rename contig fasta", min_size=100)
+        logger.info("rename_collapse completed.")
+
+        # Normalize gap rows: N -> U, linkage evidence -> proximity_ligation
+        logger.info("Normalizing AGP N gaps to U / proximity_ligation...")
+        for agp_path in (FINAL_UNITIG_SCAFFOLD_AGP, FINAL_RESCUE_AGP, FINAL_CONTIG_AGP):
+            n_converted = normalize_agp_n_gaps(agp_path)
+            logger.info(f"Converted {n_converted} N-gap row(s) in {agp_path}")
+
+        # Build contig-level scaffold FASTA from renamed contig AGP/FASTA
+        cmd = [f"{haphic_utils_dir}/agp_to_fasta", FINAL_CONTIG_AGP, FINAL_CONTIG_FASTA]
+        with open(FINAL_CONTIG_SCAFFOLD_FASTA, "w") as outfile:
             if subprocess.run(cmd, stdout=outfile).returncode != 0:
                 logger.error("agp_to_fasta failed to run.")
-                return False
-        # Check rescue FASTA file
-        check_file_exists_and_not_empty(final_contig_fasta, logger, "agp_to_fasta execution", min_size=100)
+                sys.exit(1)
+        check_file_exists_and_not_empty(FINAL_CONTIG_SCAFFOLD_FASTA, logger, "agp_to_fasta execution", min_size=100)
 
-        sort_file(final_rescue_agp)
-        sort_file(final_contig_agp)
+        Path(INTERMEDIATE_UNITIG_AGP).unlink(missing_ok=True)
+        logger.info(f"Removed intermediate file: {INTERMEDIATE_UNITIG_AGP}")
 
     except Exception as e:
         logger.error(f"An exception occurred during rescue using assembly graph: {e}")

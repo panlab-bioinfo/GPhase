@@ -12,15 +12,16 @@ from contextlib import ExitStack
 
 def rename_agp_duplicate_utg(agp_file, out_agp_file):
     """
-    Process AGP file to detect truly duplicated contigs/utgs (used in different scaffolds or non-contiguously).
-    Works regardless of contig name prefix.
-    Renames duplicated instances and returns instance_map: {original_name: [new_name1, new_name2, ...]}
+    Process AGP file to detect truly duplicated contigs/utgs.
+    Complementary (non-overlapping) fragments share one copy name first;
+    overlapping additional copies get _dup. Applies to all scaffolds.
     """
-    current_object = None
-    current_name = None
-    current_part = 0
+    def overlaps(a, b):
+        return not (a[1] < b[0] or b[1] < a[0])
 
-    instance_counts = defaultdict(int)
+    copies = defaultdict(list)      # comp_id -> [[(beg, end), ...], ...]
+    assign = {}                     # (object, comp_id, beg, end) -> copy_idx
+    seen_in_scaffold = set()
     instance_map = defaultdict(list)
 
     with open(agp_file) as fin, open(out_agp_file, "w") as fout:
@@ -37,27 +38,28 @@ def rename_agp_duplicate_utg(agp_file, out_agp_file):
             object_name = parts[0]
             comp_type = parts[4]
             comp_id = parts[5]
-            part_num = int(parts[3])
 
             if comp_type.upper() in {"W", "D", "F", "A"}:
-                is_new_instance = False
-                if (object_name != current_object or
-                    comp_id != current_name or
-                    part_num != current_part + 1):
-                    is_new_instance = True
-
-                if is_new_instance:
-                    instance_counts[comp_id] += 1
-
-                count = instance_counts[comp_id]
-                new_name = comp_id if count == 1 else f"{comp_id}_dup{count-1}"
-
-                instance_map[comp_id].append(new_name)
+                beg, end = int(parts[6]), int(parts[7])
+                key = (object_name, comp_id, beg, end)
+                if key not in seen_in_scaffold:
+                    seen_in_scaffold.add(key)
+                    rng = (beg, end)
+                    idx = None
+                    for i, copy_ranges in enumerate(copies[comp_id]):
+                        if not any(overlaps(rng, r) for r in copy_ranges):
+                            copy_ranges.append(rng)
+                            idx = i
+                            break
+                    if idx is None:
+                        copies[comp_id].append([rng])
+                        idx = len(copies[comp_id]) - 1
+                    assign[key] = idx
+                idx = assign[key]
+                new_name = comp_id if idx == 0 else f"{comp_id}_dup{idx}"
+                if new_name not in instance_map[comp_id]:
+                    instance_map[comp_id].append(new_name)
                 parts[5] = new_name
-
-                current_object = object_name
-                current_name = comp_id
-                current_part = part_num
 
             fout.write("\t".join(parts) + "\n")
 
@@ -275,7 +277,7 @@ def duplicate_fasta_sequences(fasta_file, instance_map, out_fasta_file):
 def main():
     parser = argparse.ArgumentParser(
         description="Disambiguate duplicated contigs in assembly (AGP + FASTA + optional Hi-C). "
-                    "Handles any contig prefix and cleans up all temporary files automatically."
+                    "Optionally also rename rescue AGP and contig AGP/FASTA. "
     )
     parser.add_argument("agp_file", help="Input AGP file")
     parser.add_argument("fasta_file", help="Input FASTA file")
@@ -284,12 +286,22 @@ def main():
     parser.add_argument("--hic-file", help="Hi-C file (.bam or .pairs). Required unless --no-hic")
     parser.add_argument("--processes", type=int, default=16,
                         help="Number of processes (default: 16)")
+    parser.add_argument("--rescue-agp", help="Optional rescue AGP to rename (same logic as primary AGP)")
+    parser.add_argument("--contig-agp", help="Optional contig-level AGP to rename")
+    parser.add_argument("--contig-fasta",
+                        help="Optional contig FASTA to duplicate; requires --contig-agp")
 
     args = parser.parse_args()
+
+    if bool(args.contig_agp) != bool(args.contig_fasta):
+        parser.error("--contig-agp and --contig-fasta must be used together")
 
     out_agp = args.output_prefix + ".agp"
     out_fa = args.output_prefix + ".fa"
     out_pairs = args.output_prefix + ".pairs"
+    out_rescue_agp = args.output_prefix + ".rescue.agp"
+    out_contig_agp = args.output_prefix + ".contig.agp"
+    out_contig_fa = args.output_prefix + ".contig.fa"
 
     print("Step 1: Processing AGP and renaming duplicated contigs...")
     instance_map = rename_agp_duplicate_utg(args.agp_file, out_agp)
@@ -305,12 +317,26 @@ def main():
     print("Step 3: Duplicating FASTA sequences...")
     duplicate_fasta_sequences(args.fasta_file, instance_map, out_fa)
 
+    if args.rescue_agp:
+        print("Step 4: Processing rescue AGP and renaming duplicated contigs...")
+        rename_agp_duplicate_utg(args.rescue_agp, out_rescue_agp)
+
+    if args.contig_agp:
+        print("Step 5: Processing contig AGP and duplicating contig FASTA...")
+        contig_instance_map = rename_agp_duplicate_utg(args.contig_agp, out_contig_agp)
+        duplicate_fasta_sequences(args.contig_fasta, contig_instance_map, out_contig_fa)
+
     print("\n=== All Done! Temporary files have been automatically cleaned up ===")
     print("Output files:")
     print(f"  AGP:    {out_agp}")
     print(f"  FASTA:  {out_fa}")
     if not args.no_hic:
         print(f"  PAIRS:  {out_pairs}")
+    if args.rescue_agp:
+        print(f"  Rescue AGP: {out_rescue_agp}")
+    if args.contig_agp:
+        print(f"  Contig AGP: {out_contig_agp}")
+        print(f"  Contig FASTA: {out_contig_fa}")
 
 
 if __name__ == "__main__":

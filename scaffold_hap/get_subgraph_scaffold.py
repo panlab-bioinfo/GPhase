@@ -278,7 +278,7 @@ def connect_subgraph(filter_subgraph_ctgs_dict, subgraph_connect_dict):
                 break_points_set.add(i+1)
 
         start = 0
-        for break_points in break_points_set:
+        for break_points in sorted(break_points_set):
             topo_order_list.append(topo_order[start:break_points])
             start = break_points
         topo_order_list.append(topo_order[start:])
@@ -397,8 +397,6 @@ def get_filter_subgraph_digraph(filter_subgraph_ctgs_dict, filter_ctg_subgraph_d
 
 def get_topological_sort(ctgs_list, digraph, ctgs, hic_links_dict, hic_nei_dict, global_digraph):
 
-    digraph_nk, node_map, rev_map = nx_to_nk_graph(digraph, weighted=True)
-
     ctgs_dir_path_filter_dict = defaultdict(list)
     digraph_copy = cp.deepcopy(digraph)
 
@@ -512,54 +510,21 @@ def get_topological_sort(ctgs_list, digraph, ctgs, hic_links_dict, hic_nei_dict,
 
     ctgs_sort_list = cp.deepcopy(ctgs_sort_check)
 
-    path_cache = {}
-
+    # Use topo order directly with directions. Expanding shortest paths on the
+    # original (possibly cyclic) digraph can revisit landmarks and emit the
+    # same utg twice after filtering to ctgs_sort.
     for idx, ctgs_sort in enumerate(ctgs_sort_list):
-
-        ctgs_dir_path = []
-
-        for i in range(len(ctgs_sort) - 1):
-            source_node = ctgs_sort[i]
-            target_node = ctgs_sort[i + 1]
-            source_idx = node_map[source_node]
-            target_idx = node_map[target_node]
-
-            path_key = (source_idx, target_idx)
-
-
-            if path_key in path_cache:
-                path_indices = path_cache[path_key]
+        if not ctgs_sort:
+            continue
+        ctgs_dir_path_filter = []
+        for ctg in ctgs_sort:
+            if ctg in global_digraph.nodes():
+                ctgs_dir_path_filter.append(
+                    (ctg, global_digraph.nodes[ctg].get('direction', 1))
+                )
             else:
-                dijkstra = nk.distance.Dijkstra(digraph_nk, source_idx, storePaths=True)
-                dijkstra.run()
-
-                for possible_target_idx in range(digraph_nk.numberOfNodes()):
-                    
-                    if dijkstra.distance(possible_target_idx) < float('inf'):
-                        path_cache[(source_idx, possible_target_idx)] = dijkstra.getPath(possible_target_idx)
-
-                path_indices = path_cache.get(path_key, [])
-
-            shortest_path = [rev_map[i] for i in path_indices]
-
-            for node_j in shortest_path[:-1]:
-                if node_j in global_digraph.nodes():
-                    ctgs_dir_path.append((node_j, global_digraph.nodes[node_j].get('direction', 1)))
-                else:
-                    ctgs_dir_path.append((node_j, 1))
-
-
-        if ctgs_sort:
-            last_ctg = ctgs_sort[-1]
-            if last_ctg in global_digraph.nodes():
-                ctgs_dir_path.append((last_ctg, global_digraph.nodes[last_ctg].get('direction', 1)))
-            else:
-                ctgs_dir_path.append((last_ctg, 1))
-
-            ctgs_dir_path_filter = [(ctg, dir_) for ctg, dir_ in ctgs_dir_path if ctg in ctgs_sort]
-
-            ctgs_dir_path_filter_dict[str(idx)] = ctgs_dir_path_filter
-
+                ctgs_dir_path_filter.append((ctg, 1))
+        ctgs_dir_path_filter_dict[str(idx)] = ctgs_dir_path_filter
 
     return ctgs_dir_path_filter_dict
     
