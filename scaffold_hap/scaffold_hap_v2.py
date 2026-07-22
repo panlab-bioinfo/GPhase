@@ -4,6 +4,7 @@ import argparse
 import glob
 import logging
 import os
+import re
 import subprocess
 import shutil
 import sys
@@ -339,7 +340,18 @@ def sort_file(input_file):
                     lines_to_sort.append(("", 0, line))
 
     # Sort by scaffold name and then by start position
-    lines_to_sort.sort(key=lambda x: (x[0], x[1]))
+    def sk(name: str):
+        m = re.search(r'chr(\d+)g(\d+)', name)
+        nums = (int(m.group(1)), int(m.group(2))) if m else (10**9, 0)
+        if re.search(r'\.chr\d+g\d+\.scaffold$', name):
+            tier = 0         
+        elif name.startswith('chr'):
+            tier = 1          # chr
+        else:
+            tier = 2          # utg
+        return (tier, nums, name)
+
+    lines_to_sort.sort(key=lambda x: (sk(x[0]), x[1]))
 
     # Write back to file
     with open(input_file, 'w') as f:
@@ -956,9 +968,6 @@ def main():
         script_path = os.path.abspath(sys.path[0])
         haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
 
-        sort_file(FINAL_RESCUE_AGP)
-        sort_file(FINAL_CONTIG_AGP)
-
         # Rename duplicated collapsed unitigs/contigs for Hi-C heatmap
         logger.info("Starting rename_collapse for duplicated unitigs...")
         rename_script = os.path.join(script_path, "rename_collapse_agp_pairs_fasta.py")
@@ -1002,6 +1011,10 @@ def main():
         check_file_exists_and_not_empty(FINAL_CONTIG_FASTA, logger, "Rename contig fasta", min_size=100)
         logger.info("rename_collapse completed.")
 
+        sort_file(FINAL_RESCUE_AGP)
+        sort_file(FINAL_CONTIG_AGP)
+        sort_file(FINAL_UNITIG_SCAFFOLD_AGP)
+
         # Normalize gap rows: N -> U, linkage evidence -> proximity_ligation
         logger.info("Normalizing AGP N gaps to U / proximity_ligation...")
         for agp_path in (FINAL_UNITIG_SCAFFOLD_AGP, FINAL_RESCUE_AGP, FINAL_CONTIG_AGP):
@@ -1009,12 +1022,16 @@ def main():
             logger.info(f"Converted {n_converted} N-gap row(s) in {agp_path}")
 
         # Build contig-level scaffold FASTA from renamed contig AGP/FASTA
-        cmd = [f"{haphic_utils_dir}/agp_to_fasta", FINAL_CONTIG_AGP, FINAL_CONTIG_FASTA]
-        with open(FINAL_CONTIG_SCAFFOLD_FASTA, "w") as outfile:
-            if subprocess.run(cmd, stdout=outfile).returncode != 0:
-                logger.error("agp_to_fasta failed to run.")
-                sys.exit(1)
-        check_file_exists_and_not_empty(FINAL_CONTIG_SCAFFOLD_FASTA, logger, "agp_to_fasta execution", min_size=100)
+        for agp, fa, out in (
+            (FINAL_CONTIG_AGP, FINAL_CONTIG_FASTA, FINAL_CONTIG_SCAFFOLD_FASTA),
+            (FINAL_UNITIG_SCAFFOLD_AGP, FINAL_UNITIG_FASTA, FINAL_UNITIG_SCAFFOLD_FASTA),
+        ):
+            cmd = [f"{haphic_utils_dir}/agp_to_fasta", agp, fa]
+            with open(out, "w") as outfile:
+                if subprocess.run(cmd, stdout=outfile).returncode != 0:
+                    logger.error(f"agp_to_fasta failed for {out}")
+                    sys.exit(1)
+            check_file_exists_and_not_empty(out, logger, "agp_to_fasta execution", min_size=100)
 
         Path(INTERMEDIATE_UNITIG_AGP).unlink(missing_ok=True)
         logger.info(f"Removed intermediate file: {INTERMEDIATE_UNITIG_AGP}")
