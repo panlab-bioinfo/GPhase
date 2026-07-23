@@ -41,7 +41,7 @@ def rename_agp_duplicate_utg(agp_file, out_agp_file):
 
             if comp_type.upper() in {"W", "D", "F", "A"}:
                 beg, end = int(parts[6]), int(parts[7])
-                key = (object_name, comp_id, beg, end)
+                key = (object_name, parts[1], parts[2], comp_id, beg, end)
                 if key not in seen_in_scaffold:
                     seen_in_scaffold.add(key)
                     rng = (beg, end)

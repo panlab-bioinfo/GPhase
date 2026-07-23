@@ -4,6 +4,7 @@ import argparse
 import glob
 import logging
 import os
+import re
 import subprocess
 import shutil
 import sys
@@ -66,6 +67,8 @@ def parse_arguments() -> argparse.Namespace:
     base_group.add_argument("-f", "--fa_file", metavar='\b', required=True,help="Fasta file")
     base_group.add_argument("-r", "--RE_file", metavar='\b', required=True,help="Path to RE file")
     base_group.add_argument("-e", "--enzyme_site", metavar='\b', default="GATC",help="Restriction enzyme file.")
+    base_group.add_argument("-p", "--partig_file", metavar='\b', default=None,
+                           help="Raw partig output (.txt with S lines/strand) for homolog orientation")
 
     cluster_group  = parser.add_argument_group('>>> Parameters of the file for the haplotype clustering results')
     cluster_group.add_argument("-CHP", "--cluster_hap_path",metavar='\b', required=True, help="Path to cluster hap directory")
@@ -339,7 +342,18 @@ def sort_file(input_file):
                     lines_to_sort.append(("", 0, line))
 
     # Sort by scaffold name and then by start position
-    lines_to_sort.sort(key=lambda x: (x[0], x[1]))
+    def sk(name: str):
+        m = re.search(r'chr(\d+)g(\d+)', name)
+        nums = (int(m.group(1)), int(m.group(2))) if m else (10**9, 0)
+        if re.search(r'\.chr\d+g\d+\.scaffold$', name):
+            tier = 0         
+        elif name.startswith('chr'):
+            tier = 1          # chr
+        else:
+            tier = 2          # utg
+        return (tier, nums, name)
+
+    lines_to_sort.sort(key=lambda x: (sk(x[0]), x[1]))
 
     # Write back to file
     with open(input_file, 'w') as f:
@@ -833,6 +847,247 @@ def fix_reversed_singleton_utg_scaffolds(agp_path, scaffold_fasta, utg_fasta, lo
     return fixed
 
 
+def _read_fai_index_map(fai_path):
+    """Map 1-based fasta order index (str) -> sequence name."""
+    fai_dict = {}
+    with open(fai_path, "r") as f:
+        for idx, line in enumerate(f, 1):
+            name = line.strip().split()[0]
+            fai_dict[str(idx)] = name
+    return fai_dict
+
+
+def _resolve_partig_seqname(raw_name, fai_dict):
+    """
+    Partig may emit indexed names like s1/s18 (strip leading letter -> fai index)
+    or raw contig/unitig names.
+    """
+    if raw_name in fai_dict.values():
+        return raw_name
+    if len(raw_name) >= 2 and raw_name[1:].isdigit() and raw_name[1:] in fai_dict:
+        return fai_dict[raw_name[1:]]
+    if raw_name.isdigit() and raw_name in fai_dict:
+        return fai_dict[raw_name]
+    return raw_name
+
+
+def _parse_chr_hap(scaffold_id):
+    m = re.search(r"chr(\d+)g(\d+)", scaffold_id)
+    if not m:
+        return None
+    return int(m.group(1)), int(m.group(2))
+
+
+def _flip_ori(o):
+    if o == "+":
+        return "-"
+    if o == "-":
+        return "+"
+    return o
+
+
+def _reverse_agp_scaffold_rows(rows):
+    """Reverse component order, flip W orientations, and recalculate coordinates."""
+    lines = [list(r) for r in rows]
+    lines.reverse()
+    for fields in lines:
+        if len(fields) >= 9 and fields[4].upper() == "W":
+            fields[8] = _flip_ori(fields[8])
+    pos = 1
+    out = []
+    for part_num, fields in enumerate(lines, 1):
+        fields[3] = str(part_num)
+        ctype = fields[4].upper()
+        if ctype == "W":
+            length = int(fields[7]) - int(fields[6]) + 1
+        elif ctype in ("N", "U"):
+            length = int(fields[5])
+        else:
+            length = int(fields[2]) - int(fields[1]) + 1
+        fields[1] = str(pos)
+        fields[2] = str(pos + length - 1)
+        pos += length
+        out.append(fields)
+    return out
+
+
+def unify_homolog_orientation_by_partig(
+    agp_paths,
+    partig_file,
+    fa_file,
+    logger,
+    ref_hap: int = 1,
+    opp_frac_threshold: float = 0.5,
+):
+    """
+    Unify homologous haplotype scaffold orientations using partig strand info.
+
+    For each chromosome, compare each haplotype to ref_hap by summing lengths of
+    homologous unitig pairs that appear opposite after AGP placement. If opposite
+    length / comparable length > opp_frac_threshold, reverse that haplotype's
+    longest scaffold in every AGP listed in agp_paths.
+    """
+    if not partig_file:
+        logger.info("No partig file provided; skip homolog orientation unification.")
+        return 0
+    if not os.path.exists(partig_file):
+        logger.warning(f"Partig file not found ({partig_file}); skip homolog orientation.")
+        return 0
+
+    fai_path = f"{fa_file}.fai"
+    if not os.path.exists(fai_path):
+        # build fai if missing (samtools may be available in the pipeline env)
+        try:
+            subprocess.run(["samtools", "faidx", fa_file], check=True)
+        except Exception as e:
+            logger.warning(f"Cannot read/build fai for {fa_file}: {e}; skip homolog orientation.")
+            return 0
+    fai_dict = _read_fai_index_map(fai_path)
+
+    primary_agp = agp_paths[0]
+    # utg -> (scaffold, ori, length, chr, hap); keep longest placement if duplicated
+    utg_place = {}
+    scaffold_rows = defaultdict(list)
+    scaffold_len = defaultdict(int)
+
+    with open(primary_agp, "r") as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) < 9:
+                continue
+            scaf = fields[0]
+            scaffold_rows[scaf].append(fields)
+            try:
+                end = int(fields[2])
+            except ValueError:
+                continue
+            if end > scaffold_len[scaf]:
+                scaffold_len[scaf] = end
+            if fields[4].upper() != "W":
+                continue
+            ch = _parse_chr_hap(scaf)
+            if not ch:
+                continue
+            utg = fields[5]
+            ori = fields[8]
+            try:
+                ulen = int(fields[7]) - int(fields[6]) + 1
+            except ValueError:
+                continue
+            prev = utg_place.get(utg)
+            if prev is None or ulen > prev[2]:
+                utg_place[utg] = (scaf, ori, ulen, ch[0], ch[1])
+
+    # longest scaffold per (chr, hap)
+    primary_scaffold = {}
+    for scaf, slen in scaffold_len.items():
+        ch = _parse_chr_hap(scaf)
+        if not ch:
+            continue
+        key = ch
+        if key not in primary_scaffold or slen > scaffold_len[primary_scaffold[key]]:
+            primary_scaffold[key] = scaf
+
+    # length votes relative to ref_hap: (chr, hap) -> [L_same, L_opp]
+    votes = defaultdict(lambda: [0.0, 0.0])
+    n_pairs = 0
+    with open(partig_file, "r") as f:
+        for line in f:
+            if not line.startswith("S"):
+                continue
+            cols = line.rstrip("\n").split("\t")
+            if len(cols) < 8:
+                cols = line.split()
+            if len(cols) < 8 or cols[0] != "S":
+                continue
+            u1 = _resolve_partig_seqname(cols[1], fai_dict)
+            u2 = _resolve_partig_seqname(cols[2], fai_dict)
+            strand = cols[3]
+            if strand not in ("+", "-"):
+                continue
+            p1 = utg_place.get(u1)
+            p2 = utg_place.get(u2)
+            if not p1 or not p2:
+                continue
+            _, ori1, len1, chr1, hap1 = p1
+            _, ori2, len2, chr2, hap2 = p2
+            if chr1 != chr2 or hap1 == hap2:
+                continue
+            # only vote haplotypes against ref_hap
+            if hap1 == ref_hap:
+                ref_ori, other_ori, other_hap = ori1, ori2, hap2
+            elif hap2 == ref_hap:
+                ref_ori, other_ori, other_hap = ori2, ori1, hap1
+            else:
+                continue
+            pair_len = float(min(len1, len2))
+            same_on_scaf = (ref_ori == other_ori)
+            partig_same = (strand == "+")
+            opposite = (same_on_scaf != partig_same)
+            votes[(chr1, other_hap)][1 if opposite else 0] += pair_len
+            n_pairs += 1
+
+    to_flip_scaffolds = set()
+    for (chr_id, hap_id), (l_same, l_opp) in sorted(votes.items()):
+        l_all = l_same + l_opp
+        if l_all <= 0:
+            continue
+        frac = l_opp / l_all
+        logger.info(
+            f"Homolog orient chr{chr_id}g{hap_id} vs g{ref_hap}: "
+            f"L_same={l_same:.0f} L_opp={l_opp:.0f} frac_opp={frac:.3f}"
+        )
+        if frac > opp_frac_threshold:
+            scaf = primary_scaffold.get((chr_id, hap_id))
+            if scaf:
+                to_flip_scaffolds.add(scaf)
+                logger.info(
+                    f"Will reverse scaffold {scaf} (frac_opp={frac:.3f} > {opp_frac_threshold})"
+                )
+            else:
+                logger.warning(f"No primary scaffold for chr{chr_id}g{hap_id} to reverse")
+
+    logger.info(
+        f"Homolog orientation: used {n_pairs} partig pairs; "
+        f"reversing {len(to_flip_scaffolds)} scaffold(s)"
+    )
+    if not to_flip_scaffolds:
+        return 0
+
+    flipped = 0
+    for agp_path in agp_paths:
+        if not os.path.exists(agp_path):
+            logger.warning(f"AGP not found, skip flip: {agp_path}")
+            continue
+        rows_by_scaf = defaultdict(list)
+        order = []
+        with open(agp_path, "r") as f:
+            for line in f:
+                if line.startswith("#") or not line.strip():
+                    continue
+                fields = line.rstrip("\n").split("\t")
+                scaf = fields[0]
+                if scaf not in rows_by_scaf:
+                    order.append(scaf)
+                rows_by_scaf[scaf].append(fields)
+
+        n_here = 0
+        with open(agp_path, "w") as out:
+            for scaf in order:
+                rows = rows_by_scaf[scaf]
+                if scaf in to_flip_scaffolds:
+                    rows = _reverse_agp_scaffold_rows(rows)
+                    n_here += 1
+                for fields in rows:
+                    out.write("\t".join(fields) + "\n")
+        flipped = max(flipped, n_here)
+        logger.info(f"Reversed {n_here} scaffold(s) in {agp_path}")
+
+    return flipped
+
+
 def append_unplaced_utgs(agp_path, all_utg_fasta, target_fasta):
     """
     Identify the Unitigs present in the input FASTA but absent from the final AGP,
@@ -956,9 +1211,6 @@ def main():
         script_path = os.path.abspath(sys.path[0])
         haphic_utils_dir = os.path.join(script_path, "../src/HapHiC/utils")
 
-        sort_file(FINAL_RESCUE_AGP)
-        sort_file(FINAL_CONTIG_AGP)
-
         # Rename duplicated collapsed unitigs/contigs for Hi-C heatmap
         logger.info("Starting rename_collapse for duplicated unitigs...")
         rename_script = os.path.join(script_path, "rename_collapse_agp_pairs_fasta.py")
@@ -1002,6 +1254,24 @@ def main():
         check_file_exists_and_not_empty(FINAL_CONTIG_FASTA, logger, "Rename contig fasta", min_size=100)
         logger.info("rename_collapse completed.")
 
+        sort_file(FINAL_RESCUE_AGP)
+        sort_file(FINAL_CONTIG_AGP)
+        sort_file(FINAL_UNITIG_SCAFFOLD_AGP)
+
+        # Unify homologous haplotype orientations using partig strand (length vote)
+        logger.info("Unifying homologous chromosome orientations by partig...")
+        n_flip = unify_homolog_orientation_by_partig(
+            agp_paths=[FINAL_UNITIG_SCAFFOLD_AGP, FINAL_RESCUE_AGP, FINAL_CONTIG_AGP],
+            partig_file=args.partig_file,
+            fa_file=args.fa_file,
+            logger=logger,
+        )
+        logger.info(f"Homolog orientation unification done ({n_flip} scaffold(s) reversed).")
+        if n_flip:
+            sort_file(FINAL_RESCUE_AGP)
+            sort_file(FINAL_CONTIG_AGP)
+            sort_file(FINAL_UNITIG_SCAFFOLD_AGP)
+
         # Normalize gap rows: N -> U, linkage evidence -> proximity_ligation
         logger.info("Normalizing AGP N gaps to U / proximity_ligation...")
         for agp_path in (FINAL_UNITIG_SCAFFOLD_AGP, FINAL_RESCUE_AGP, FINAL_CONTIG_AGP):
@@ -1009,12 +1279,16 @@ def main():
             logger.info(f"Converted {n_converted} N-gap row(s) in {agp_path}")
 
         # Build contig-level scaffold FASTA from renamed contig AGP/FASTA
-        cmd = [f"{haphic_utils_dir}/agp_to_fasta", FINAL_CONTIG_AGP, FINAL_CONTIG_FASTA]
-        with open(FINAL_CONTIG_SCAFFOLD_FASTA, "w") as outfile:
-            if subprocess.run(cmd, stdout=outfile).returncode != 0:
-                logger.error("agp_to_fasta failed to run.")
-                sys.exit(1)
-        check_file_exists_and_not_empty(FINAL_CONTIG_SCAFFOLD_FASTA, logger, "agp_to_fasta execution", min_size=100)
+        for agp, fa, out in (
+            (FINAL_CONTIG_AGP, FINAL_CONTIG_FASTA, FINAL_CONTIG_SCAFFOLD_FASTA),
+            (FINAL_UNITIG_SCAFFOLD_AGP, FINAL_UNITIG_FASTA, FINAL_UNITIG_SCAFFOLD_FASTA),
+        ):
+            cmd = [f"{haphic_utils_dir}/agp_to_fasta", agp, fa]
+            with open(out, "w") as outfile:
+                if subprocess.run(cmd, stdout=outfile).returncode != 0:
+                    logger.error(f"agp_to_fasta failed for {out}")
+                    sys.exit(1)
+            check_file_exists_and_not_empty(out, logger, "agp_to_fasta execution", min_size=100)
 
         Path(INTERMEDIATE_UNITIG_AGP).unlink(missing_ok=True)
         logger.info(f"Removed intermediate file: {INTERMEDIATE_UNITIG_AGP}")
