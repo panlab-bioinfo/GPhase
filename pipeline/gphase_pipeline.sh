@@ -434,10 +434,11 @@ safe_ln "$gfa"
 safe_ln "${cluster_chr_dir}/group_ctgs_All.txt"
 safe_ln "${cluster_chr_dir}/${output_prefix}.digraph.csv"
 safe_ln "${workdir_preprocessing}/map.pairs" "map.pairs"
+safe_ln "${cluster_chr_dir}/${output_prefix}.partig.17_17_60_0.80.txt"
 
 check_file_exists_and_nonempty "map.pairs" "map.pairs for scaffolding"
 
-run_step "python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap_v2.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g $(basename "$gfa") -d ${output_prefix}.digraph.csv -m map.pairs -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes}" "scaffold_hap_v2.py"
+run_step "python ${SCRIPT_DIR}/../scaffold_hap/scaffold_hap_v2.py -f $(basename "$fa_file") -r ${output_prefix}.RE_counts.txt -l ${output_prefix}.map.links.nor.csv -op ${output_prefix} -n_chr ${n_chr} -n_hap ${n_hap} -CHP ../cluster_hap -s group_ctgs_All.txt -g $(basename "$gfa") -d ${output_prefix}.digraph.csv -m map.pairs -t ${thread} ${no_contig_ec} ${no_scaffold_ec} --min_len ${min_len} --mutprob ${mutprob} --ngen ${ngen} --npop ${npop} --processes ${processes} -p ${output_prefix}.partig.17_17_60_0.80.txt" "scaffold_hap_v2.py"
 
 # ====== Final summary ======
 cd "${current_dir}"
