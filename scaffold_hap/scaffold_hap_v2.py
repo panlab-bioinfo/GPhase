@@ -1218,6 +1218,7 @@ def main():
         rename_rescue_agp = f"{RENAME_COLLAPSE_PREFIX}.rescue.agp"
         rename_contig_agp = f"{RENAME_COLLAPSE_PREFIX}.contig.agp"
         rename_contig_fa = f"{RENAME_COLLAPSE_PREFIX}.contig.fa"
+        rename_ctg2utg = f"{RENAME_COLLAPSE_PREFIX}.ctg2utg.txt"
         rename_cmd = [
             "python", rename_script,
             INTERMEDIATE_UNITIG_AGP,
@@ -1227,6 +1228,7 @@ def main():
             "--rescue-agp", FINAL_RESCUE_AGP,
             "--contig-agp", FINAL_CONTIG_AGP,
             "--contig-fasta", FINAL_CONTIG_FASTA,
+            "--ctg2utg", FINAL_CTG2UTG,
         ]
         rename_outputs = [
             FINAL_UNITIG_SCAFFOLD_AGP,
@@ -1234,6 +1236,7 @@ def main():
             rename_rescue_agp,
             rename_contig_agp,
             rename_contig_fa,
+            rename_ctg2utg,
         ]
         if not run_command(
             rename_cmd,
@@ -1248,10 +1251,12 @@ def main():
         Path(rename_rescue_agp).replace(FINAL_RESCUE_AGP)
         Path(rename_contig_agp).replace(FINAL_CONTIG_AGP)
         Path(rename_contig_fa).replace(FINAL_CONTIG_FASTA)
+        Path(rename_ctg2utg).replace(FINAL_CTG2UTG)
         check_file_exists_and_not_empty(FINAL_UNITIG_FASTA, logger, "Rename unitig fasta", min_size=100)
         check_file_exists_and_not_empty(FINAL_RESCUE_AGP, logger, "Rename rescue AGP", min_size=100)
         check_file_exists_and_not_empty(FINAL_CONTIG_AGP, logger, "Rename contig AGP", min_size=100)
         check_file_exists_and_not_empty(FINAL_CONTIG_FASTA, logger, "Rename contig fasta", min_size=100)
+        check_file_exists_and_not_empty(FINAL_CTG2UTG, logger, "Sync ctg2utg", min_size=10)
         logger.info("rename_collapse completed.")
 
         sort_file(FINAL_RESCUE_AGP)

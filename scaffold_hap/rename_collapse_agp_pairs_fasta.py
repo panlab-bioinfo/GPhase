@@ -274,6 +274,25 @@ def duplicate_fasta_sequences(fasta_file, instance_map, out_fasta_file):
     SeqIO.write(out_records, out_fasta_file, "fasta")
 
 
+def sync_ctg2utg(ctg2utg_in, instance_map, ctg2utg_out):
+    """Expand ctg2utg so every renamed contig ID (incl. _dup) shares the same utg path."""
+    path_of = {}
+    with open(ctg2utg_in) as f:
+        for line in f:
+            if not line.strip():
+                continue
+            ctg, path = line.rstrip("\n").split("\t", 1)
+            path_of[ctg] = path
+
+    with open(ctg2utg_out, "w") as out:
+        for ctg, path in path_of.items():
+            out.write(f"{ctg}\t{path}\n")
+            for new_name in instance_map.get(ctg, []):
+                if new_name == ctg:
+                    continue
+                out.write(f"{new_name}\t{path}\n")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Disambiguate duplicated contigs in assembly (AGP + FASTA + optional Hi-C). "
@@ -290,11 +309,17 @@ def main():
     parser.add_argument("--contig-agp", help="Optional contig-level AGP to rename")
     parser.add_argument("--contig-fasta",
                         help="Optional contig FASTA to duplicate; requires --contig-agp")
+    parser.add_argument(
+        "--ctg2utg",
+        help="Optional ctg2utg to sync with contig rename aliases; requires --contig-agp",
+    )
 
     args = parser.parse_args()
 
     if bool(args.contig_agp) != bool(args.contig_fasta):
         parser.error("--contig-agp and --contig-fasta must be used together")
+    if args.ctg2utg and not args.contig_agp:
+        parser.error("--ctg2utg requires --contig-agp")
 
     out_agp = args.output_prefix + ".agp"
     out_fa = args.output_prefix + ".fa"
@@ -302,6 +327,7 @@ def main():
     out_rescue_agp = args.output_prefix + ".rescue.agp"
     out_contig_agp = args.output_prefix + ".contig.agp"
     out_contig_fa = args.output_prefix + ".contig.fa"
+    out_ctg2utg = args.output_prefix + ".ctg2utg.txt"
 
     print("Step 1: Processing AGP and renaming duplicated contigs...")
     instance_map = rename_agp_duplicate_utg(args.agp_file, out_agp)
@@ -325,6 +351,9 @@ def main():
         print("Step 5: Processing contig AGP and duplicating contig FASTA...")
         contig_instance_map = rename_agp_duplicate_utg(args.contig_agp, out_contig_agp)
         duplicate_fasta_sequences(args.contig_fasta, contig_instance_map, out_contig_fa)
+        if args.ctg2utg:
+            print("Step 6: Syncing ctg2utg with contig rename aliases...")
+            sync_ctg2utg(args.ctg2utg, contig_instance_map, out_ctg2utg)
 
     print("\n=== All Done! Temporary files have been automatically cleaned up ===")
     print("Output files:")
@@ -337,6 +366,8 @@ def main():
     if args.contig_agp:
         print(f"  Contig AGP: {out_contig_agp}")
         print(f"  Contig FASTA: {out_contig_fa}")
+    if args.ctg2utg:
+        print(f"  Contig ctg2utg: {out_ctg2utg}")
 
 
 if __name__ == "__main__":

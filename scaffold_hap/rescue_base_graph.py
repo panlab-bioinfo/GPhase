@@ -4,7 +4,6 @@ from collections import defaultdict
 from Bio import SeqIO
 from Bio.Seq import Seq
 import igraph as ig
-import re
 
 
 
@@ -251,231 +250,206 @@ def update_agp_with_insert_lists(agp_df, insert_dict, ctg_RE_dict, utgs_set):
     return updated_df
 
 
-def scaffold_sequences_from_agp(updated_df, gfa_graph, fasta_file):
-    def reverse_complement(seq):
-        return str(Seq(seq).reverse_complement())
+def _reverse_complement(seq):
+    return str(Seq(seq).reverse_complement())
 
+
+def _gfa_connected(gfa_graph, a, b):
+    """Return (connected, overlap_len) for placement a -> b using orientations."""
+    utg, ori = a["utg"], a["ori"]
+    nutg, nori = b["utg"], b["ori"]
+    if ori == "+":
+        ok = (nutg, nori) in gfa_graph[utg]["forward_list"]
+    elif ori == "-":
+        ok = (nutg, nori) in gfa_graph[utg]["reverse_list"]
+    else:
+        return False, 0
+    if not ok:
+        return False, 0
+    ov = gfa_graph[utg]["edges"].get((nutg, nori), 0)
+    return True, ov
+
+
+def _interrupted_utgs(placements):
+    """
+    Utgs split into multiple different component ranges on this scaffold.
+
+    Same (beg, end) repeated does not count as 打断; different break positions do.
+    """
+    ranges_by_utg = defaultdict(set)
+    for p in placements:
+        ranges_by_utg[p["utg"]].add((p["beg"], p["end"]))
+    return {utg for utg, ranges in ranges_by_utg.items() if len(ranges) > 1}
+
+
+def build_contigs_from_rescue_agp(
+    updated_df,
+    gfa_graph,
+    fasta_file,
+    gap_len=100,
+    out_ctg2utg="gphase_final_ctg2utg.txt",
+    out_contig_fa="gphase_final_contig.fasta",
+    out_contig_agp="gphase_final_contig.agp",
+):
+    """
+    Build contig fasta / ctg2utg / contig AGP from rescue AGP placements.
+
+    Source of truth: rescue AGP (updated_df -> gphase_final.unitig.rescue.agp).
+
+    - Each W placement is one instance; never clamp/reuse contig IDs.
+    - Different (utg, comp_beg, comp_end) = different fragments.
+    - Same path appearing again still gets a new contig ID (no dict overwrite).
+    - Consecutive GFA-connected W placements merge into one contig walk.
+    - If an utg is interrupted (split into different component ranges on this
+      scaffold), stop merging: do not extend a walk through that utg.
+    """
     utg_seq_dict = {rec.id: str(rec.seq) for rec in SeqIO.parse(fasta_file, "fasta")}
-    scaffold_seq_dict = {}
-    grouped = updated_df.groupby("scaffold", sort=False)
 
-    for scaffold, group in grouped:
-        group = group.reset_index(drop=True)
-        i = 0
-        while i < len(group):
-            row_current = group.iloc[i]
-            if row_current['type'] != 'W':
-                i += 1
-                continue
-
-            utg_id = row_current['object']
-            orientation = row_current['orientation']
-            seq = utg_seq_dict[utg_id]
-
-            start_pos = int(row_current.iloc[6])  
-            end_pos = int(row_current.iloc[7])   
-
-            if start_pos < 1 or end_pos < start_pos or end_pos > len(seq):
-                raise ValueError(f"error: start_pos={start_pos}, end_pos={end_pos} for {utg_id}")
-            actual_length = end_pos - start_pos + 1
-            seq = seq[start_pos-1:end_pos]  
-            
-            if orientation == '-':
-                seq = reverse_complement(seq)
-            current_seq = seq
-            current_components = [f"{utg_id}:{start_pos}:{end_pos}_{orientation}"]
-
-            j = i + 1
-            while j < len(group):
-                row_next = group.iloc[j]
-                if row_next['type'] != 'W':
-                    j += 1
-                    continue
-
-                next_utg_id = row_next['object']
-                next_orientation = row_next['orientation']
-                connected = False
-                if orientation == '+':
-                    if (next_utg_id, next_orientation) in gfa_graph[utg_id]['forward_list']:
-                        connected = True
-                        overlap_length = gfa_graph[utg_id]['edges'].get((next_utg_id, next_orientation), 0)
-                elif orientation == '-':
-                    if (next_utg_id, next_orientation) in gfa_graph[utg_id]['reverse_list']:
-                        connected = True
-                        overlap_length = gfa_graph[utg_id]['edges'].get((next_utg_id, next_orientation), 0)
-
-                if connected:
-                    next_seq = utg_seq_dict[next_utg_id]
-                    try:
-                        start_pos = int(row_next.iloc[6])  
-                        end_pos = int(row_next.iloc[7])   
-                        if start_pos < 1 or end_pos < start_pos or end_pos > len(next_seq):
-                            raise ValueError(f"error: start_pos={start_pos}, end_pos={end_pos} for {next_utg_id}")
-                        actual_length = end_pos - start_pos + 1
-                        next_seq = next_seq[start_pos-1:end_pos]  
-                    except (ValueError, IndexError) as e:
-                        actual_length = len(next_seq)
-
-                    # trans direction
-                    if next_orientation == '-':
-                        next_seq = reverse_complement(next_seq)
-
-                    overlap_length = gfa_graph[utg_id]['edges'].get((next_utg_id, next_orientation), 0)
-
-                    if overlap_length > 0:
-                        if overlap_length >= len(next_seq):
-                            overlap_length = 0
-                        else:
-                            next_seq = next_seq[overlap_length:] 
-
-                    current_seq += next_seq
-                    current_components.append(f"{next_utg_id}:{start_pos}:{end_pos}_{next_orientation}")
-                    utg_id = next_utg_id
-                    orientation = next_orientation
-                    j += 1
-                else:
-                    break
-
-            scaffold_name = "_".join(current_components)
-            if scaffold_name:
-                scaffold_seq_dict[scaffold_name] = current_seq
-
-            i = j if j > i else i + 1
-
-    # add contig that not in AGP 
-    agp_utg_ids = set(updated_df[updated_df['type'] == 'W']['object'])
-    for utg_id in utg_seq_dict:
-        if utg_id not in agp_utg_ids:
-            row = updated_df[updated_df['object'] == utg_id]
-            if not row.empty:
-                start = row['component_beg'].iloc[0]
-                end = row['component_end'].iloc[0]
-
-                scaffold_seq_dict[f"{utg_id}:{start}:{end}_+"] = utg_seq_dict[utg_id]
-
-    # fasta
-    with open("gphase_final_contig.fasta", 'w') as f,  open("gphase_final_ctg2utg.txt", 'w') as f2:
-        for idx, (scaffold_name, seq) in enumerate(scaffold_seq_dict.items(), 1):
-
-            ctg_ID = f"ctg{idx:0>6}l"
-            utgs_list = scaffold_name.replace("+", "_").replace("-", "_").split("_")
-
-            f2.write(f"{ctg_ID}\t{scaffold_name}\n")
-
-            f.write(f">{ctg_ID}\n")
-            for i in range(0, len(seq), 80):
-                f.write(seq[i:i+80] + '\n')
-
-    return scaffold_seq_dict
-
-
-def utg_to_ctg_agp(updated_df, ctg2utg_file, fasta_file, output_agp="gphase_final_contig.agp", gap_len=100):
-
-    ctg_len = {rec.id: len(rec.seq) for rec in SeqIO.parse(fasta_file, "fasta")}
-
-    utg_to_ctg_list = defaultdict(list)  
-    pair_pat = re.compile(r"(utg\d+[a-z]?)_([+-])")
-    
-    with open(ctg2utg_file) as f:
-        for line in f:
-            ctg, utgs_str = line.strip().split("\t")
-            pairs = pair_pat.findall(utgs_str)
-            _ = utgs_str.split("_")
-            pairs = [p for p in _ if p not in ["+", "-"]]
-            for utg_id in pairs:
-                utg_to_ctg_list[utg_id].append(ctg)
-
-    utg_counter = defaultdict(int)
-    agp_lines = []
-
+    placements_by_scaf = {}
     for scaffold, group in updated_df.groupby("scaffold", sort=False):
         group = group.reset_index(drop=True)
+        placements = []
+        for _, row in group.iterrows():
+            if row["type"] != "W":
+                continue
+            utg_id = row["object"]
+            beg = int(row["object_beg"])
+            end = int(row["object_end"])
+            ori = row["orientation"]
+            if utg_id not in utg_seq_dict:
+                raise KeyError(f"utg '{utg_id}' not found in fasta file")
+            full = utg_seq_dict[utg_id]
+            if beg < 1 or end < beg or end > len(full):
+                raise ValueError(
+                    f"error: start_pos={beg}, end_pos={end} for {utg_id} (len={len(full)})"
+                )
+            piece = full[beg - 1 : end]
+            if ori == "-":
+                piece = _reverse_complement(piece)
+            placements.append(
+                {
+                    "utg": utg_id,
+                    "beg": beg,
+                    "end": end,
+                    "ori": ori,
+                    "seq": piece,
+                    "token": f"{utg_id}:{beg}:{end}_{ori}",
+                }
+            )
+        placements_by_scaf[scaffold] = placements
+
+    contig_records = []
+    ctg_idx = 0
+
+    for scaffold, placements in placements_by_scaf.items():
+        interrupted = _interrupted_utgs(placements)
+        i = 0
+        while i < len(placements):
+            # Interrupted utg fragment: always emit alone, do not merge.
+            if placements[i]["utg"] in interrupted:
+                walk = [placements[i]]
+                seq = placements[i]["seq"]
+                j = i + 1
+            else:
+                walk = [placements[i]]
+                seq = placements[i]["seq"]
+                j = i + 1
+                while j < len(placements):
+                    # Stop before an interrupted utg; do not merge across it.
+                    if placements[j]["utg"] in interrupted:
+                        break
+                    connected, ov = _gfa_connected(gfa_graph, walk[-1], placements[j])
+                    if not connected:
+                        break
+                    nxt = placements[j]["seq"]
+                    if ov > 0:
+                        if ov >= len(nxt):
+                            ov = 0
+                        else:
+                            nxt = nxt[ov:]
+                    seq += nxt
+                    walk.append(placements[j])
+                    j += 1
+
+            ctg_idx += 1
+            ctg_id = f"ctg{ctg_idx:06d}l"
+            path = "_".join(p["token"] for p in walk)
+            contig_records.append(
+                {
+                    "ctg": ctg_id,
+                    "path": path,
+                    "seq": seq,
+                    "scaffold": scaffold,
+                }
+            )
+            for k in range(i, j):
+                placements[k]["ctg"] = ctg_id
+            i = j
+
+    with open(out_ctg2utg, "w") as f2, open(out_contig_fa, "w") as fa:
+        for rec in contig_records:
+            f2.write(f"{rec['ctg']}\t{rec['path']}\n")
+            fa.write(f">{rec['ctg']}\n")
+            s = rec["seq"]
+            for x in range(0, len(s), 80):
+                fa.write(s[x : x + 80] + "\n")
+
+    ctg_len = {rec["ctg"]: len(rec["seq"]) for rec in contig_records}
+
+    agp_lines = []
+    for scaffold, placements in placements_by_scaf.items():
+        ordered_ctgs = []
+        seen = set()
+        for p in placements:
+            c = p["ctg"]
+            if c not in seen:
+                ordered_ctgs.append(c)
+                seen.add(c)
+
         part_number = 1
         current_pos = 1
-        i = 0
         prev_ctg = None
-
-        while i < len(group):
-            row = group.iloc[i]
-
-            if row['type'] != 'W':
-                i += 1
-                continue 
-
-            utg = row['object']
-            start = row['object_beg']
-            end = row['object_end']
-
-            utg += f":{start}:{end}"
-            idx = utg_counter[utg]
-
-            if idx >= len(utg_to_ctg_list[utg]):
-                idx = len(utg_to_ctg_list[utg]) - 1
-            ctg = utg_to_ctg_list[utg][idx]
-            utg_counter[utg] += 1
-
-
-            j = i + 1
-            while j < len(group):
-                nxt_row = group.iloc[j]
-                if nxt_row['type'] == 'W':
-                    nxt_utg = nxt_row['object']
-                    start = nxt_row['object_beg']
-                    end = nxt_row['object_end']
-
-                    nxt_utg += f":{start}:{end}"
-
-                    nxt_idx = utg_counter[nxt_utg]
-                    if nxt_idx >= len(utg_to_ctg_list[nxt_utg]):
-                        nxt_idx = len(utg_to_ctg_list[nxt_utg]) - 1
-
-                    nxt_ctg = utg_to_ctg_list[nxt_utg][nxt_idx]
-                    if nxt_ctg != ctg:
-                        break
-                    utg_counter[nxt_utg] += 1
-                j += 1
-
-            if prev_ctg is not None and prev_ctg != ctg:
-                agp_lines.append([
-                    scaffold,
-                    current_pos,
-                    current_pos + gap_len - 1,
-                    part_number,
-                    "U",
-                    gap_len,
-                    "scaffold",
-                    "yes",
-                    "proximity_ligation"
-                ])
+        for ctg in ordered_ctgs:
+            if prev_ctg is not None:
+                agp_lines.append(
+                    [
+                        scaffold,
+                        current_pos,
+                        current_pos + gap_len - 1,
+                        part_number,
+                        "U",
+                        gap_len,
+                        "scaffold",
+                        "yes",
+                        "proximity_ligation",
+                    ]
+                )
                 current_pos += gap_len
                 part_number += 1
 
-
-            length = ctg_len.get(ctg)
-            if length is None:
-                raise KeyError(f"CTG '{ctg}' not found in fasta file...")
-            agp_lines.append([
-                scaffold,
-                current_pos,
-                current_pos + length - 1,
-                part_number,
-                "W",
-                ctg,
-                1,
-                length,
-                "+"
-            ])
+            length = ctg_len[ctg]
+            agp_lines.append(
+                [
+                    scaffold,
+                    current_pos,
+                    current_pos + length - 1,
+                    part_number,
+                    "W",
+                    ctg,
+                    1,
+                    length,
+                    "+",
+                ]
+            )
             current_pos += length
             part_number += 1
-
             prev_ctg = ctg
-            i = j
 
-    with open(output_agp, "w") as f:
+    with open(out_contig_agp, "w") as f:
         for line in agp_lines:
             f.write("\t".join(map(str, line)) + "\n")
 
-    return output_agp
+    return contig_records
 
 
 def Rescue_base_graph(edge_file, agp_file, gfa_file, REFile, fa_file):
@@ -484,9 +458,16 @@ def Rescue_base_graph(edge_file, agp_file, gfa_file, REFile, fa_file):
     utg_rescue_dict = rescue(edge_file, agp_file, gfa_file, REFile)
     agp_df = read_agp_pd(agp_file)
     updated_df = update_agp_with_insert_lists(agp_df, utg_rescue_dict, ctg_RE_dict, utgs_set)
-    scaffold_seq_dict = scaffold_sequences_from_agp(updated_df, gfa_graph, fa_file)
-
-    utg_to_ctg_agp(updated_df, "gphase_final_ctg2utg.txt", "gphase_final_contig.fasta", output_agp="gphase_final_contig.agp")
+    # updated_df is written as gphase_final_rescue.agp (-> gphase_final.unitig.rescue.agp)
+    build_contigs_from_rescue_agp(
+        updated_df,
+        gfa_graph,
+        fa_file,
+        gap_len=100,
+        out_ctg2utg="gphase_final_ctg2utg.txt",
+        out_contig_fa="gphase_final_contig.fasta",
+        out_contig_agp="gphase_final_contig.agp",
+    )
 
 
 
