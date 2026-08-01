@@ -13,55 +13,147 @@ from contextlib import ExitStack
 def rename_agp_duplicate_utg(agp_file, out_agp_file):
     """
     Process AGP file to detect truly duplicated contigs/utgs.
-    Complementary (non-overlapping) fragments share one copy name first;
-    overlapping additional copies get _dup. Applies to all scaffolds.
+
+    Two-pass logic:
+      1) Collect every fragment of each utg/contig.
+      2) Stitch fragments into copies only when they concatenate without gaps
+         (abutting ranges); then assign _dup suffixes per stitched copy.
     """
     def overlaps(a, b):
         return not (a[1] < b[0] or b[1] < a[0])
 
-    copies = defaultdict(list)      # comp_id -> [[(beg, end), ...], ...]
-    assign = {}                     # (object, comp_id, beg, end) -> copy_idx
-    seen_in_scaffold = set()
-    instance_map = defaultdict(list)
+    def is_gapless(ranges):
+        if len(ranges) <= 1:
+            return True
+        ordered = sorted(ranges)
+        for i in range(1, len(ordered)):
+            if ordered[i - 1][1] + 1 != ordered[i][0]:
+                return False
+        return True
 
-    with open(agp_file) as fin, open(out_agp_file, "w") as fout:
+    def can_join(copy_ranges, rng):
+        """Join only if no overlap and the union stays a single gapless block."""
+        if any(overlaps(rng, r) for r in copy_ranges):
+            return False
+        return is_gapless(copy_ranges + [rng])
+
+    def stitch_copies(frags):
+        """
+        frags: list of (key, beg, end) in AGP order.
+        Returns dict key -> copy_idx (0 = original name, >=1 => _dupN).
+        """
+        copies = []  # list[list[(beg, end)]]
+        key_to_idx = {}
+
+        for key, beg, end in frags:
+            rng = (beg, end)
+            idx = None
+            for i, copy_ranges in enumerate(copies):
+                if can_join(copy_ranges, rng):
+                    copy_ranges.append(rng)
+                    idx = i
+                    break
+            if idx is None:
+                copies.append([rng])
+                idx = len(copies) - 1
+            key_to_idx[key] = idx
+
+        # Merge copies that themselves abut into one gapless block
+        n = len(copies)
+        parent = list(range(n))
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        changed = True
+        while changed:
+            changed = False
+            roots = [i for i in range(n) if find(i) == i]
+            for ai in range(len(roots)):
+                for bi in range(ai + 1, len(roots)):
+                    a, b = find(roots[ai]), find(roots[bi])
+                    if a == b:
+                        continue
+                    ra, rb = copies[a], copies[b]
+                    if any(overlaps(x, y) for x in ra for y in rb):
+                        continue
+                    if is_gapless(ra + rb):
+                        copies[a] = ra + rb
+                        copies[b] = []
+                        parent[b] = a
+                        changed = True
+                        break
+                if changed:
+                    break
+
+        # Dense indices in first-appearance order
+        old_to_new = {}
+        next_idx = 0
+        assign = {}
+        for key, _beg, _end in frags:
+            oi = find(key_to_idx[key])
+            if oi not in old_to_new:
+                old_to_new[oi] = next_idx
+                next_idx += 1
+            assign[key] = old_to_new[oi]
+        return assign
+
+    # Pass 1: collect all fragments per component ID
+    lines = []
+    fragments = defaultdict(list)  # comp_id -> [(key, beg, end), ...]
+    seen_in_scaffold = set()
+
+    with open(agp_file) as fin:
         for line in fin:
-            if line.startswith("#") or line.strip() == "":
+            lines.append(line)
+            if line.startswith("#") or not line.strip():
+                continue
+            parts = line.strip().split("\t")
+            if len(parts) < 6:
+                continue
+            comp_type = parts[4]
+            if comp_type.upper() not in {"W", "D", "F", "A"}:
+                continue
+            comp_id = parts[5]
+            beg, end = int(parts[6]), int(parts[7])
+            key = (parts[0], parts[1], parts[2], comp_id, beg, end)
+            if key in seen_in_scaffold:
+                continue
+            seen_in_scaffold.add(key)
+            fragments[comp_id].append((key, beg, end))
+
+    # Stitch gapless copies, then decide suffixes
+    assign = {}
+    instance_map = defaultdict(list)
+    for comp_id, frags in fragments.items():
+        for key, idx in stitch_copies(frags).items():
+            assign[key] = idx
+            new_name = comp_id if idx == 0 else f"{comp_id}_dup{idx}"
+            if new_name not in instance_map[comp_id]:
+                instance_map[comp_id].append(new_name)
+
+    # Pass 2: write renamed AGP
+    with open(out_agp_file, "w") as fout:
+        for line in lines:
+            if line.startswith("#") or not line.strip():
                 fout.write(line)
                 continue
-
             parts = line.strip().split("\t")
             if len(parts) < 6:
                 fout.write(line)
                 continue
-
-            object_name = parts[0]
-            comp_type = parts[4]
-            comp_id = parts[5]
-
-            if comp_type.upper() in {"W", "D", "F", "A"}:
+            if parts[4].upper() in {"W", "D", "F", "A"}:
+                comp_id = parts[5]
                 beg, end = int(parts[6]), int(parts[7])
-                key = (object_name, parts[1], parts[2], comp_id, beg, end)
-                if key not in seen_in_scaffold:
-                    seen_in_scaffold.add(key)
-                    rng = (beg, end)
-                    idx = None
-                    for i, copy_ranges in enumerate(copies[comp_id]):
-                        if not any(overlaps(rng, r) for r in copy_ranges):
-                            copy_ranges.append(rng)
-                            idx = i
-                            break
-                    if idx is None:
-                        copies[comp_id].append([rng])
-                        idx = len(copies[comp_id]) - 1
-                    assign[key] = idx
+                key = (parts[0], parts[1], parts[2], comp_id, beg, end)
                 idx = assign[key]
-                new_name = comp_id if idx == 0 else f"{comp_id}_dup{idx}"
-                if new_name not in instance_map[comp_id]:
-                    instance_map[comp_id].append(new_name)
-                parts[5] = new_name
-
-            fout.write("\t".join(parts) + "\n")
+                parts[5] = comp_id if idx == 0 else f"{comp_id}_dup{idx}"
+                fout.write("\t".join(parts) + "\n")
+            else:
+                fout.write(line if line.endswith("\n") else line + "\n")
 
     return instance_map
 
