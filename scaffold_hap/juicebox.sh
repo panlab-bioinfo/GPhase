@@ -7,6 +7,7 @@ agp=""
 pairs=""
 output_prefix=""
 GPhase_path=""
+file_type="PA5"
 
 # Usage instructions
 usage() {
@@ -21,6 +22,9 @@ usage() {
 |  -p, --pairs FILE      Pairs file after copying the collapsed unitigs. (required)
 |  -o, --output PREFIX   Output prefix for .hic and intermediate files (required)
 |  -g, --gphase PATH     Path to GPhase installation directory (required)
+|
+| Options:
+|  -t, --file-type TYPE  File type for juicer pre. One of: PA5, BED, BAM, BIN. (default: PA5)
 |
 |Example:
 |  $(basename "$0") -f rename.fa -a rename.agp -p rename.pairs -o sample_hic -g /Path/to/GPhase
@@ -53,6 +57,10 @@ while [[ $# -gt 0 ]]; do
             GPhase_path="$2"
             shift 2
             ;;
+        -t|--file-type)
+            file_type="$2"
+            shift 2
+            ;;
         -h|--help)
             usage
             ;;
@@ -82,6 +90,12 @@ done
 [[ -d "$GPhase_path" ]] || { echo "Error: GPhase_path directory not found: $GPhase_path"; exit 1; }
 [[ -d "$GPhase_path/src/HapHiC/utils" ]] || { echo "Error: GPhase_path/src/HapHiC/utils directory not found"; exit 1; }
 
+# Validate file_type
+case "${file_type}" in
+    PA5|BED|BAM|BIN) ;;
+    *) echo "Error: Invalid --file-type '$file_type'. Must be one of: PA5, BED, BAM, BIN." >&2; exit 1 ;;
+esac
+
 # Locate juicer executable and juicer_tools.jar
 juicer_path=$(find "$GPhase_path/src/HapHiC/utils" -maxdepth 1 -name 'juicer*' -type f -executable 2>/dev/null | head -n1)
 juicer_tools_path=$(find "$GPhase_path/src/HapHiC/utils" -maxdepth 1 -name 'juicer_tools*' -type f 2>/dev/null | head -n1)
@@ -107,7 +121,7 @@ fai=${fa}.fai
     -a -q 0 \
     -o "$output_prefix" \
     "$pairs" "$agp" "$fai" \
-    --file-type pa5 \
+    --file-type "${file_type}" \
     > "$log_file" 2>&1
 
 # Check if PRE_C_SIZE exists in the log
