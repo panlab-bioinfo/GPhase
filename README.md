@@ -145,6 +145,11 @@ Contigs are formed by stitching adjacent unitigs after phasing and scaffolding, 
 
 The correspondence between unitigs and contigs can be found in `gphase_final.ctg2utg.txt`.
 
+> [!NOTE]
+>
+> 1. Chromosome labels assigned by GPhase are arbitrary. If the species of interest already has an established chromosome numbering/naming scheme, you may need to map these labels accordingly. When a chromosome-level reference genome is available, you can follow the approach described in the [HapHiC documentation](https://github.com/zengxiaofei/HapHiC#order-and-orient-whole-scaffolds-using-a-reference-genome) to order and orient the scaffolds against the reference.
+> 2. Like all other tools that perform haplotype phasing using 3C-based long-range data (e.g., HapHiC and hifiasm), GPhase resolves haplotypes at the chromosome level but not at the whole-genome level. This means that haplotype assignments across non-homologous chromosomes are not intrinsically linked.
+
 ## Visualization and curation in Juicebox
 
 The input for this workflow can be either the unitig-based results (`gphase_final.unitig.fasta` and `gphase_final.unitig.scaffold.agp`) or the contig-based results (`gphase_final.contig.fasta` and `gphase_final.contig.scaffold.agp`), depending on your needs. Unitigs offer lower contiguity but individual unitigs rarely contain phasing errors, making unitig-based results easier to curate in Juicebox. Contigs provide higher contiguity, but if phasing errors are present, correcting them first requires breaking contigs at misjoined sites, which is difficult to perform accurately.
