@@ -186,7 +186,7 @@ chromap --preset hic -x reindex -r <prefix>.fasta -q 1 \
 
 ### 2. Generating .assembly and .hic files
 
-Use `juicebox.sh` to generate `.assembly` and `.hic` files from the assembly and the remapped long-range data. Replace `<map_file>` with `remap.chromap.pairs` for Hi-C/Omni-C, or `remapping/map.concatemer2pe.bam` for Pore-C/CiFi:
+Use `juicebox.sh` to generate `.assembly` and `.hic` files from the assembly and the remapped long-range data. Replace `<map_file>` with `remap.chromap.pairs` for Hi-C/Omni-C, or `remapping/map.concatemer2pe.bam` for Pore-C/CiFi. For BAM input (Pore-C/CiFi), use `-t BAM` instead:
 
 ```
 bash /path/to/GPhase/scaffold_hap/juicebox.sh \
@@ -194,7 +194,8 @@ bash /path/to/GPhase/scaffold_hap/juicebox.sh \
     -a <prefix>.scaffold.agp \
     -p <map_file> \
     -o juicebox \
-    -g /path/to/GPhase
+    -g /path/to/GPhase \
+    -t PA5  # use -t BAM for Pore-C/CiFi
 ```
 
 ### 3. Curating in Juicebox
