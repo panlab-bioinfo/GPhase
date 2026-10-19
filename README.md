@@ -2,6 +2,8 @@
 
 GPhase leverages an assembly graph and 3C-based long-range data (e.g., Hi-C, Omni-C, Pore-C, and CiFi) to facilitate genome assembly phasing, automatically resolves and assigns collapsed sequences, and fills assembly gaps.
 ---
+If you use Gphase in your genome assembly， please cite the article as follow:  
+Du, W., Li, Y., Zeng, X. et al. Assembly-graph-assisted haplotype-resolved scaffolding of polyploid genomes. Nat. Plants (2026). https://doi.org/10.1038/s41477-026-02422-5
 
 ## Table of Contents
 
