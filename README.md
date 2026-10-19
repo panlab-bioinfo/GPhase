@@ -1,9 +1,13 @@
-# GPhase: An assembly graph-assisted haplotype-resolved scaffolding tool using 3C-based long-range data
+# GPhase: An assembly graph-assisted haplotype-resolved scaffolding tool using 3C-based long-range data  
 
-GPhase leverages an assembly graph and 3C-based long-range data (e.g., Hi-C, Omni-C, Pore-C, and CiFi) to facilitate genome assembly phasing, automatically resolves and assigns collapsed sequences, and fills assembly gaps.
----
-If you use Gphase in your genome assembly， please cite the article as follow:  
-Du, W., Li, Y., Zeng, X. et al. Assembly-graph-assisted haplotype-resolved scaffolding of polyploid genomes. Nat. Plants (2026). https://doi.org/10.1038/s41477-026-02422-5
+**GPhase leverages an assembly graph and 3C-based long-range data (e.g., Hi-C, Omni-C, Pore-C, and CiFi) to facilitate genome assembly phasing, automatically resolves and assigns collapsed sequences, and fills assembly gaps.**
+
+If you use Gphase in your genome assembly, please cite the article as follow:  
+> 1. Du W, Li Y, Zeng X, Yang J, Wang X, Zhang X, Shang L, Fu X, Zhang X, Wei X, Cheng T, Li D, Wu Z, Pan W. Assembly-graph-assisted haplotype-resolved scaffolding of polyploid genomes. Nature Plants, 2026:1-16. https://doi.org/10.1038/s41477-026-02422-5.
+
+The following two works are also used in Gphase; therefore, we suggest that you cite them as well.
+> 2. Xiaofei Zeng, Zili Yi, Xingtan Zhang, Yuhui Du, Yu Li, Zhiqing Zhou, Sijie Chen, Huijie Zhao, Sai Yang, Yibin Wang, Guoan Chen. Chromosome-level scaffolding of haplotype-resolved assemblies using Hi-C data without reference genomes. Nature Plants, 10:1184-1200. doi: https://doi.org/10.1038/s41477-024-01755-3.  
+> 3. Chenxi Zhou, Shane A. McCarthy, Richard Durbin. YaHS: yet another Hi-C scaffolding tool. Bioinformatics, 39(1), btac808. https://doi.org/10.1093/bioinformatics/btac808.  
 
 ## Table of Contents
 
