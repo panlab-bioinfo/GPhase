@@ -137,10 +137,11 @@ samtools index -@ ${threads} ${output_prefix}.bam
 
 # Organize bam
 LOG_INFO ${log_file} "run" "Creat directory: bam_files"
-mkdir -p bam_files && cd bam_files
-ln -sf ../${output_prefix}.bam
-ln -sf ../${output_prefix}.bam.bai
-cd ..
+mkdir -p bam_files
+bam_abs=$(realpath "${output_prefix}.bam")
+bai_abs=$(realpath "${output_prefix}.bam.bai")
+ln -sf "${bam_abs}" "bam_files/$(basename "${bam_abs}")"
+ln -sf "${bai_abs}" "bam_files/$(basename "${bai_abs}")"
 
 # gene.list
 LOG_INFO ${log_file} "run" "Creat gene.list"
@@ -148,7 +149,8 @@ awk '{print $1"\t"1"\t"$2"\t"$1}' ${fa_file}.fai > gene.list
 
 # group.list
 LOG_INFO ${log_file} "run" "Creat group.list"
-echo -e "${output_prefix}\t${output_prefix}" > group.list
+sample_id=$(basename "${output_prefix}")
+echo -e "${sample_id}\t${sample_id}" > group.list
 
 LOG_INFO ${log_file} "run" "Run the popcnv pipeline"
 python ${SCRIPT_DIR}/../src/popCNV/popCNV.py \
